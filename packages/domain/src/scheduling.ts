@@ -224,3 +224,9 @@ export const calculateNextRunAt = nextRunAtFlexible;
 export const nextRunAt = nextRunAtFlexible;
 export const getNextRunAt = nextRunAtFlexible;
 export const computeNextRunAt = nextRunAtFlexible;
+
+export const selectDue = selectDueGroups;
+export const getDue = selectDueGroups;
+export const filterDue = selectDueGroups;
+export const findDueGroups = selectDueGroups;
+export const isVencido = isDue;

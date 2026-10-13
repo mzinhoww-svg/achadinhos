@@ -142,3 +142,8 @@ export function filterNotRepeated<T extends { item_id?: unknown; itemId?: unknow
 export function sevenDayDedupe(input: DedupeCheckInput): boolean {
   return isRepeated(input);
 }
+
+export const dedupe = isRepeated;
+export const isDeduped = isRepeated;
+export const antiRepeat = isRepeated;
+export const recentSend = isRepeated;

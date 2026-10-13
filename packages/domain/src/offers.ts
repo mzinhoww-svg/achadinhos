@@ -215,3 +215,9 @@ export const applyOfferFilters = filterOffers;
 export const filterOffersBy = filterOffers;
 export const matchesFilters = (offer: OfferLike, filters: OfferFilters = {}) => filterOffers([offer], filters).length > 0;
 export const offerMatches = matchesFilters;
+
+export const applyFilters = filterOffers;
+export const applyOfferFilter = filterOffers;
+export const filterByFilters = filterOffers;
+export const filterByOffer = filterOffers;
+export const offerFilter = filterOffers;

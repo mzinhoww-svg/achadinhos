@@ -136,3 +136,11 @@ export function checkAutomationLimit(count: number, max: number = MAX_AUTOMATION
 }
 
 export const enforceAutomationLimit = assertAutomationLimit;
+
+// extra aliases for common names
+export const validate = validateAutomation;
+export const parseAutomation = validateAutomation;
+export const safeValidate = safeValidateAutomation;
+export const automationLimitOk = canCreateAutomation;
+export const enforceLimit = assertAutomationLimit;
+export const checkLimit = checkAutomationLimit;

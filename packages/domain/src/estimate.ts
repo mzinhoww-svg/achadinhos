@@ -59,3 +59,6 @@ export function estimatePostsPerDay(input: EstimateInput): { raw: number; capped
 export const estimate = estimatePostsPerDay;
 export const calculateEstimate = estimatePostsPerDay;
 export const postsPerDay = estimatePostsPerDay;
+
+export const estimateDailyPosts = estimatePostsPerDay;
+export const calculateEstimatePosts = estimatePostsPerDay;
