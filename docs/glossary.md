@@ -1,0 +1,14 @@
+# Glossário
+- **Oferta**: produto Shopee retornado por productOfferV2, com preço, comissão e link.
+- **Link curto**: URL gerada por generateShortLink com os subIds de rastreio.
+- **subId**: rótulo (até 5) que a Shopee devolve no conversionReport; usamos [conta, automação, grupo, canal, envio].
+- **Automação**: regra (filtros + janela + frequência) que alimenta a fila de um ou mais grupos.
+- **Janela**: intervalo diário (início/fim) no fuso da conta em que a automação pode postar.
+- **Envio (send)**: registro de uma oferta destinada a um grupo; passa por queued→sending→sent|failed|skipped.
+- **Fila**: sends em queued, consumidos 1 por vez por canal, por prioridade e scheduled_for.
+- **Mandar agora**: envio manual com prioridade 100 (topo da fila).
+- **Antirrepetição**: bloqueio de reenvio do mesmo item_id ao mesmo grupo por 7 dias.
+- **Criativo**: PNG 1080x1080 gerado no servidor (Satori + Resvg).
+- **Canal**: integração de mensagens (telegram; whatsapp futuro). **Grupo**: chat de destino no canal.
+- **Comissão**: valor estimado vindo do conversionReport, agregado por sub_id (checkout_id idempotente).
+- **Teto diário**: máximo de 200 envios por canal por dia.

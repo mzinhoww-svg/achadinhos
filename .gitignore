@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+.turbo/
+.env
+.env.*
+!.env.example
+*.pem
+.DS_Store
+coverage/
+supabase/.temp/
+.maestri/
+STOP

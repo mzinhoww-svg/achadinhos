@@ -1,0 +1,117 @@
+{
+  "projeto": "achadinhos",
+  "itens": [
+    {
+      "id": 1,
+      "titulo": "Cliente Shopee assinado",
+      "aceite": "Testes unitários com vetor conhecido + teste contra GraphQL simulado",
+      "fase": "F1",
+      "status": "pendente",
+      "depende_credencial": true
+    },
+    {
+      "id": 2,
+      "titulo": "Conexões: validar e salvar App ID/Secret (Vault)",
+      "aceite": "Nenhuma rota ou payload RSC contém o Secret",
+      "fase": "F1",
+      "status": "pendente",
+      "depende_credencial": true
+    },
+    {
+      "id": 3,
+      "titulo": "Canal Telegram: token, grupos, ativar, sub_id único",
+      "aceite": "Grupo de teste aparece e recebe mensagem de verificação",
+      "fase": "F1",
+      "status": "pendente",
+      "depende_credencial": true
+    },
+    {
+      "id": 4,
+      "titulo": "Automações CRUD com limite de 5",
+      "aceite": "Validação testada e 6a automação recusada",
+      "fase": "F2",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 5,
+      "titulo": "Estimativa de posts por dia",
+      "aceite": "Teste de unidade da fórmula",
+      "fase": "F2",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 6,
+      "titulo": "Worker agendador a cada minuto",
+      "aceite": "Relógio simulado: borda de janela e virada de dia em America/Cuiaba",
+      "fase": "F3",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 7,
+      "titulo": "Antirrepetição 7 dias",
+      "aceite": "Reexecução do worker 2x sem duplicata",
+      "fase": "F3",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 8,
+      "titulo": "Fila: 1 por canal, 60 s, teto 200, prioridade 100",
+      "aceite": "Concorrência com 2 workers sem envio duplo",
+      "fase": "F3",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 9,
+      "titulo": "Criativo PNG 1080x1080",
+      "aceite": "Snapshot visual aprovado pelo Designer",
+      "fase": "F2",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 10,
+      "titulo": "Mandar agora",
+      "aceite": "E2E com Shopee simulada",
+      "fase": "F4",
+      "status": "pendente",
+      "depende_credencial": true
+    },
+    {
+      "id": 11,
+      "titulo": "Envios: cards, lista 30 dias, Realtime",
+      "aceite": "E2E: status muda e tela atualiza sem recarregar",
+      "fase": "F4",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 12,
+      "titulo": "Comissão: conversionReport a cada 6 h idempotente",
+      "aceite": "Reexecução não duplica; soma por grupo bate com fixture",
+      "fase": "F5",
+      "status": "pendente",
+      "depende_credencial": true
+    },
+    {
+      "id": 13,
+      "titulo": "Alertas por e-mail",
+      "aceite": "Teste com transporte de e-mail simulado",
+      "fase": "F5",
+      "status": "pendente",
+      "depende_credencial": false
+    },
+    {
+      "id": 14,
+      "titulo": "Onboarding e estados vazios",
+      "aceite": "QA visual 390x844 e 1440x900",
+      "fase": "F4",
+      "status": "pendente",
+      "depende_credencial": false
+    }
+  ]
+}
