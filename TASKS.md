@@ -9,3 +9,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T3 | Design system + telas base | Prisma | devolvido (ciclo 1) | PR #5; QA: token na URL, criativo quebra >R$ 10.000 |
 | T4 | Bot Telegram (token, grupos, envio) | Vigia | devolvido (ciclo 1) | PR #2; QA: sem timeout, chat privado vira grupo |
 | T5 | Painel de progresso 127.0.0.1:3300 | Bússola | em_andamento | servidor no ar |
+| T6 | Packages/domain funções puras (MVP 4-7 parte pura) | Cat Jam | em_revisao | PR feat/domain-pure (testes Vitest) |
