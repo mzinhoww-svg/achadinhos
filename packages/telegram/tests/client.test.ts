@@ -105,3 +105,45 @@ describe("TelegramClient", () => {
     expect(Array.isArray(client.getGroups())).toBe(true);
   });
 });
+describe("TelegramClient group discovery safety", () => {
+  it("does not mark group removed when another member leaves", async () => {
+    const server = createMockTelegramServer();
+    const client = new TelegramClient("t", { transport: server.transport });
+    await client.getMe();
+    server.enqueueMyChatMember({ chatId: -2001, title: "G", newStatus: "administrator" });
+    await client.getUpdates();
+    // chat_member update describing João (not the bot) leaving
+    server.enqueueUpdate({
+      update_id: 9,
+      chat_member: {
+        chat: { id: -2001, type: "supergroup", title: "G" },
+        from: { id: 50, is_bot: false, first_name: "Joao" },
+        date: 1,
+        old_chat_member: { user: { id: 50, is_bot: false, first_name: "Joao" }, status: "member" },
+        new_chat_member: { user: { id: 50, is_bot: false, first_name: "Joao" }, status: "left" },
+      },
+    });
+    await client.getUpdates();
+    const g = client.listGroups()[0];
+    expect(g.active).toBe(true);
+    expect(g.status).toBe("administrator");
+  });
+
+  it("ignores private chats in group list", async () => {
+    const server = createMockTelegramServer();
+    const client = new TelegramClient("t", { transport: server.transport });
+    server.enqueueMyChatMember({ chatId: 55, title: "Private", type: "private", newStatus: "kicked" });
+    await client.getUpdates();
+    expect(client.listGroups()).toHaveLength(0);
+  });
+
+  it("marks group inactive after BotRemovedError on send", async () => {
+    const server = createMockTelegramServer();
+    const client = new TelegramClient("t", { transport: server.transport });
+    server.enqueueMyChatMember({ chatId: -2002, title: "G2", newStatus: "administrator" });
+    await client.getUpdates();
+    server.removeBotFromChat(-2002);
+    await expect(client.sendMessage({ chat_id: -2002, text: "hi" })).rejects.toBeInstanceOf(BotRemovedError);
+    expect(client.listGroups({ activeOnly: true })).toHaveLength(0);
+  });
+});

@@ -1,7 +1,10 @@
 import {
+  BotRemovedError,
   CaptionTooLongError,
+  ChatNotFoundError,
   classifyTelegramError,
   InvalidTokenError,
+  NoAccessError,
   TelegramApiError,
   TelegramTransportError,
 } from "./errors";
@@ -32,6 +35,7 @@ type ConstructorInput = string | TelegramClientOptions;
 export class TelegramClient {
   private readonly transport: TelegramTransport;
   private readonly groupsMap = new Map<string, TelegramGroup>();
+  private botId?: number;
 
   constructor(first?: ConstructorInput, second?: TelegramTransport | TelegramClientOptions) {
     let opts: TelegramClientOptions = {};
@@ -71,8 +75,9 @@ export class TelegramClient {
 
   // ---------- Bot ----------
   async getMe(): Promise<TelegramUser> {
-    const data = await this.callTransport<TelegramUser>("getMe", {});
-    return this.unwrap(data, "getMe");
+    const me = this.unwrap(await this.callTransport<TelegramUser>("getMe", {}), "getMe");
+    this.botId = me.id;
+    return me;
   }
 
   // ---------- Updates / grupos ----------
@@ -82,6 +87,14 @@ export class TelegramClient {
     if (params?.limit !== undefined) payload.limit = params.limit;
     if (params?.timeout !== undefined) payload.timeout = params.timeout;
     if (params?.allowed_updates !== undefined) payload.allowed_updates = params.allowed_updates;
+
+    if (this.botId === undefined) {
+      try {
+        await this.getMe();
+      } catch {
+        // discovery de chat_member do bot fica desabilitada se getMe falhar
+      }
+    }
 
     const data = await this.callTransport<TelegramUpdate[]>("getUpdates", payload);
     const updates = this.unwrap(data, "getUpdates");
@@ -97,7 +110,7 @@ export class TelegramClient {
   private discoverGroups(updates: TelegramUpdate[]): void {
     for (const upd of updates) {
       const cm = upd.my_chat_member;
-      if (cm) {
+      if (cm && cm.chat.type !== "private") {
         this.upsertGroup(cm.chat, cm.new_chat_member.status);
       }
       const msgChat = upd.message?.chat ?? upd.channel_post?.chat;
@@ -105,13 +118,18 @@ export class TelegramClient {
         this.upsertGroup(msgChat, "unknown" as TelegramGroup["status"]);
       }
       const chatMember = upd.chat_member;
-      if (chatMember) {
+      if (
+        chatMember &&
+        chatMember.chat.type !== "private" &&
+        (this.botId === undefined || chatMember.new_chat_member.user.id === this.botId)
+      ) {
         this.upsertGroup(chatMember.chat, chatMember.new_chat_member.status);
       }
     }
   }
 
   private upsertGroup(chat: TelegramChat, status: TelegramGroup["status"]): void {
+    if (chat.type === "private") return;
     const key = String(chat.id);
     const existing = this.groupsMap.get(key);
     const discoveredAt = existing?.discoveredAt ?? new Date().toISOString();
@@ -149,8 +167,20 @@ export class TelegramClient {
     if (params.disable_notification !== undefined) payload.disable_notification = params.disable_notification;
     if (params.reply_to_message_id !== undefined) payload.reply_to_message_id = params.reply_to_message_id;
 
-    const data = await this.callTransport<TelegramMessage>("sendMessage", payload);
-    const message = this.unwrap(data, "sendMessage");
+    let data: TelegramApiResponse<TelegramMessage>;
+    try {
+      data = await this.callTransport<TelegramMessage>("sendMessage", payload);
+    } catch (err) {
+      this.markGroupInactiveIfNeeded(params.chat_id, err);
+      throw err;
+    }
+    let message: TelegramMessage;
+    try {
+      message = this.unwrap(data, "sendMessage");
+    } catch (err) {
+      this.markGroupInactiveIfNeeded(params.chat_id, err);
+      throw err;
+    }
     if (message.chat && message.chat.type !== "private") {
       this.upsertGroup(message.chat, "unknown" as TelegramGroup["status"]);
     }
@@ -169,8 +199,20 @@ export class TelegramClient {
     if (params.disable_notification !== undefined) payload.disable_notification = params.disable_notification;
     if (params.reply_to_message_id !== undefined) payload.reply_to_message_id = params.reply_to_message_id;
 
-    const data = await this.callTransport<TelegramMessage>("sendPhoto", payload);
-    const message = this.unwrap(data, "sendPhoto");
+    let data: TelegramApiResponse<TelegramMessage>;
+    try {
+      data = await this.callTransport<TelegramMessage>("sendPhoto", payload);
+    } catch (err) {
+      this.markGroupInactiveIfNeeded(params.chat_id, err);
+      throw err;
+    }
+    let message: TelegramMessage;
+    try {
+      message = this.unwrap(data, "sendPhoto");
+    } catch (err) {
+      this.markGroupInactiveIfNeeded(params.chat_id, err);
+      throw err;
+    }
     if (message.chat && message.chat.type !== "private") {
       this.upsertGroup(message.chat, "unknown" as TelegramGroup["status"]);
     }
@@ -219,6 +261,18 @@ export class TelegramClient {
       return (obj.request as (m: string, p: Record<string, unknown>) => Promise<TelegramApiResponse<T>>)(method, payload);
     }
     throw new TelegramTransportError(`Transport does not implement call/request for ${method}`);
+  }
+
+  private markGroupInactiveIfNeeded(chatId: number | string, err: unknown): void {
+    if (!(err instanceof BotRemovedError || err instanceof ChatNotFoundError || err instanceof NoAccessError)) return;
+    const key = String(chatId);
+    const existing = this.groupsMap.get(key);
+    if (!existing) return;
+    this.groupsMap.set(key, {
+      ...existing,
+      active: false,
+      status: err instanceof BotRemovedError ? "kicked" : existing.status,
+    });
   }
 
   // ---------- unwrap ----------

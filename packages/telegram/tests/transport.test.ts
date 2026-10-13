@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FetchTelegramTransport } from "../src/transport";
+import { TelegramTimeoutError } from "../src/errors";
 
 describe("FetchTelegramTransport", () => {
   it("posts to correct URL and returns parsed body", async () => {
@@ -34,5 +35,36 @@ describe("FetchTelegramTransport", () => {
 
   it("throws when token missing", () => {
     expect(() => new FetchTelegramTransport("")).toThrow();
+  });
+});
+describe("FetchTelegramTransport timeout and redaction", () => {
+  it("throws TelegramTimeoutError when fetch never responds", async () => {
+    const hangingFetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    const t = new FetchTelegramTransport("tok", { fetch: hangingFetch, timeoutMs: 20 });
+    const start = Date.now();
+    await expect(t.call("getMe", {})).rejects.toBeInstanceOf(TelegramTimeoutError);
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
+  it("redacts token from network error message", async () => {
+    const failingFetch = (async () => {
+      throw new Error("request to https://api.telegram.org/bot123:SECRET/getMe failed");
+    }) as unknown as typeof fetch;
+    const t = new FetchTelegramTransport("123:SECRET", { fetch: failingFetch, timeoutMs: 20 });
+    try {
+      await t.call("getMe", {});
+    } catch (e) {
+      expect(String(e)).not.toContain("123:SECRET");
+      expect(e).not.toBeInstanceOf(TelegramTimeoutError);
+    }
+  });
+
+  it("returns parsed body on non-JSON http error", async () => {
+    const fakeFetch = (async () =>
+      new Response("not json", { status: 500 })) as unknown as typeof fetch;
+    const t = new FetchTelegramTransport("tok", { fetch: fakeFetch, timeoutMs: 20 });
+    const res = await t.call("getMe", {});
+    expect(res.ok).toBe(false);
+    expect(res.description).toContain("not json");
   });
 });

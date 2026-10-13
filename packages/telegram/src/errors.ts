@@ -50,13 +50,19 @@ export class ChatNotFoundError extends TelegramApiError {}
 export class CaptionTooLongError extends TelegramError {}
 export class InvalidTokenError extends TelegramError {}
 export class TelegramTransportError extends TelegramError {}
+export class TelegramTimeoutError extends TelegramTransportError {}
+export class ConflictError extends TelegramApiError {}
+
+export function redactSecrets(text: string): string {
+  return text.replace(/bot\d+:[A-Za-z0-9_-]+/g, "bot[REDACTED]");
+}
 
 export function classifyTelegramError(
   data: { error_code?: number; description?: string; parameters?: { retry_after?: number; migrate_to_chat_id?: number } },
   method: string,
 ): TelegramApiError {
   const code = data.error_code ?? 0;
-  const description = data.description ?? "Telegram API error";
+  const description = redactSecrets(data.description ?? "Telegram API error");
   const lower = description.toLowerCase();
   const retryAfter = data.parameters?.retry_after;
 
@@ -78,6 +84,10 @@ export function classifyTelegramError(
     parameters: data.parameters,
     ...extra,
   });
+
+  if (code === 409) {
+    return new ConflictError(description, makeInit());
+  }
 
   if (lower.includes("chat not found")) {
     return new ChatNotFoundError(description, makeInit());
