@@ -317,3 +317,8 @@ export function createShopeeClient(
 ): ShopeeClient {
   return new ShopeeClient(credentials, options);
 }
+
+
+export function sign(appId: string, timestamp: string | number, payload: string, secret: string): string {
+  return ShopeeClient.sign(appId, timestamp, payload, secret);
+}
