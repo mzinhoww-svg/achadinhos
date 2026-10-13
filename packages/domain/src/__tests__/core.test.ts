@@ -20,7 +20,7 @@ describe("window", () => {
   it("cross midnight inside", () => {
     // America/Cuiaba UTC-4; choose noon-ish? Use explicit date string parse as UTC? We'll test isWithinWindow with Date constructed
     const d = new Date("2026-10-13T23:30:00-04:00");
-    expect(D.isWithinWindow(d, { windowStart: "22:00", windowEnd: "02:00", days: [d.getDay()], timeZone: "America/Cuiaba" })).toBe(true);
+    expect(D.isWithinWindow(d, { windowStart: "22:00", windowEnd: "02:00", days: [2], timeZone: "America/Cuiaba" })).toBe(true);
   });
   it("minutesOfDay", () => {
     const min = D.windowMinutes("22:00", "02:00");
