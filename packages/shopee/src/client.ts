@@ -267,18 +267,25 @@ export class ShopeeClient {
         "NETWORK",
       );
     }
-    clearTimeout(timer);
-
     if (!response.ok) {
+      clearTimeout(timer);
       throw new ShopeeNetworkError(`HTTP ${response.status}`, "HTTP");
     }
 
     let json: unknown;
     try {
       json = await response.json();
-    } catch {
-      throw new ShopeeSchemaError("response is not valid JSON", "INVALID_JSON");
+    } catch (error) {
+      clearTimeout(timer);
+      if (controller.signal.aborted) {
+        throw new ShopeeTimeoutError("Shopee request timed out", "TIMEOUT");
+      }
+      throw new ShopeeSchemaError(
+        error instanceof Error ? error.message : "response is not valid JSON",
+        "INVALID_JSON",
+      );
     }
+    clearTimeout(timer);
 
     const envelope = EnvelopeSchema.safeParse(json);
     if (!envelope.success) {

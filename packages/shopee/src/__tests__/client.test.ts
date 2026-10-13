@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ShopeeClient, createShopeeClient } from "../index.js";
-import { ShopeeSchemaError, ShopeeSignatureError } from "../index.js";
+import { ShopeeSchemaError, ShopeeSignatureError, ShopeeTimeoutError } from "../index.js";
 import { startMockShopeeServer } from "../mock-server/index.js";
 
 const APP_ID = "test-app-id";
@@ -59,18 +59,7 @@ describe("ShopeeClient against mock server", () => {
   });
 
   it("raises ShopeeSchemaError when a response field is missing", async () => {
-    const client = createShopeeClient({ appId: APP_ID, secret: SECRET }, { endpoint: server.url });
-    // monkeypatch fetch to return malformed payload
     const badClient = new ShopeeClient(
-      { appId: APP_ID, secret: SECRET },
-      {
-        endpoint: server.url,
-        fetch: async () =>
-          new Response(JSON.stringify({ data: { productOfferV2: { nodes: [], pageInfo: { limit: 20, hasNextPage: false } } } })),
-      },
-    );
-    // missing itemId etc not triggered because nodes empty; force by removing nodes
-    const badClient2 = new ShopeeClient(
       { appId: APP_ID, secret: SECRET },
       {
         endpoint: server.url,
@@ -80,8 +69,32 @@ describe("ShopeeClient against mock server", () => {
           ),
       },
     );
-    await expect(badClient2.productOfferV2()).rejects.toBeInstanceOf(ShopeeSchemaError);
-    void client;
-    void badClient;
+    await expect(badClient.productOfferV2()).rejects.toBeInstanceOf(ShopeeSchemaError);
   });
+
+  it("raises ShopeeTimeoutError when the response body stalls", async () => {
+    const client = new ShopeeClient(
+      { appId: APP_ID, secret: SECRET },
+      {
+        endpoint: "http://example.invalid/graphql",
+        timeoutMs: 50,
+        fetch: (async (_url: unknown, init?: { signal?: AbortSignal }) => {
+          const signal = init?.signal;
+          return {
+            ok: true,
+            status: 200,
+            json: () =>
+              new Promise((_resolve, reject) => {
+                signal?.addEventListener(
+                  "abort",
+                  () => reject(new DOMException("aborted", "AbortError")),
+                  { once: true },
+                );
+              }),
+          } as Response;
+        }) as unknown as typeof fetch,
+      },
+    );
+    await expect(client.productOfferV2()).rejects.toBeInstanceOf(ShopeeTimeoutError);
+  }, 2000);
 });
