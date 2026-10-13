@@ -2,7 +2,11 @@ import { InvalidTokenError, TelegramTransportError } from "./errors";
 import type { TelegramApiResponse } from "./types";
 
 export interface TelegramTransport {
-  call<T = unknown>(
+  call?<T = unknown>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<TelegramApiResponse<T>>;
+  request?<T = unknown>(
     method: string,
     params?: Record<string, unknown>,
   ): Promise<TelegramApiResponse<T>>;

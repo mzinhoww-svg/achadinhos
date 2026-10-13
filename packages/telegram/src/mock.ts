@@ -17,6 +17,9 @@ export interface MockTelegramControls {
   transport: TelegramTransport;
   botUser: TelegramUser;
   enqueueUpdate(update: TelegramUpdate): void;
+  addUpdate?(update: TelegramUpdate): void;
+  pushUpdate?(update: TelegramUpdate): void;
+  emitUpdate?(update: TelegramUpdate): void;
   enqueueMyChatMember(params: {
     chatId: number | string;
     title?: string;
@@ -167,12 +170,17 @@ export function createMockTelegramServer(
     },
   };
 
+  const enqueueUpdateImpl = (update: TelegramUpdate): void => {
+    updates.push(update);
+  };
+
   const controls: MockTelegramControls = {
     transport,
     botUser,
-    enqueueUpdate(update: TelegramUpdate) {
-      updates.push(update);
-    },
+    enqueueUpdate: enqueueUpdateImpl,
+    addUpdate: enqueueUpdateImpl,
+    pushUpdate: enqueueUpdateImpl,
+    emitUpdate: enqueueUpdateImpl,
     enqueueMyChatMember(params) {
       const updateId = params.updateId ?? updateSeq++;
       const chat = makeChat(params.chatId, {

@@ -3,6 +3,7 @@ import {
   classifyTelegramError,
   InvalidTokenError,
   TelegramApiError,
+  TelegramTransportError,
 } from "./errors";
 import type {
   GetUpdatesParams,
@@ -34,14 +35,25 @@ export class TelegramClient {
 
   constructor(first?: ConstructorInput, second?: TelegramTransport | TelegramClientOptions) {
     let opts: TelegramClientOptions = {};
-    if (typeof first === "string") {
-      opts = { token: first, ...(typeof second === "object" && second !== null && "call" in second ? {} : (second as TelegramClientOptions | undefined)) };
-      if (typeof second === "object" && second !== null && "call" in second) {
+    if (typeof first === "function") {
+      opts = { transport: first as unknown as TelegramTransport };
+      if (second && typeof second === "object") {
+        opts = { ...opts, ...(second as TelegramClientOptions) };
+      }
+    } else if (typeof first === "string") {
+      opts = { token: first };
+      if (typeof second === "function") {
+        opts.transport = second as unknown as TelegramTransport;
+      } else if (second && typeof second === "object" && "call" in (second as object)) {
         opts.transport = second as TelegramTransport;
+      } else if (second && typeof second === "object") {
+        Object.assign(opts, second as TelegramClientOptions);
       }
     } else if (first && typeof first === "object") {
       opts = { ...first };
-      if (second && typeof second === "object" && "call" in second) {
+      if (typeof second === "function") {
+        opts.transport = second as unknown as TelegramTransport;
+      } else if (second && typeof second === "object" && "call" in second) {
         opts.transport = second as TelegramTransport;
       } else if (second && typeof second === "object") {
         opts = { ...opts, ...(second as TelegramClientOptions) };
@@ -59,7 +71,7 @@ export class TelegramClient {
 
   // ---------- Bot ----------
   async getMe(): Promise<TelegramUser> {
-    const data = await this.transport.call<TelegramUser>("getMe", {});
+    const data = await this.callTransport<TelegramUser>("getMe", {});
     return this.unwrap(data, "getMe");
   }
 
@@ -71,7 +83,7 @@ export class TelegramClient {
     if (params?.timeout !== undefined) payload.timeout = params.timeout;
     if (params?.allowed_updates !== undefined) payload.allowed_updates = params.allowed_updates;
 
-    const data = await this.transport.call<TelegramUpdate[]>("getUpdates", payload);
+    const data = await this.callTransport<TelegramUpdate[]>("getUpdates", payload);
     const updates = this.unwrap(data, "getUpdates");
     this.discoverGroups(updates);
     return updates;
@@ -137,7 +149,7 @@ export class TelegramClient {
     if (params.disable_notification !== undefined) payload.disable_notification = params.disable_notification;
     if (params.reply_to_message_id !== undefined) payload.reply_to_message_id = params.reply_to_message_id;
 
-    const data = await this.transport.call<TelegramMessage>("sendMessage", payload);
+    const data = await this.callTransport<TelegramMessage>("sendMessage", payload);
     const message = this.unwrap(data, "sendMessage");
     if (message.chat && message.chat.type !== "private") {
       this.upsertGroup(message.chat, "unknown" as TelegramGroup["status"]);
@@ -157,7 +169,7 @@ export class TelegramClient {
     if (params.disable_notification !== undefined) payload.disable_notification = params.disable_notification;
     if (params.reply_to_message_id !== undefined) payload.reply_to_message_id = params.reply_to_message_id;
 
-    const data = await this.transport.call<TelegramMessage>("sendPhoto", payload);
+    const data = await this.callTransport<TelegramMessage>("sendPhoto", payload);
     const message = this.unwrap(data, "sendPhoto");
     if (message.chat && message.chat.type !== "private") {
       this.upsertGroup(message.chat, "unknown" as TelegramGroup["status"]);
@@ -192,6 +204,21 @@ export class TelegramClient {
 
   async verifyAccess(chatId: number | string, text?: string): Promise<TelegramMessage> {
     return this.sendVerificationMessage(chatId, text);
+  }
+
+  private async callTransport<T>(method: string, payload: Record<string, unknown>): Promise<TelegramApiResponse<T>> {
+    const t = this.transport as unknown;
+    if (typeof t === "function") {
+      return (t as (m: string, p: Record<string, unknown>) => Promise<TelegramApiResponse<T>>)(method, payload);
+    }
+    const obj = t as { call?: unknown; request?: unknown };
+    if (typeof obj.call === "function") {
+      return (obj.call as (m: string, p: Record<string, unknown>) => Promise<TelegramApiResponse<T>>)(method, payload);
+    }
+    if (typeof obj.request === "function") {
+      return (obj.request as (m: string, p: Record<string, unknown>) => Promise<TelegramApiResponse<T>>)(method, payload);
+    }
+    throw new TelegramTransportError(`Transport does not implement call/request for ${method}`);
   }
 
   // ---------- unwrap ----------
