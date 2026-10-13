@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { CREATIVE_SIZE, fontFamily, palette } from "./tokens.ts";
 import { formatBRL } from "./format.ts";
+import { hasDiscount, priceLayout, sanitizeTitle } from "./layout.ts";
 
 export interface CreativeProps {
   title: string;
@@ -17,6 +18,8 @@ export interface CreativeProps {
  * sem classes, sem grid, sem var(). Renderiza igual no DOM (preview do painel) e em PNG (worker).
  */
 export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct, affiliateHandle }: CreativeProps) {
+  const discounted = hasDiscount(priceCurrent, priceOld);
+  const { currentFont } = priceLayout(priceCurrent, priceOld);
   const handle = affiliateHandle.startsWith("@") ? affiliateHandle : `@${affiliateHandle}`;
   const root: CSSProperties = {
     width: CREATIVE_SIZE,
@@ -29,7 +32,7 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
   };
   return (
     <div style={root}>
-      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, padding: "48px 48px 0 48px" }}>
+      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "hidden", padding: "48px 48px 0 48px" }}>
       <div style={{ display: "flex", position: "relative", width: 984, height: 600 }}>
         <img
           src={imageUrl}
@@ -37,6 +40,7 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
           height={600}
           style={{ width: 984, height: 600, objectFit: "cover", borderRadius: 40, backgroundColor: palette.sunken }}
         />
+        {discounted && (
         <div
           style={{
             position: "absolute",
@@ -60,6 +64,7 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
           </div>
           <div style={{ display: "flex", fontWeight: 700, fontSize: 30, letterSpacing: 2 }}>OFF</div>
         </div>
+        )}
       </div>
 
       <div
@@ -76,7 +81,7 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
           width: 984,
         }}
       >
-        {title}
+        {sanitizeTitle(title)}
       </div>
 
       <div style={{ display: "flex", alignItems: "flex-end", marginTop: 16 }}>
@@ -85,16 +90,19 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
             display: "flex",
             fontFamily: fontFamily.display,
             fontWeight: 800,
-            fontSize: 116,
+            fontSize: currentFont,
             lineHeight: 1,
+            whiteSpace: "nowrap",
             color: palette.plum600,
           }}
         >
           {formatBRL(priceCurrent)}
         </div>
+        {discounted && (
         <div
           style={{
             display: "flex",
+            whiteSpace: "nowrap",
             marginLeft: 28,
             marginBottom: 10,
             fontWeight: 600,
@@ -105,6 +113,7 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
         >
           {formatBRL(priceOld)}
         </div>
+        )}
       </div>
 
       </div>
@@ -124,7 +133,7 @@ export function Creative({ title, imageUrl, priceCurrent, priceOld, discountPct,
           fontWeight: 700,
         }}
       >
-        <div style={{ display: "flex" }}>{handle}</div>
+        <div style={{ display: "flex", maxWidth: 680, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{handle}</div>
         <div style={{ display: "flex", fontWeight: 600, fontSize: 28, color: palette.plum50 }}>oferta Shopee</div>
       </div>
     </div>

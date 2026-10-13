@@ -6,6 +6,7 @@ import { Field, Input, Switch } from "@/components/ui/form";
 import { IconLock, IconPlug } from "@/components/ui/icons";
 import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PrototypeForm } from "@/components/prototype-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { formatDateTime, formatInt } from "@/lib/format";
 import { groups, isEmptyPreview, shopee, telegram } from "@/lib/mock";
@@ -29,7 +30,7 @@ export default async function ConexoesPage({ searchParams }: { searchParams: Pro
           action={<StatusBadge status={shopeeOk ? "connected" : "pending"} />}
         >
           <span id="shopee" className="relative -top-20 block" />
-          <form className="grid gap-4 sm:grid-cols-2" aria-label="Credenciais da Shopee">
+          <PrototypeForm className="grid gap-4 sm:grid-cols-2" aria-label="Credenciais da Shopee">
             <Field label="App ID" htmlFor="app-id" hint={shopeeOk ? `Validada em ${formatDateTime(shopee.validatedAt)}` : "Número do aplicativo no painel de afiliados."}>
               <Input id="app-id" name="app_id" inputMode="numeric" autoComplete="off" placeholder="Ex.: 18350000000" defaultValue={shopeeOk ? shopee.appIdMasked : ""} />
             </Field>
@@ -48,7 +49,7 @@ export default async function ConexoesPage({ searchParams }: { searchParams: Pro
               <Button type="button">Validar e salvar</Button>
               {shopeeOk && <Button type="button" variant="danger">Remover credencial</Button>}
             </div>
-          </form>
+          </PrototypeForm>
         </Card>
 
         <Card
@@ -57,12 +58,12 @@ export default async function ConexoesPage({ searchParams }: { searchParams: Pro
           action={<StatusBadge status={telegramOk ? "connected" : "pending"} />}
         >
           <span id="telegram" className="relative -top-20 block" />
-          <form className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end" aria-label="Token do bot do Telegram">
+          <PrototypeForm className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end" aria-label="Token do bot do Telegram">
             <Field label="Token do bot" htmlFor="bot-token" hint="Guardado no cofre; não é exibido depois de salvo.">
               <Input id="bot-token" name="bot_token" type="password" autoComplete="new-password" placeholder={telegramOk ? "••••••••••••••••" : "Cole o token do bot"} />
             </Field>
             <Button type="button" variant="secondary">Validar bot</Button>
-          </form>
+          </PrototypeForm>
 
           <div className="-mx-5 mt-6 -mb-5 border-t border-line">
             {rows.length === 0 ? (
