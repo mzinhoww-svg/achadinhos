@@ -1,5 +1,5 @@
 -- achadinhos: schema inicial (multi-conta, RLS)
--- T2: schema Postgres e RLS
+-- T2: schema Postgres e RLS (correcao ciclo 1: FKs compostas por conta, limite atomico, deletes via FK)
 
 -- =========================================================
 -- accounts
@@ -14,8 +14,6 @@ CREATE TABLE public.accounts (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE public.accounts IS 'Conta/dono. account_id e a chave de tenancy.';
-
 -- =========================================================
 -- shopee_credentials
 -- =========================================================
@@ -29,7 +27,9 @@ CREATE TABLE public.shopee_credentials (
   last_error text,
   validated_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (account_id)
+  UNIQUE (account_id),
+  UNIQUE (account_id, id),
+  UNIQUE (secret_id)
 );
 
 -- =========================================================
@@ -42,7 +42,9 @@ CREATE TABLE public.channels (
   config_secret_id uuid NOT NULL REFERENCES vault.secrets (id),
   status text NOT NULL DEFAULT 'active'
     CHECK (status IN ('active','inactive','error')),
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (account_id, id),
+  UNIQUE (config_secret_id)
 );
 
 -- =========================================================
@@ -51,12 +53,14 @@ CREATE TABLE public.channels (
 CREATE TABLE public.groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.accounts (account_id) ON DELETE CASCADE,
-  channel_id uuid NOT NULL REFERENCES public.channels (id) ON DELETE CASCADE,
+  channel_id uuid NOT NULL,
   external_id text NOT NULL,
   name text,
   sub_id text,
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (account_id, id),
+  FOREIGN KEY (account_id, channel_id) REFERENCES public.channels (account_id, id) ON DELETE CASCADE,
   UNIQUE (channel_id, external_id)
 );
 
@@ -75,19 +79,22 @@ CREATE TABLE public.automations (
   footer text,
   status text NOT NULL DEFAULT 'active'
     CHECK (status in ('active','paused','archived')),
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (account_id, id)
 );
 
 -- =========================================================
 -- automation_groups
 -- =========================================================
 CREATE TABLE public.automation_groups (
-  automation_id uuid NOT NULL REFERENCES public.automations (id) ON DELETE CASCADE,
+  automation_id uuid NOT NULL,
   account_id uuid NOT NULL REFERENCES public.accounts (account_id) ON DELETE CASCADE,
-  group_id uuid NOT NULL REFERENCES public.groups (id) ON DELETE CASCADE,
+  group_id uuid NOT NULL,
   next_run_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (automation_id, group_id)
+  PRIMARY KEY (automation_id, group_id),
+  FOREIGN KEY (account_id, automation_id) REFERENCES public.automations (account_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id, group_id) REFERENCES public.groups (account_id, id) ON DELETE CASCADE
 );
 
 -- =========================================================
@@ -108,7 +115,8 @@ CREATE TABLE public.offers (
   product_url text,
   raw jsonb,
   fetched_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (account_id, item_id)
+  UNIQUE (account_id, item_id),
+  UNIQUE (account_id, id)
 );
 
 -- =========================================================
@@ -117,9 +125,9 @@ CREATE TABLE public.offers (
 CREATE TABLE public.sends (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.accounts (account_id) ON DELETE CASCADE,
-  offer_id uuid REFERENCES public.offers (id) ON DELETE SET NULL,
-  group_id uuid REFERENCES public.groups (id) ON DELETE SET NULL,
-  channel_id uuid REFERENCES public.channels (id) ON DELETE SET NULL,
+  offer_id uuid,
+  group_id uuid,
+  channel_id uuid,
   priority integer NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'queued'
     CHECK (status IN ('queued','sending','sent','failed','skipped')),
@@ -130,7 +138,11 @@ CREATE TABLE public.sends (
   external_message_id text,
   scheduled_for timestamptz,
   sent_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (account_id, id),
+  FOREIGN KEY (account_id, offer_id) REFERENCES public.offers (account_id, id) ON DELETE SET NULL (offer_id),
+  FOREIGN KEY (account_id, group_id) REFERENCES public.groups (account_id, id) ON DELETE SET NULL (group_id),
+  FOREIGN KEY (account_id, channel_id) REFERENCES public.channels (account_id, id) ON DELETE SET NULL (channel_id)
 );
 
 CREATE INDEX sends_queue_idx
@@ -157,21 +169,22 @@ CREATE TABLE public.commissions (
 );
 
 -- =========================================================
--- send_status_events (historico de mudanca de status)
+-- send_status_events
 -- =========================================================
 CREATE TABLE public.send_status_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.accounts (account_id) ON DELETE CASCADE,
-  send_id uuid NOT NULL REFERENCES public.sends (id) ON DELETE CASCADE,
+  send_id uuid NOT NULL,
   old_status text,
   new_status text NOT NULL
     CHECK (new_status IN ('queued','sending','sent','failed','skipped')),
   changed_at timestamptz NOT NULL DEFAULT now(),
-  changed_by uuid REFERENCES auth.users (id)
+  changed_by uuid REFERENCES auth.users (id),
+  FOREIGN KEY (account_id, send_id) REFERENCES public.sends (account_id, id) ON DELETE CASCADE
 );
 
 -- =========================================================
--- RLS
+-- RLS (unchanged)
 -- =========================================================
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shopee_credentials ENABLE ROW LEVEL SECURITY;
@@ -184,7 +197,6 @@ ALTER TABLE public.sends ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.commissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.send_status_events ENABLE ROW LEVEL SECURITY;
 
--- accounts
 CREATE POLICY accounts_select ON public.accounts FOR SELECT TO authenticated
   USING (user_id = auth.uid());
 CREATE POLICY accounts_insert ON public.accounts FOR INSERT TO authenticated
@@ -194,8 +206,6 @@ CREATE POLICY accounts_update ON public.accounts FOR UPDATE TO authenticated
 CREATE POLICY accounts_delete ON public.accounts FOR DELETE TO authenticated
   USING (user_id = auth.uid());
 
--- helper expression used below
--- child tables: full CRUD for owner of the account, except send* insert-only
 CREATE POLICY shopee_credentials_all ON public.shopee_credentials FOR ALL TO authenticated
   USING (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()))
   WITH CHECK (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
@@ -220,25 +230,21 @@ CREATE POLICY offers_all ON public.offers FOR ALL TO authenticated
   USING (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()))
   WITH CHECK (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 
--- sends: insert-only (+select)
 CREATE POLICY sends_select ON public.sends FOR SELECT TO authenticated
   USING (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 CREATE POLICY sends_insert ON public.sends FOR INSERT TO authenticated
   WITH CHECK (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 
--- commissions: insert-only (+select)
 CREATE POLICY commissions_select ON public.commissions FOR SELECT TO authenticated
   USING (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 CREATE POLICY commissions_insert ON public.commissions FOR INSERT TO authenticated
   WITH CHECK (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 
--- send_status_events: insert-only (+select)
 CREATE POLICY send_status_events_select ON public.send_status_events FOR SELECT TO authenticated
   USING (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 CREATE POLICY send_status_events_insert ON public.send_status_events FOR INSERT TO authenticated
   WITH CHECK (account_id IN (SELECT account_id FROM public.accounts WHERE user_id = auth.uid()));
 
--- FORCE RLS so table owners also obey (service role still bypasses via BYPASSRLS)
 ALTER TABLE public.accounts FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.shopee_credentials FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.channels FORCE ROW LEVEL SECURITY;
@@ -253,29 +259,35 @@ ALTER TABLE public.send_status_events FORCE ROW LEVEL SECURITY;
 -- =========================================================
 -- Triggers
 -- =========================================================
--- 5 automations per account
+-- 5 automations per account (serialised per account)
 CREATE OR REPLACE FUNCTION public.enforce_automation_limit()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF (SELECT count(*) FROM public.automations WHERE account_id = NEW.account_id) >= 5 THEN
+  PERFORM 1 FROM public.accounts WHERE account_id = NEW.account_id FOR UPDATE;
+  IF TG_OP = 'UPDATE' AND NEW.account_id IS NOT DISTINCT FROM OLD.account_id THEN
+    RETURN NEW;
+  END IF;
+  IF (SELECT count(*) FROM public.automations
+       WHERE account_id = NEW.account_id
+         AND id IS DISTINCT FROM NEW.id) >= 5 THEN
     RAISE EXCEPTION 'automation limit exceeded: max 5 per account' USING ERRCODE = 'check_violation';
   END IF;
   RETURN NEW;
 END $$;
 
-CREATE TRIGGER automations_limit_insert
-  BEFORE INSERT ON public.automations
+CREATE TRIGGER automations_limit_all
+  BEFORE INSERT OR UPDATE ON public.automations
   FOR EACH ROW EXECUTE FUNCTION public.enforce_automation_limit();
 
-CREATE TRIGGER automations_limit_update
-  BEFORE UPDATE OF account_id ON public.automations
-  FOR EACH ROW EXECUTE FUNCTION public.enforce_automation_limit();
-
--- sends immutability (direct update/delete blocked)
+-- sends immutability, allowing FK actions
 CREATE OR REPLACE FUNCTION public.send_immutable_guard()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF current_setting('achadinhos.internal_send_mutation', true) = 'on' THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
+  IF pg_trigger_depth() > 1 THEN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
   END IF;
@@ -291,7 +303,7 @@ CREATE TRIGGER sends_immutable_delete
 
 -- apply status change from send_status_events
 CREATE OR REPLACE FUNCTION public.apply_send_status_event()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   PERFORM set_config('achadinhos.internal_send_mutation', 'on', true);
   UPDATE public.sends
@@ -304,10 +316,14 @@ CREATE TRIGGER send_status_event_applies
   AFTER INSERT ON public.send_status_events
   FOR EACH ROW EXECUTE FUNCTION public.apply_send_status_event();
 
--- commissions immutability
+-- generic immutability with FK allowance
 CREATE OR REPLACE FUNCTION public.immutable_guard()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+  IF pg_trigger_depth() > 1 THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
   RAISE EXCEPTION '% is insert-only' , TG_TABLE_NAME USING ERRCODE = 'insufficient_privilege';
 END $$;
 
@@ -318,7 +334,6 @@ CREATE TRIGGER commissions_immutable_delete
   BEFORE DELETE ON public.commissions
   FOR EACH ROW EXECUTE FUNCTION public.immutable_guard();
 
--- send_status_events immutability
 CREATE TRIGGER send_status_events_immutable_update
   BEFORE UPDATE ON public.send_status_events
   FOR EACH ROW EXECUTE FUNCTION public.immutable_guard();
@@ -326,9 +341,50 @@ CREATE TRIGGER send_status_events_immutable_delete
   BEFORE DELETE ON public.send_status_events
   FOR EACH ROW EXECUTE FUNCTION public.immutable_guard();
 
--- grants
+-- evita uso de segredo do Vault por outra conta
+CREATE OR REPLACE FUNCTION public.guard_shopee_secret_account()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.channels
+     WHERE config_secret_id = NEW.secret_id
+       AND account_id IS DISTINCT FROM NEW.account_id
+    UNION ALL
+    SELECT 1 FROM public.shopee_credentials
+     WHERE secret_id = NEW.secret_id
+       AND account_id IS DISTINCT FROM NEW.account_id
+  ) THEN
+    RAISE EXCEPTION 'secret belongs to another account' USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER shopee_secret_account_scope
+  BEFORE INSERT OR UPDATE ON public.shopee_credentials
+  FOR EACH ROW EXECUTE FUNCTION public.guard_shopee_secret_account();
+
+CREATE OR REPLACE FUNCTION public.guard_channel_secret_account()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.shopee_credentials
+     WHERE secret_id = NEW.config_secret_id
+       AND account_id IS DISTINCT FROM NEW.account_id
+    UNION ALL
+    SELECT 1 FROM public.channels
+     WHERE config_secret_id = NEW.config_secret_id
+       AND account_id IS DISTINCT FROM NEW.account_id
+  ) THEN
+    RAISE EXCEPTION 'secret belongs to another account' USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER channel_secret_account_scope
+  BEFORE INSERT OR UPDATE ON public.channels
+  FOR EACH ROW EXECUTE FUNCTION public.guard_channel_secret_account();
+
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
--- insert-only enforced by RLS + triggers; service_role bypasses RLS but triggers still apply.
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;
