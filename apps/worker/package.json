@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
+    "@achadinhos/creative": "workspace:*",
     "@achadinhos/domain": "workspace:*",
     "@achadinhos/shopee": "workspace:*",
     "@achadinhos/telegram": "workspace:*",
