@@ -21,3 +21,4 @@ export const createClock = (initial: Date = new Date()) => {
 
 export type Clock = ReturnType<typeof createClock>;
 export * from "./unknown-result";
+export * from "./sendable";
