@@ -206,4 +206,15 @@ describe("T7-04 agendador", () => {
     expect(s.store.sends).toHaveLength(0);
     expect(s.store.group("a1", "g1").nextRunAt!.toISOString()).toBe("2026-10-13T15:00:00.000Z");
   });
+
+  it("log de erro não carrega a mensagem crua (pode conter segredo)", async () => {
+    const s = setup({ nowIso: "2026-10-13T16:00:00Z" });
+    const logs: Record<string, unknown>[] = [];
+    const boom: OfferSelector = async () => {
+      throw new Error("conexao postgres://u:senha-secreta@h/db falhou");
+    };
+    await runSchedulerTick({ store: s.store, now: s.clock.now, selectOffer: boom, log: (_e, d) => logs.push(d) });
+    expect(JSON.stringify(logs)).not.toContain("senha-secreta");
+    expect(logs[0]).toMatchObject({ groupId: "g1", errorName: "Error" });
+  });
 });

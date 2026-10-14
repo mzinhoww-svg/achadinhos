@@ -80,4 +80,53 @@ describe("T7-05 seleção de oferta e antirrepetição", () => {
       selectOffer({ source: hang, filters: {}, history: [], now: NOW, dedupeDays: 7, groupId: "g1", timeoutMs: 25 }),
     ).rejects.toThrow(/timeout/i);
   });
+
+  describe("nó inválido da Shopee não envenena o grupo (QA #14 bloqueante)", () => {
+    const invalidos: [string, Partial<ReturnType<typeof node>>][] = [
+      ["offerLink javascript:", { offerLink: "javascript:alert(1)" }],
+      ["offerLink vazio", { offerLink: "" }],
+      ["imageUrl vazio", { imageUrl: "" }],
+      ["imageUrl http:", { imageUrl: "http://img/1.jpg" }],
+      ["productName vazio", { productName: "  " }],
+      ["priceMin NaN", { priceMin: Number.NaN }],
+      ["priceMin zero", { priceMin: 0 }],
+      ["itemId ausente", { itemId: undefined as unknown as number }],
+    ];
+    for (const [nome, defeito] of invalidos) {
+      it(`pula ${nome} e devolve o próximo válido`, async () => {
+        const src = source([node({ itemId: 111, ...defeito }), node({ itemId: 222 })]);
+        const r = await selectOffer({ source: src, filters: {}, history: [], now: NOW, dedupeDays: 7, groupId: "g1" });
+        expect(r).toMatchObject({ kind: "offer", offer: { itemId: 222 } });
+      });
+    }
+
+    it("só inválidos ⇒ none/sem_oferta e informa os descartados com motivo", async () => {
+      const dropped: unknown[] = [];
+      const src = source([node({ itemId: 111, offerLink: "" }), node({ itemId: 112, priceMin: Number.NaN })]);
+      const r = await selectOffer({
+        source: src, filters: {}, history: [], now: NOW, dedupeDays: 7, groupId: "g1",
+        onDiscard: (d) => dropped.push(d),
+      });
+      expect(r).toEqual({ kind: "none", reason: "sem_oferta" });
+      expect(dropped).toEqual([
+        { itemId: "111", reason: "offerLink_invalido" },
+        { itemId: "112", reason: "preco_invalido" },
+      ]);
+    });
+  });
+
+  it("histórico sem data válida bloqueia (fail-closed)", async () => {
+    const semData = { ...sentOn(1, NOW), sentAt: null, attemptedAt: null, createdAt: new Date("x") };
+    const r = await selectOffer({ source: source(), filters: {}, history: [semData], now: NOW, dedupeDays: 7, groupId: "g1" });
+    expect(r).toMatchObject({ offer: { itemId: 2 } });
+  });
+
+  it("resposta malformada vira erro tipado, não TypeError", async () => {
+    for (const bad of [null, {}, { nodes: null }]) {
+      const src = { productOfferV2: async () => bad as never };
+      await expect(
+        selectOffer({ source: src, filters: {}, history: [], now: NOW, dedupeDays: 7, groupId: "g1" }),
+      ).rejects.toMatchObject({ name: "OfferSourceError" });
+    }
+  });
 });

@@ -134,7 +134,8 @@ export async function runSchedulerTick(deps: SchedulerTickDeps): Promise<Schedul
       deps.log?.("scheduler.group_error", {
         automationId: group.automationId,
         groupId: group.groupId,
-        message: error instanceof Error ? error.message : "erro desconhecido",
+        // nunca error.message: erro de banco/Shopee pode carregar segredo
+        errorName: error instanceof Error ? error.name : "desconhecido",
       });
     }
   }
