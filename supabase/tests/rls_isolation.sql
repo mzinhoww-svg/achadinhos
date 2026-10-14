@@ -44,16 +44,17 @@ SELECT is(
   'user2 sees only its 1 offer'
 );
 
--- anon sees nothing
+-- anon has no privileges on public tables (B1)
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claim.sub', '', true);
-SELECT is(
-  (SELECT count(*)::int FROM public.offers),
-  0,
-  'anon sees no offers'
+SELECT throws_ok(
+  $$SELECT count(*)::int FROM public.offers$$,
+  '42501',
+  NULL,
+  'anon has no access to offers'
 );
 
--- force back for cleanup (postgres superuser privileges inherited via ROLLBACK)
+-- force back for cleanup
 RESET ROLE;
 
 SELECT pass('reset completed');

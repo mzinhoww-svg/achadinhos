@@ -388,3 +388,8 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;
+
+-- B1 (Farol): eventos de status so pelo worker/service_role; historico imutavel para authenticated
+REVOKE INSERT, UPDATE, DELETE ON public.send_status_events FROM authenticated;
+REVOKE UPDATE, DELETE ON public.sends, public.commissions FROM authenticated;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
