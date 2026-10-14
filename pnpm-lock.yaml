@@ -80,6 +80,12 @@ importers:
 
   apps/worker:
     dependencies:
+      '@achadinhos/alerts':
+        specifier: workspace:*
+        version: link:../../packages/alerts
+      '@achadinhos/creative':
+        specifier: workspace:*
+        version: link:../../packages/creative
       '@achadinhos/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -96,6 +102,9 @@ importers:
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: ^5
         version: 5.9.3
