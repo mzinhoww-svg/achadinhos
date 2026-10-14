@@ -1,9 +1,11 @@
 import "server-only";
 import { MemoryAutomations, MemoryConnections, MemoryVault } from "./memory";
+import type { SendsRepo } from "./envios-ports";
 import { MemorySendNow } from "./memory-sends";
 import type { AutomationsRepo, ConnectionsRepo, SecretVault, TelegramGateway } from "./ports";
 import type { OfferCandidate, OfferFinder, SendNowRepo, ShortLinkGateway } from "./send-ports";
 import { offers as demoOffers } from "@/lib/mock";
+import { dayWindow } from "@/lib/envios-view";
 import { createTelegramGateway } from "./telegram-gateway";
 import type { Session, SessionProvider } from "./session";
 
@@ -14,6 +16,9 @@ export interface Container {
   telegram: TelegramGateway;
   sessions: SessionProvider;
   sendNow: SendNowRepo;
+  sends: SendsRepo;
+  /** Só no demo: avança a fila simulada um passo (queued→sending→sent) para a tela de Envios mudar sozinha. */
+  advanceDemo?: () => void;
   finder: OfferFinder;
   links: ShortLinkGateway;
 }
@@ -106,7 +111,36 @@ async function seed(c: Container) {
   const tg = await saveTelegram(deps, S, { token: "1000000001:DEMO-token-nao-real-000000000000" });
   for (const g of tg.groups.slice(0, 3)) await setGroupActive(deps, S, { groupId: g.id, active: true });
   const ids = tg.groups.map((g) => g.id);
-  (c.sendNow as MemorySendNow).markSent(DEMO_ACCOUNT, ids[0]!, "9001", new Date(Date.now() - 2 * 86_400_000));
+  const sn = c.sendNow as MemorySendNow;
+  const off = await Promise.all(demoCandidates.map((cand) => sn.saveOffer(DEMO_ACCOUNT, cand)));
+  const nowMs = Date.now();
+  const ago = (min: number) => new Date(nowMs - min * 60_000);
+  // "Hoje" no fuso da conta: nunca antes da 00:00 local, mesmo se o demo subir logo após a meia-noite.
+  const dayStart = dayWindow(new Date(nowMs), "America/Cuiaba").start.getTime();
+  const todayAgo = (min: number) => Math.max(0, Math.min((nowMs - dayStart) / 60_000 - 1, min)) ;
+  const h = (n: number) => todayAgo(n * 60);
+  const row = (i: number, g: number, status: "queued" | "sending" | "sent" | "failed" | "skipped", min: number, extra: { reason?: string; priority?: number; automationName?: string } = {}) =>
+    sn.seed({ accountId: DEMO_ACCOUNT, offerId: off[i]!, groupId: ids[g]!, status, at: ago(min), ...extra });
+  row(0, 0, "sent", 2 * 24 * 60, { automationName: "Eletrônicos até R$ 150" }); // alimenta o aviso de repetição
+  row(2, 0, "sent", h(3), { automationName: "Eletrônicos até R$ 150" });
+  row(3, 1, "sent", h(2), { automationName: "Casa e cozinha — manhã" });
+  row(6, 1, "sent", h(5), { automationName: "Casa e cozinha — manhã" });
+  row(5, 0, "sent", todayAgo(40), { priority: 100 });
+  row(4, 2, "failed", h(4), { reason: "Telegram: bot removido do grupo", automationName: "Eletrônicos até R$ 150" });
+  row(7, 2, "skipped", h(6), { reason: "teto diário do canal atingido" });
+  row(1, 1, "sending", 0, { automationName: "Casa e cozinha — manhã" });
+  row(5, 1, "queued", 0, { priority: 100 });
+  row(7, 0, "queued", 0, { automationName: "Eletrônicos até R$ 150" });
+  c.advanceDemo = () => {
+    const rows = sn.rows(DEMO_ACCOUNT);
+    const sending = rows.find((r) => r.status === "sending");
+    if (sending) {
+      sn.transition(DEMO_ACCOUNT, sending.id, "sent");
+      return;
+    }
+    const next = rows.filter((r) => r.status === "queued").sort((a, b) => b.priority - a.priority)[0];
+    if (next) sn.transition(DEMO_ACCOUNT, next.id, "sending");
+  };
   const ad = { automations: c.automations, connections: c.connections };
   await createAutomation(ad, S, { name: "Eletrônicos até R$ 150", days: [0, 1, 2, 3, 4, 5, 6], windowStart: "08:00", windowEnd: "22:00", frequencyMin: 30, filters: { category: "Eletrônicos", minDiscount: 30, minCommission: 5, priceMax: 150, minRating: 4.5 }, header: "Achadinho do dia", footer: "Preço pode mudar a qualquer momento.", groupIds: [ids[0]!] });
   await createAutomation(ad, S, { name: "Casa e cozinha — manhã", days: [1, 2, 3, 4, 5], windowStart: "07:00", windowEnd: "12:00", frequencyMin: 60, filters: { category: "Casa e Cozinha", minDiscount: 25, minCommission: 4, priceMax: 200, minRating: 4.3 }, groupIds: [ids[1]!] });
@@ -117,13 +151,15 @@ const g = globalThis as { __achadinhos?: Promise<Container> };
 export function container(): Promise<Container> {
   g.__achadinhos ??= (async () => {
     const connections = new MemoryConnections();
+    const sendNow = new MemorySendNow(connections);
     const c: Container = {
       connections,
       automations: new MemoryAutomations(),
       vault: new MemoryVault(),
       telegram: DEMO() ? demoTelegram : createTelegramGateway(),
       sessions,
-      sendNow: new MemorySendNow(connections),
+      sendNow,
+      sends: sendNow,
       finder: DEMO() ? demoFinder : offlineFinder,
       links: DEMO() ? demoLinks : offlineLinks,
     };
