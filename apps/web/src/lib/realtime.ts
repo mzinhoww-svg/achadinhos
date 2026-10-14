@@ -34,6 +34,11 @@ export function applySendChange(items: readonly PublicSend[], c: SendChange, acc
 
 export type ConnectionState = "live" | "reconnecting";
 
+/** O polling só descansa enquanto a assinatura Realtime está ao vivo; em qualquer outro estado a tela relê sozinha. */
+export function shouldPoll(conn: ConnectionState | "polling"): boolean {
+  return conn !== "live";
+}
+
 /** Superfície mínima de `@supabase/supabase-js` usada aqui (tipagem estrutural: a web não depende do SDK ainda). */
 export interface RealtimeChannelLike {
   on(type: "postgres_changes", filter: { event: string; schema: string; table: string; filter?: string }, cb: (payload: unknown) => void): RealtimeChannelLike;

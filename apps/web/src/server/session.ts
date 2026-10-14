@@ -6,6 +6,8 @@
 export interface Session {
   accountId: string;
   userId: string;
+  /** JWT do Supabase Auth do próprio usuário, quando houver; usado só para o Realtime sob RLS. */
+  accessToken?: string;
 }
 
 export interface SessionProvider {
