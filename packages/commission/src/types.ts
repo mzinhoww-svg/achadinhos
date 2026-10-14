@@ -69,6 +69,7 @@ export interface CollectOptions {
   readonly lookbackSeconds?: number;
   readonly now?: () => number;
   readonly maxPages?: number;
+  readonly accountId?: unknown;
 }
 
 export interface CollectResult {

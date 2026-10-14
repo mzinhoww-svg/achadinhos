@@ -5,7 +5,7 @@ import type {
   CommissionSaveResult,
   StatusChangeEvent,
 } from "./types.js";
-import { commissionGroupKey } from "./normalizer.js";
+import { commissionGroupKey, canTransition } from "./normalizer.js";
 
 interface StoredCommission {
   checkoutId: string;
@@ -48,8 +48,24 @@ export class InMemoryCommissionRepository implements CommissionRepository {
 
   constructor(_options?: unknown) {}
 
+  private storageKey(commission: Commission): string {
+    return `${String(commission.accountId ?? "")}:${commission.checkoutId}`;
+  }
+
+  private findStorageKey(checkoutId: string, accountId?: unknown): string | undefined {
+    const direct = `${String(accountId ?? "")}:${checkoutId}`;
+    if (this.recordMap.has(direct)) return direct;
+    for (const [key, value] of this.recordMap.entries()) {
+      if (value.checkoutId === checkoutId) return key;
+    }
+    return undefined;
+  }
+
   private saveOne(commission: Commission): CommissionSaveResult {
-    const existing = this.recordMap.get(commission.checkoutId);
+    const accountId = commission.accountId;
+    const key = this.storageKey(commission);
+    const existingKey = this.recordMap.has(key) ? key : this.findStorageKey(commission.checkoutId, accountId);
+    const existing = existingKey ? this.recordMap.get(existingKey) : undefined;
     const now = Date.now();
 
     if (!existing) {
@@ -62,7 +78,7 @@ export class InMemoryCommissionRepository implements CommissionRepository {
         status: commission.status,
         updatedAt: now,
       };
-      this.recordMap.set(commission.checkoutId, stored);
+      this.recordMap.set(key, stored);
       this.eventList.push({
         checkoutId: commission.checkoutId,
         from: "(new)",
@@ -72,21 +88,50 @@ export class InMemoryCommissionRepository implements CommissionRepository {
       return { inserted: true, updated: false, duplicate: false };
     }
 
-    if (fieldsEqual(existing, commission)) {
-      return { inserted: false, updated: false, duplicate: true };
-    }
+    let changed = false;
 
-    if (existing.status !== commission.status) {
-      const from = existing.status;
+    // Status monotônico: não reverte estado mais avançado com dado antigo.
+    let previousStatus: string | undefined;
+    if (existing.status !== commission.status && canTransition(existing.status, commission.status)) {
+      previousStatus = existing.status;
       existing.status = commission.status;
-      existing.updatedAt = now;
+      changed = true;
       this.eventList.push({
         checkoutId: commission.checkoutId,
-        from,
+        from: previousStatus,
         to: commission.status,
         at: now,
       });
-      return { inserted: false, updated: true, duplicate: false, previousStatus: from };
+    }
+
+    if (existing.estimatedCommission !== commission.estimatedCommission) {
+      existing.estimatedCommission = commission.estimatedCommission;
+      changed = true;
+    }
+    if (existing.subIds.join("\u0000") !== [...commission.subIds].join("\u0000")) {
+      existing.subIds = [...commission.subIds];
+      changed = true;
+    }
+    if (String(existing.purchaseTime) !== String(commission.purchaseTime)) {
+      existing.purchaseTime = commission.purchaseTime;
+      changed = true;
+    }
+    if (accountId !== undefined && existing.accountId !== accountId) {
+      existing.accountId = accountId;
+      changed = true;
+    }
+
+    const resultPreviousStatus = previousStatus;
+    if (changed) {
+      existing.updatedAt = now;
+      if (existingKey !== key && existingKey) {
+        this.recordMap.delete(existingKey);
+        this.recordMap.set(key, existing);
+      }
+      if (resultPreviousStatus !== undefined) {
+        return { inserted: false, updated: true, duplicate: false, previousStatus: resultPreviousStatus };
+      }
+      return { inserted: false, updated: true, duplicate: false };
     }
 
     return { inserted: false, updated: false, duplicate: true };
@@ -121,7 +166,8 @@ export class InMemoryCommissionRepository implements CommissionRepository {
   }
 
   getByCheckoutId(checkoutId: string): StoredCommission | undefined {
-    const v = this.recordMap.get(checkoutId);
+    const key = this.findStorageKey(checkoutId, undefined);
+    const v = key ? this.recordMap.get(key) : undefined;
     return v ? cloneCommission(v) : undefined;
   }
   findById(checkoutId: string): StoredCommission | undefined {
@@ -167,7 +213,7 @@ export class InMemoryCommissionRepository implements CommissionRepository {
   }
 
   has(checkoutId: string): boolean {
-    return this.recordMap.has(checkoutId);
+    return this.findStorageKey(checkoutId) !== undefined;
   }
 
   aggregateBySubId(): Record<string, number> {

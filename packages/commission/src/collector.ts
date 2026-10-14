@@ -6,7 +6,7 @@ import type {
   ConversionSource,
   ConversionSourcePort,
 } from "./types.js";
-import { normalizeConversion } from "./normalizer.js";
+import { normalizeConversion, toSeconds } from "./normalizer.js";
 import { InMemoryCommissionRepository } from "./repository.js";
 
 function isRepository(value: unknown): value is CommissionRepository {
@@ -34,12 +34,8 @@ function isSource(value: unknown): value is ConversionSource | ConversionSourceP
   );
 }
 
-function toSeconds(ms: number): number {
-  return Math.floor(ms / 1000);
-}
-
 function defaultNow(): number {
-  return toSeconds(Date.now());
+  return toSeconds(Date.now()) ?? Math.floor(Date.now() / 1000);
 }
 
 function resolveSource(args: unknown[]): ConversionSource | ConversionSourcePort | undefined {
@@ -92,41 +88,47 @@ async function callSource(
 
   if (!fn) throw new Error("ConversionSource has no callable method");
 
-  let result: unknown;
-  try {
-    result = await fn.call(source, params);
-  } catch (error) {
-    // Retry without params in case of mismatched signature.
-    result = await fn.call(source);
-  }
+  const result = await fn.call(source, params);
 
   if (Array.isArray(result)) {
     return { nodes: result, pageInfo: { hasNextPage: false, scrollId: "" } };
   }
 
-  const obj = (result ?? {}) as Record<string, unknown>;
-  const nodes = Array.isArray(obj.nodes)
-    ? obj.nodes
-    : Array.isArray(obj.data)
-      ? obj.data
-      : Array.isArray(obj.conversions)
-        ? obj.conversions
-        : Array.isArray(obj.items)
-          ? obj.items
-          : Array.isArray(obj.results)
-            ? obj.results
-            : [];
+  const obj = result as Record<string, unknown> | null;
+  // Aceita envelope { data: { conversionReport: { nodes, pageInfo } } }.
+  const unwrap =
+    obj && typeof obj === "object" && obj.data && typeof obj.data === "object"
+      ? (obj.data as Record<string, unknown>).conversionReport
+      : undefined;
+  const sourceObj =
+    unwrap && typeof unwrap === "object" ? (unwrap as Record<string, unknown>) : obj;
 
-  const pageInfoRaw = obj.pageInfo ?? obj.pagination ?? {};
+  if (!sourceObj || typeof sourceObj !== "object" || Array.isArray(sourceObj)) {
+    throw new Error("invalid conversion report response");
+  }
+
+  if (!Array.isArray(sourceObj.nodes)) {
+    throw new Error("invalid conversion report response: missing nodes");
+  }
+
+  const pageInfoRaw = sourceObj.pageInfo ?? sourceObj.pagination ?? {};
   const pageInfo = pageInfoRaw && typeof pageInfoRaw === "object" ? (pageInfoRaw as Record<string, unknown>) : {};
+  const hasNextPage = Boolean(
+    pageInfo.hasNextPage ?? pageInfo.hasMore ?? pageInfo.next ?? false,
+  );
+  const scrollId = String(
+    pageInfo.scrollId ?? pageInfo.nextScrollId ?? pageInfo.cursor ?? "",
+  );
   const limit = typeof pageInfo.limit === "number" ? pageInfo.limit : undefined;
+
   const resultPageInfo: { hasNextPage: boolean; scrollId: string; limit?: number } = {
-    hasNextPage: Boolean(pageInfo.hasNextPage ?? pageInfo.hasMore ?? pageInfo.next),
-    scrollId: String(pageInfo.scrollId ?? pageInfo.nextScrollId ?? pageInfo.cursor ?? ""),
+    hasNextPage,
+    scrollId,
   };
   if (limit !== undefined) resultPageInfo.limit = limit;
+
   return {
-    nodes,
+    nodes: sourceObj.nodes,
     pageInfo: resultPageInfo,
   };
 }
@@ -149,12 +151,14 @@ export class CommissionCollector {
   async collect(override?: CollectOptions): Promise<CollectResult> {
     const opts = { ...this.options, ...(override ?? {}) };
     const nowFn = opts.now ?? defaultNow;
-    const endSeconds = opts.purchaseTimeEnd ?? nowFn();
+    const nowSeconds = toSeconds(nowFn()) ?? defaultNow();
+    const endSeconds = toSeconds(opts.purchaseTimeEnd ?? nowSeconds) ?? nowSeconds;
     const lookback = opts.lookbackSeconds ?? 6 * 60 * 60;
     const overlap = opts.overlapSeconds ?? 10 * 60;
-    const last = this.repository.getLastCollectedAt?.() ?? null;
+    const rawLast = this.repository.getLastCollectedAt?.();
+    const last = rawLast === null || rawLast === undefined ? null : (toSeconds(rawLast) ?? rawLast);
     const startSeconds =
-      opts.purchaseTimeStart ??
+      toSeconds(opts.purchaseTimeStart as unknown) ??
       (last !== null && last !== undefined ? last - overlap : endSeconds - lookback);
 
     const pageSize = opts.pageSize ?? opts.limit ?? 50;
@@ -167,6 +171,7 @@ export class CommissionCollector {
     let updated = 0;
     let skipped = 0;
     let total = 0;
+    let completed = true;
 
     do {
       const page = await callSource(this.source, {
@@ -178,7 +183,7 @@ export class CommissionCollector {
 
       pages += 1;
       for (const node of page.nodes) {
-        const commission = normalizeConversion(node as never);
+        const commission = normalizeConversion(node as never, { accountId: opts.accountId });
         total += 1;
         const result = await Promise.resolve(this.repository.save(commission));
         if (result.inserted) inserted += 1;
@@ -188,12 +193,22 @@ export class CommissionCollector {
 
       if (!page.pageInfo.hasNextPage) break;
       const next = page.pageInfo.scrollId;
-      if (!next || visited.has(next)) break;
+      if (!next || visited.has(next)) {
+        completed = false;
+        break;
+      }
       visited.add(next);
       scrollId = next;
 
-      if (pages >= maxPages) break;
+      if (pages >= maxPages) {
+        completed = false;
+        break;
+      }
     } while (true);
+
+    if (!completed) {
+      throw new Error("commission collection truncated: not all pages were read");
+    }
 
     const collectedAt = endSeconds;
     this.repository.setLastCollectedAt?.(collectedAt);

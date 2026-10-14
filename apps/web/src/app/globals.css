@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/*
+ * Tokens do design system "achadinhos".
+ * Marca: ameixa (hue 340) sobre branco puro. Segunda camada neutra (sunken) para sidebar/painéis.
+ * Hex calculado a partir de OKLCH; mesma paleta em packages/creative/src/tokens.ts.
+ * Sem semelhança com achadinhos.doti.gg: base clara, ameixa + amarelo-sol, Bricolage Grotesque + Figtree.
+ */
+@theme {
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Figtree", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #ffffff;
+  --color-sunken: #f9f4f7;
+  --color-sunken-2: #f3ecf0;
+  --color-line: #e8e0e5;
+  --color-line-strong: #d2c7ce;
+  --color-ink: #1c1319;
+  --color-ink-2: #574851;
+  --color-ink-3: #6c5f67;
+
+  --color-brand-50: #ffecfa;
+  --color-brand-100: #ffd6f1;
+  --color-brand-500: #a61b86;
+  --color-brand-600: #8d1071;
+  --color-brand-700: #71115b;
+
+  --color-sun: #f7d22a;
+  --color-sun-50: #fff6d0;
+  --color-sun-ink: #724e00;
+
+  --color-ok: #00713e;
+  --color-ok-50: #e0f9e8;
+  --color-err: #b71824;
+  --color-err-50: #ffebe8;
+  --color-info: #2266a4;
+  --color-info-50: #e6f4ff;
+  --color-teal: #00756b;
+  --color-teal-50: #ddf9f4;
+
+  --radius-control: 0.625rem;
+  --radius-panel: 0.875rem;
+
+  --shadow-pop: 0 1px 2px rgb(28 19 25 / 0.06), 0 8px 24px -8px rgb(28 19 25 / 0.14);
+
+  --z-sticky: 20;
+  --z-nav: 30;
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-size-adjust: 100%;
+  }
+  h1, h2, h3 { text-wrap: balance; }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  ::selection { background: var(--color-brand-100); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
