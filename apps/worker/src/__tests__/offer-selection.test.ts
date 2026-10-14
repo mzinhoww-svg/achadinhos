@@ -78,7 +78,7 @@ describe("T7-05 seleção de oferta e antirrepetição", () => {
   it("deadline total: Shopee que não responde vira erro, não trava o tick", async () => {
     const hang = { productOfferV2: () => new Promise<never>(() => {}) };
     await expect(
-      selectOffer({ source: hang, filters: {}, history: [], now: NOW, dedupeDays: 7, groupId: "g1", timeoutMs: 25 }),
+      selectOffer({ source: hang, filters: {}, history: [], now: NOW, dedupeDays: 7, groupId: "g1", timeoutMs: 25, ...HOSTS }),
     ).rejects.toThrow(/timeout/i);
   });
 
