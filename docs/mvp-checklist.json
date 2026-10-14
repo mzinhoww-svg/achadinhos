@@ -6,7 +6,7 @@
       "titulo": "Cliente Shopee assinado",
       "aceite": "Testes unitários com vetor conhecido + teste contra GraphQL simulado",
       "fase": "F1",
-      "status": "pendente",
+      "status": "concluida",
       "depende_credencial": true
     },
     {
@@ -14,7 +14,7 @@
       "titulo": "Conexões: validar e salvar App ID/Secret (Vault)",
       "aceite": "Nenhuma rota ou payload RSC contém o Secret",
       "fase": "F1",
-      "status": "pendente",
+      "status": "implementado; aguardando credencial Shopee para validar de verdade",
       "depende_credencial": true
     },
     {
@@ -22,7 +22,7 @@
       "titulo": "Canal Telegram: token, grupos, ativar, sub_id único",
       "aceite": "Grupo de teste aparece e recebe mensagem de verificação",
       "fase": "F1",
-      "status": "pendente",
+      "status": "implementado; aguardando token do bot e grupo de teste",
       "depende_credencial": true
     },
     {
@@ -30,7 +30,7 @@
       "titulo": "Automações CRUD com limite de 5",
       "aceite": "Validação testada e 6a automação recusada",
       "fase": "F2",
-      "status": "pendente",
+      "status": "concluida (CRUD, limite de 5 no banco, QA aprovado)",
       "depende_credencial": false
     },
     {
@@ -38,7 +38,7 @@
       "titulo": "Estimativa de posts por dia",
       "aceite": "Teste de unidade da fórmula",
       "fase": "F2",
-      "status": "pendente",
+      "status": "concluida",
       "depende_credencial": false
     },
     {
@@ -46,7 +46,7 @@
       "titulo": "Worker agendador a cada minuto",
       "aceite": "Relógio simulado: borda de janela e virada de dia em America/Cuiaba",
       "fase": "F3",
-      "status": "pendente",
+      "status": "em_revisao (agendador PR #14)",
       "depende_credencial": false
     },
     {
@@ -54,7 +54,7 @@
       "titulo": "Antirrepetição 7 dias",
       "aceite": "Reexecução do worker 2x sem duplicata",
       "fase": "F3",
-      "status": "pendente",
+      "status": "em_revisao (antirrepetição PR #14)",
       "depende_credencial": false
     },
     {
@@ -62,7 +62,7 @@
       "titulo": "Fila: 1 por canal, 60 s, teto 200, prioridade 100",
       "aceite": "Concorrência com 2 workers sem envio duplo",
       "fase": "F3",
-      "status": "pendente",
+      "status": "parcial (SQL da fila na main; executor PR #13 em revisão)",
       "depende_credencial": false
     },
     {
@@ -70,7 +70,7 @@
       "titulo": "Criativo PNG 1080x1080",
       "aceite": "Snapshot visual aprovado pelo Designer",
       "fase": "F2",
-      "status": "pendente",
+      "status": "concluida (PNG real, QA aprovado)",
       "depende_credencial": false
     },
     {
@@ -78,7 +78,7 @@
       "titulo": "Mandar agora",
       "aceite": "E2E com Shopee simulada",
       "fase": "F4",
-      "status": "pendente",
+      "status": "implementado; falta e2e com Shopee simulada",
       "depende_credencial": true
     },
     {
@@ -86,7 +86,7 @@
       "titulo": "Envios: cards, lista 30 dias, Realtime",
       "aceite": "E2E: status muda e tela atualiza sem recarregar",
       "fase": "F4",
-      "status": "pendente",
+      "status": "implementado; falta e2e de Realtime",
       "depende_credencial": false
     },
     {
@@ -94,7 +94,7 @@
       "titulo": "Comissão: conversionReport a cada 6 h idempotente",
       "aceite": "Reexecução não duplica; soma por grupo bate com fixture",
       "fase": "F5",
-      "status": "pendente",
+      "status": "parcial (coletor idempotente em memória; persistência SQL pendente)",
       "depende_credencial": true
     },
     {
@@ -102,7 +102,7 @@
       "titulo": "Alertas por e-mail",
       "aceite": "Teste com transporte de e-mail simulado",
       "fase": "F5",
-      "status": "pendente",
+      "status": "concluida (transporte simulado)",
       "depende_credencial": false
     },
     {
@@ -110,7 +110,7 @@
       "titulo": "Onboarding e estados vazios",
       "aceite": "QA visual 390x844 e 1440x900",
       "fase": "F4",
-      "status": "pendente",
+      "status": "concluida (QA aprovado)",
       "depende_credencial": false
     }
   ]
