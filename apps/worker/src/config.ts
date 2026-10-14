@@ -71,6 +71,10 @@ const schema = z
     CLAIM_LEASE_MS: ms(120_000),
     EXTERNAL_TIMEOUT_MS: ms(30_000),
     HEARTBEAT_STALE_MS: ms(180_000),
+    EXECUTOR_POLL_MS: ms(5_000, 1_000, 60_000),
+    WORKER_STALL_ALERT_MS: ms(600_000, 60_000),
+    SHUTDOWN_GRACE_MS: ms(30_000, 1_000, 300_000),
+    ALERT_EMAIL_TO: z.string().email().optional(),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   })
   .refine((c) => c.EXTERNAL_TIMEOUT_MS + LEASE_MARGIN_MS <= c.CLAIM_LEASE_MS, {
@@ -78,6 +82,9 @@ const schema = z
   })
   .refine((c) => c.HEARTBEAT_STALE_MS >= 2 * c.TICK_INTERVAL_MS, {
     path: ["HEARTBEAT_STALE_MS"],
+  })
+  .refine((c) => c.WORKER_STALL_ALERT_MS > c.HEARTBEAT_STALE_MS, {
+    path: ["WORKER_STALL_ALERT_MS"],
   });
 
 export interface WorkerConfig {
@@ -87,6 +94,10 @@ export interface WorkerConfig {
   readonly leaseMs: number;
   readonly externalTimeoutMs: number;
   readonly heartbeatStaleMs: number;
+  readonly executorPollMs: number;
+  readonly stallAlertMs: number;
+  readonly shutdownGraceMs: number;
+  readonly alertEmailTo: string | undefined;
   readonly logLevel: "debug" | "info" | "warn" | "error";
 }
 
@@ -109,6 +120,10 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
     leaseMs: c.CLAIM_LEASE_MS,
     externalTimeoutMs: c.EXTERNAL_TIMEOUT_MS,
     heartbeatStaleMs: c.HEARTBEAT_STALE_MS,
+    executorPollMs: c.EXECUTOR_POLL_MS,
+    stallAlertMs: c.WORKER_STALL_ALERT_MS,
+    shutdownGraceMs: c.SHUTDOWN_GRACE_MS,
+    alertEmailTo: c.ALERT_EMAIL_TO,
     logLevel: c.LOG_LEVEL,
   });
 }

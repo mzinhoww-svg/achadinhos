@@ -62,6 +62,20 @@ export class MemoryStore implements SchedulerStore {
     if (!g) throw new Error(`grupo ${groupId} inexistente`);
     return g;
   }
+  /** Desativa o grupo em todas as automações e pula os `queued` dele (contrato do adaptador SQL). */
+  deactivateGroup(groupId: string, reason: string): void {
+    for (const g of this.groups.values()) if (g.groupId === groupId) g.active = false;
+    for (const s of this.sends) {
+      if (s.groupId === groupId && s.status === "queued") {
+        s.status = "skipped";
+        s.reason = "grupo_inativo";
+      }
+    }
+    this.deactivated.set(groupId, reason);
+  }
+  /** Último motivo de desativação por grupo (`groups.last_error`). */
+  readonly deactivated = new Map<string, string>();
+
   seedSend(s: SeedSend): void {
     this.sends.push({ id: `seed-${++this.seq}`, createdAt: s.createdAt ?? new Date(0), scheduledFor: s.scheduledFor ?? new Date(0), ...s });
   }
