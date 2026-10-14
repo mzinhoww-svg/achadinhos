@@ -13,7 +13,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/table";
 import { estimatePostsPerDay } from "@/lib/estimate";
 import { formatBRL, formatDateTime } from "@/lib/format";
-import { account, automationById, discountOf, groupById, isEmptyPreview, offerById, offers, sends } from "@/lib/mock";
+import { account, discountOf, isEmptyPreview, offerById, offers, sends } from "@/lib/mock";
+import { container, viewSession } from "@/server/context";
+import { DeleteAutomationButton } from "@/components/delete-automation-button";
 
 export const metadata: Metadata = { title: "Automação" };
 
@@ -25,12 +27,17 @@ export default async function AutomacaoDetalhe({
   searchParams: Promise<{ vazio?: string }>;
 }) {
   const { id } = await params;
-  const empty = isEmptyPreview(await searchParams);
-  const a = automationById(id);
+  const c = await container();
+  const session = await viewSession(c, isEmptyPreview(await searchParams));
+  const a = session ? await c.automations.get(session.accountId, id) : null;
   if (!a) notFound();
+  const groupList = await c.connections.listGroups(a.accountId);
+  const groupById = (gid: string) => groupList.find((g) => g.id === gid);
+  const DAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const f = a.filters as { category?: string; priceMax?: number; minDiscount?: number; minCommission?: number; minRating?: number };
 
   const est = estimatePostsPerDay({ groups: a.groupIds.length, windowStart: a.windowStart, windowEnd: a.windowEnd, frequencyMin: a.frequencyMin, dailyCap: account.dailyCapPerChannel });
-  const history = empty ? [] : sends.filter((s) => s.automationId === a.id);
+  const history = sends.filter((s) => s.automationId === a.id); // envios reais entram no T8-07
   const sample = offers[0]!;
 
   return (
@@ -50,8 +57,8 @@ export default async function AutomacaoDetalhe({
         }
         actions={
           <>
-            <Button variant="secondary">{a.status === "active" ? "Pausar" : "Ativar"}</Button>
-            <Button icon={<IconSend width={18} height={18} />}>Mandar agora</Button>
+            <Button variant="secondary" href={`/automacoes/${a.id}/editar`}>Editar</Button>
+            <DeleteAutomationButton id={a.id} />
           </>
         }
       />
@@ -60,19 +67,19 @@ export default async function AutomacaoDetalhe({
         <div className="grid gap-6">
           <Card title="Regras">
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              <Row label="Categoria" value={a.category} />
-              <Row label="Preço máximo" value={a.maxPrice ? formatBRL(a.maxPrice) : "Sem limite"} />
-              <Row label="Desconto mínimo" value={`${a.minDiscount}%`} />
-              <Row label="Comissão mínima" value={`${a.minCommission}%`} />
-              <Row label="Avaliação mínima" value={String(a.minRating).replace(".", ",")} />
-              <Row label="Dias" value={a.days.join(", ")} />
+              <Row label="Categoria" value={f.category || "Todas"} />
+              <Row label="Preço máximo" value={f.priceMax ? formatBRL(f.priceMax) : "Sem limite"} />
+              <Row label="Desconto mínimo" value={`${f.minDiscount ?? 0}%`} />
+              <Row label="Comissão mínima" value={`${f.minCommission ?? 0}%`} />
+              <Row label="Avaliação mínima" value={String(f.minRating ?? 0).replace(".", ",")} />
+              <Row label="Dias" value={a.days.map((d) => DAY[d]).join(", ")} />
               <Row label="Cabeçalho" value={a.header || "—"} />
               <Row label="Rodapé" value={a.footer || "—"} />
               <div className="sm:col-span-2">
                 <dt className="text-sm text-ink-2">Grupos</dt>
                 <dd className="mt-1.5 flex flex-wrap gap-2">
                   {a.groupIds.map((gid) => (
-                    <Badge key={gid} tone={groupById(gid)?.active ? "brand" : "neutral"}>{groupById(gid)?.name}</Badge>
+                    <Badge key={gid} tone={groupById(gid)?.active ? "brand" : "neutral"}>{groupById(gid)?.name ?? "Grupo removido"}</Badge>
                   ))}
                 </dd>
               </div>
@@ -106,7 +113,7 @@ export default async function AutomacaoDetalhe({
                       );
                     },
                   },
-                  { key: "group", header: "Grupo", cell: (s) => groupById(s.groupId)?.name },
+                  { key: "group", header: "Grupo", cell: (s) => s.groupId },
                   { key: "when", header: "Horário", cell: (s) => formatDateTime(s.sentAt ?? s.scheduledFor) },
                   { key: "status", header: "Status", cell: (s) => <StatusBadge status={s.status} /> },
                 ]}

@@ -10,12 +10,12 @@ INSERT INTO public.accounts (account_id,user_id) VALUES
 
 INSERT INTO public.channels (id,account_id,kind,config_secret_id) VALUES
   ('99999999-9999-9999-9999-999999999999','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','telegram', vault.create_secret('c'));
-INSERT INTO public.groups (id,account_id,channel_id,external_id) VALUES
-  ('88888888-8888-8888-8888-888888888888','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','99999999-9999-9999-9999-999999999999','g');
+INSERT INTO public.groups (id,account_id,channel_id,external_id,sub_id) VALUES
+  ('88888888-8888-8888-8888-888888888888','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','99999999-9999-9999-9999-999999999999','g','sg');
 INSERT INTO public.offers (id,account_id,item_id) VALUES
   ('77777777-7777-7777-7777-777777777777','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','it');
-INSERT INTO public.sends (id,account_id,offer_id,group_id,channel_id) VALUES
-  ('66666666-6666-6666-6666-666666666666','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','77777777-7777-7777-7777-777777777777','88888888-8888-8888-8888-888888888888','99999999-9999-9999-9999-999999999999');
+INSERT INTO public.sends (id,account_id,offer_id,group_id,channel_id,idempotency_key) VALUES
+  ('66666666-6666-6666-6666-666666666666','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','77777777-7777-7777-7777-777777777777','88888888-8888-8888-8888-888888888888','99999999-9999-9999-9999-999999999999','k-hist');
 INSERT INTO public.send_status_events (account_id,send_id,old_status,new_status) VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','66666666-6666-6666-6666-666666666666','queued','sent');
 
