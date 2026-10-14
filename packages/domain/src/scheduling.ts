@@ -215,9 +215,9 @@ export function advanceNextRunAt(group: GroupLike, automation: AutomationConfig,
   const current = asDate(group.next_run_at ?? group.nextRunAt) ?? new Date();
   const baseNow = now == null ? new Date() : (now instanceof Date ? now : new Date(now as string | number));
   const isMissed = current.getTime() < baseNow.getTime();
-  // avança a partir de max(next_run_at, now), pulando slots vencidos
+  // avança a partir de max(next_run_at, now), pulando slots vencidos (estritamente depois de now)
   const searchFrom = isMissed
-    ? baseNow
+    ? new Date(baseNow.getTime() + 1)
     : new Date(current.getTime() + 1000);
   return _calculateNextRunAtStrict(searchFrom, automation as Record<string, unknown>);
 }
