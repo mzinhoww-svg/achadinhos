@@ -9,4 +9,6 @@ export * from "./scheduler-ports.js";
 export * from "./scheduler.js";
 export * from "./offer-selection.js";
 export * from "./deadline.js";
+export * from "./runtime.js";
+export * from "./main.js";
 export * from "./commission-job.js";

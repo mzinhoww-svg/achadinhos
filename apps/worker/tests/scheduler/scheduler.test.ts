@@ -218,3 +218,17 @@ describe("T7-04 agendador", () => {
     expect(logs[0]).toMatchObject({ groupId: "g1", errorName: "Error" });
   });
 });
+
+describe("MemoryStore.deactivateGroup", () => {
+  it("desativa o grupo, pula queued com grupo_inativo e o agendador deixa de considerá-lo", async () => {
+    const { MemoryStore } = await import("../../src/memory-store.js");
+    const store = new MemoryStore();
+    store.addAutomation({ id: "a", accountId: "acc", status: "active", days: [0, 1, 2, 3, 4, 5, 6], windowStart: "00:00", windowEnd: "23:59", frequencyMin: 60, filters: {}, timezone: "America/Cuiaba" });
+    store.addGroup({ automationId: "a", groupId: "g", accountId: "acc", channelId: "c", active: true, nextRunAt: null });
+    store.seedSend({ accountId: "acc", automationId: "a", groupId: "g", channelId: "c", status: "queued", idempotencyKey: "k" });
+    store.deactivateGroup("g", "telegram_sem_acesso");
+    expect(store.group("a", "g").active).toBe(false);
+    expect(store.sends[0]).toMatchObject({ status: "skipped", reason: "grupo_inativo" });
+    expect(await store.listDueGroups(new Date(), 10)).toHaveLength(0);
+  });
+});

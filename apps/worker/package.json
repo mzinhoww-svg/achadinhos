@@ -7,10 +7,13 @@
   "types": "src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "start": "node --import tsx src/bin.ts"
   },
   "dependencies": {
+    "@achadinhos/alerts": "workspace:*",
     "@achadinhos/commission": "workspace:*",
+    "@achadinhos/creative": "workspace:*",
     "@achadinhos/domain": "workspace:*",
     "@achadinhos/shopee": "workspace:*",
     "@achadinhos/telegram": "workspace:*",
@@ -18,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^2"
   }
