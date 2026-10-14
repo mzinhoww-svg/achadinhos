@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { downloadProductImage } from "../src/image.ts";
-import { PNG } from "./helpers.ts";
+import { downloadProductImage } from "../src/image.js";
+import { PNG } from "./helpers.js";
 
 const base = { allowedHosts: ["cf.shopee.com.br"], maxBytes: 100, timeoutMs: 1000 };
 const ok = (async () => new Response(PNG, { headers: { "content-type": "image/png" } })) as unknown as typeof fetch;

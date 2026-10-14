@@ -19,9 +19,9 @@ import {
   TelegramTransportError,
   type TelegramClient,
 } from "@achadinhos/telegram";
-import { downloadProductImage, ImageRejectedError } from "./image.ts";
-import { StepTimeoutError, withTimeout } from "./timeouts.ts";
-import { DEFAULT_SHOPEE_LINK_HOSTS, isAllowedLink, isHttpsUrl } from "./links.ts";
+import { downloadProductImage, ImageRejectedError } from "./image.js";
+import { StepTimeoutError, withTimeout } from "./timeouts.js";
+import { DEFAULT_SHOPEE_LINK_HOSTS, isAllowedLink, isHttpsUrl } from "./links.js";
 
 import { UNKNOWN_RESULT_SUFFIX } from "@achadinhos/domain";
 export { UNKNOWN_RESULT_SUFFIX };

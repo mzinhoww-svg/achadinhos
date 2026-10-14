@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMockTelegramServer, TelegramClient } from "@achadinhos/telegram";
-import { ShopeeClient, startMockShopeeServer } from "@achadinhos/shopee";
+import { ShopeeClient } from "@achadinhos/shopee";
+import { startMockShopeeServer } from "@achadinhos/shopee/testing";
 import {
   createSendExecutor,
   UNKNOWN_RESULT_SUFFIX,
   type ClaimedSend,
   type ExecutorDeps,
   type FinishArgs,
-} from "../src/executor.ts";
+} from "../src/executor.js";
 import { isUnknownResultReason } from "@achadinhos/domain";
-import { PNG } from "./helpers.ts";
+import { PNG } from "./helpers.js";
 
 const SECRET_TOKEN = "123456:SUPER-SECRET-TOKEN";
 const TIMEOUTS = { clientsMs: 2000, shortLinkMs: 5000, downloadMs: 5000, renderMs: 5000, storeMs: 5000, telegramMs: 5000, finishMs: 2000 };

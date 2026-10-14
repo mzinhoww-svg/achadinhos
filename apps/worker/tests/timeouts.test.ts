@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ShopeeClient, ShopeeTimeoutError } from "@achadinhos/shopee";
 import { FetchTelegramTransport, TelegramTimeoutError } from "@achadinhos/telegram";
-import { downloadProductImage, ImageRejectedError } from "../src/image.ts";
-import { StepTimeoutError, withTimeout } from "../src/timeouts.ts";
-import { startStalledServer } from "./helpers.ts";
+import { downloadProductImage, ImageRejectedError } from "../src/image.js";
+import { StepTimeoutError, withTimeout } from "../src/timeouts.js";
+import { startStalledServer } from "./helpers.js";
 
 describe("timeout cobre a leitura do corpo em cada cliente", () => {
   let stalled: Awaited<ReturnType<typeof startStalledServer>>;
