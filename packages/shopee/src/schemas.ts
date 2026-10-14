@@ -2,14 +2,27 @@ import { z } from "zod";
 
 const stringOrNumber = z.union([z.string(), z.number()]);
 
+/** URL https não vazia; entra em mensagem pública ou download (auditoria R4). */
+export const HttpsUrlSchema = z
+  .string()
+  .min(1)
+  .url()
+  .refine((value) => {
+    try {
+      return new URL(value).protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "must be an https URL");
+
 export const ProductOfferV2NodeSchema = z.object({
   itemId: z.number(),
-  productName: z.string(),
-  productLink: z.string(),
-  offerLink: z.string(),
-  imageUrl: z.string(),
-  priceMin: z.number(),
-  priceMax: z.number(),
+  productName: z.string().min(1),
+  productLink: HttpsUrlSchema,
+  offerLink: HttpsUrlSchema,
+  imageUrl: HttpsUrlSchema,
+  priceMin: z.number().nonnegative(),
+  priceMax: z.number().nonnegative(),
   priceDiscountRate: z.number(),
   sales: z.number(),
   ratingStar: z.number(),
@@ -40,7 +53,7 @@ export const ProductOfferV2ResponseSchema = z.object({
 
 export const GenerateShortLinkResponseSchema = z.object({
   generateShortLink: z.object({
-    shortLink: z.string(),
+    shortLink: HttpsUrlSchema,
   }),
 });
 

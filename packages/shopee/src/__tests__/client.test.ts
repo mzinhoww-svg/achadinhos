@@ -76,14 +76,14 @@ describe("ShopeeClient against mock server", () => {
     const client = new ShopeeClient(
       { appId: APP_ID, secret: SECRET },
       {
-        endpoint: "http://example.invalid/graphql",
+        endpoint: "http://127.0.0.1:1/graphql",
         timeoutMs: 50,
         fetch: (async (_url: unknown, init?: { signal?: AbortSignal }) => {
           const signal = init?.signal;
           return {
             ok: true,
             status: 200,
-            json: () =>
+            text: () =>
               new Promise((_resolve, reject) => {
                 signal?.addEventListener(
                   "abort",
