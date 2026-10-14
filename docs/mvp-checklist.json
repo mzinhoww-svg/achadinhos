@@ -110,7 +110,7 @@
       "titulo": "Onboarding e estados vazios",
       "aceite": "QA visual 390x844 e 1440x900",
       "fase": "F4",
-      "status": "parcial (UI na main; 'validado' depende do laço de validação #28 e de persistência)",
+      "status": "parcial (UI na main; 'validado' depende do adaptador SQL do ValidationStore e da entrada do worker (#30))",
       "depende_credencial": false
     }
   ]

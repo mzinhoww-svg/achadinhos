@@ -81,7 +81,7 @@ Legenda de severidade: **C** crítico (bloqueia), **A** alto, **M** médio. "Ite
 | ☐ | A | VPS: SSH por chave, sem root, `ufw` fechado, atualizações automáticas, NTP, `TZ=UTC` | Inspeção (decisão 003 H4) | 6 |
 | ☐ | A | CI: gitleaks, typecheck, testes; branch protegida, sem force-push | Revisar workflow e regras | — |
 | ☐ | A | Dependências: lockfile commitado, `pnpm audit`, fixar Satori/Resvg/fontes | Rodar auditoria | 9 |
-| ☐ | M | Heartbeat do worker e alerta por e-mail se parado > 3 min | Teste | 13 |
+| ☐ | M | Heartbeat do worker e alerta por e-mail se parado > 3 min, **por monitor externo ao VPS** (`docs/plans/deploy.md` 3.2); `WORKER_STALL_ALERT_MS=180000` | Teste matando o processo | 13 |
 | ☐ | M | Custo dentro do teto de R$ 100/mês (STATUS.md atualizado) | Revisar | — |
 | ☐ | M | Conformidade: dados pessoais mínimos (grupo/chat IDs); registro de uso da API conforme termos da Shopee | Revisar | — |
 
