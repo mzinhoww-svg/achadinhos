@@ -31,30 +31,53 @@ export class Secret {
   }
 }
 
-const ms = (def: number) =>
+const ms = (def: number, min = 1, max = 3_600_000) =>
   z
     .string()
-    .regex(/^\d+$/)
+    .regex(/^\d{1,9}$/)
     .transform(Number)
-    .pipe(z.number().int().positive())
+    .pipe(z.number().int().min(min).max(max))
     .default(String(def));
+
+// `new URL` lança TypeError com o valor na mensagem: nunca deixar escapar.
+function parse(u: string): URL | null {
+  try {
+    return new URL(u);
+  } catch {
+    return null;
+  }
+}
+
+const LEASE_MARGIN_MS = 5_000;
 
 const schema = z
   .object({
-    DATABASE_URL: z.string().url(),
+    DATABASE_URL: z
+      .string()
+      .url()
+      .refine((u) => ["postgres:", "postgresql:"].includes(parse(u)?.protocol ?? "")),
     SHOPEE_ENDPOINT: z
       .string()
       .url()
-      .refine((u) => new URL(u).protocol === "https:")
+      .refine((u) => {
+        const x = parse(u);
+        if (!x) return false;
+        const host = x.hostname;
+        const ip = /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.startsWith("[");
+        return x.protocol === "https:" && !x.username && !x.password && !ip && host !== "localhost";
+      })
       .default("https://open-api.affiliate.shopee.com.br/graphql"),
-    TICK_INTERVAL_MS: ms(60_000),
+    TICK_INTERVAL_MS: ms(60_000, 5_000),
     CLAIM_LEASE_MS: ms(120_000),
     EXTERNAL_TIMEOUT_MS: ms(30_000),
     HEARTBEAT_STALE_MS: ms(180_000),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   })
-  .refine((c) => c.EXTERNAL_TIMEOUT_MS < c.CLAIM_LEASE_MS, {
+  .refine((c) => c.EXTERNAL_TIMEOUT_MS + LEASE_MARGIN_MS <= c.CLAIM_LEASE_MS, {
     path: ["EXTERNAL_TIMEOUT_MS"],
+  })
+  .refine((c) => c.HEARTBEAT_STALE_MS >= 2 * c.TICK_INTERVAL_MS, {
+    path: ["HEARTBEAT_STALE_MS"],
   });
 
 export interface WorkerConfig {
@@ -68,7 +91,12 @@ export interface WorkerConfig {
 }
 
 export function loadConfig(env: Record<string, string | undefined>): WorkerConfig {
-  const r = schema.safeParse(env);
+  let r;
+  try {
+    r = schema.safeParse(env);
+  } catch {
+    throw new ConfigError(["config"]);
+  }
   if (!r.success) {
     const vars = [...new Set(r.error.issues.map((i) => String(i.path[0] ?? "config")))];
     throw new ConfigError(vars);

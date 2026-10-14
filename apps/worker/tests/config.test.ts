@@ -55,3 +55,22 @@ describe("loadConfig", () => {
     expect(c.databaseUrl.reveal()).toBe(valid.DATABASE_URL);
   });
 });
+
+describe("loadConfig — endurecimento", () => {
+  const base = { DATABASE_URL: "postgres://worker:pw@db.example.com:5432/postgres" };
+  it("DATABASE_URL só postgres/postgresql", () => {
+    expect(() => loadConfig({ DATABASE_URL: "https://db.example.com/x" })).toThrow(ConfigError);
+    expect(() => loadConfig({ DATABASE_URL: "postgresql://u:p@h/db" })).not.toThrow();
+  });
+  it("endpoint recusa userinfo e IP literal/loopback", () => {
+    for (const u of ["https://user:pw@evil.example/graphql", "https://127.0.0.1/graphql", "https://[::1]/graphql", "https://localhost/graphql"]) {
+      expect(() => loadConfig({ ...base, SHOPEE_ENDPOINT: u })).toThrow(ConfigError);
+    }
+  });
+  it("limites: tick ≥ 5 s, heartbeat ≥ 2× tick, lease ≥ timeout + margem", () => {
+    expect(() => loadConfig({ ...base, TICK_INTERVAL_MS: "1" })).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, TICK_INTERVAL_MS: "99999999999999999999" })).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, HEARTBEAT_STALE_MS: "1000" })).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, CLAIM_LEASE_MS: "10000", EXTERNAL_TIMEOUT_MS: "9000" })).toThrow(ConfigError);
+  });
+});
