@@ -1,10 +1,29 @@
-import { filterOffers, filterNotRepeated, type OfferFilters, type OfferLike } from "@achadinhos/domain";
+import {
+  DEFAULT_SHOPEE_LINK_HOSTS,
+  filterNotRepeated,
+  filterOffers,
+  isAllowedLink,
+  isUnknownResultReason,
+  sendableOfferField,
+  type OfferFilters,
+  type OfferLike,
+} from "@achadinhos/domain";
 import type { ProductOfferV2Params } from "@achadinhos/shopee";
 import { withDeadline } from "./deadline.js";
 import type { OfferSelector, ProductOfferNode, SelectionInput, SelectionResult, SendHistoryRow } from "./ports.js";
 
-/** Motivo gravado pelo reaper quando o resultado do envio é desconhecido (decisão 001 A4/A5). */
+/** Motivo do reaper (decisão 001 A4/A5); o critério de bloqueio é o sufixo `_resultado_desconhecido`. */
 export const UNKNOWN_RESULT_REASON = "lease_expirado_resultado_desconhecido";
+const REJECTION_BLOCK_MS = 24 * 3_600_000;
+
+/** Recusa do executor por oferta/link/imagem: não pode voltar no slot seguinte. */
+function isOfferRejection(r: SendHistoryRow): boolean {
+  const reason = r.reason ?? "";
+  return (
+    (r.status === "failed" && (reason === "link_invalido" || reason.startsWith("imagem_"))) ||
+    (r.status === "skipped" && reason.startsWith("oferta_invalida_"))
+  );
+}
 
 export const DEFAULT_SELECTION_TIMEOUT_MS = 15_000;
 const DEFAULT_PAGES = 3;
@@ -16,23 +35,27 @@ export class OfferSourceError extends Error {
 
 export type DiscardedNode = { itemId: string | null; reason: string };
 
-function httpsUrl(v: unknown): boolean {
-  if (typeof v !== "string" || v.trim() === "") return false;
-  try {
-    return new URL(v).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-/** Motivo de descarte, ou null se o nó é utilizável pelo executor (QA #14: nó inválido envenenava o grupo). */
-export function invalidNodeReason(n: ProductOfferNode): string | null {
+/** Motivo de descarte, ou null se o nó passa no MESMO critério do executor (domain/sendable). */
+export function invalidNodeReason(
+  n: ProductOfferNode,
+  hosts: { linkHosts?: readonly string[]; imageHosts: readonly string[] },
+): string | null {
   const id = (n as { itemId?: unknown }).itemId;
-  if (id === undefined || id === null || String(id).trim() === "") return "item_id_ausente";
-  if (typeof n.productName !== "string" || n.productName.trim() === "") return "titulo_vazio";
-  if (!httpsUrl(n.offerLink)) return "offerLink_invalido";
-  if (!httpsUrl(n.imageUrl)) return "imageUrl_invalida";
-  if (typeof n.priceMin !== "number" || !Number.isFinite(n.priceMin) || n.priceMin <= 0) return "preco_invalido";
+  if (id === undefined || id === null || String(id).trim() === "") return "oferta_invalida_itemId";
+  const field = sendableOfferField(
+    {
+      title: n.productName,
+      priceCurrent: n.priceMin,
+      priceOld: n.priceMax,
+      discountPct: n.priceDiscountRate,
+      productUrl: n.productLink,
+      imageUrl: n.imageUrl,
+    },
+    hosts,
+  );
+  if (field) return `oferta_invalida_${field}`;
+  // o executor gera o shortLink a partir do link de oferta: mesmo host permitido
+  if (!isAllowedLink(n.offerLink, hosts.linkHosts ?? DEFAULT_SHOPEE_LINK_HOSTS)) return "oferta_invalida_offerLink";
   return null;
 }
 
@@ -47,6 +70,9 @@ export type SelectOfferInput = Omit<SelectionInput, "accountId" | "automationId"
   /** Prazo total (todas as páginas) da busca na Shopee. */
   timeoutMs?: number;
   maxPages?: number;
+  /** Mesma allowlist que o executor usa para baixar a imagem (config); obrigatória de propósito. */
+  imageHosts: readonly string[];
+  linkHosts?: readonly string[];
   /** Chamado para cada nó descartado por formato inválido (motivo fixo, sem dado da Shopee). */
   onDiscard?: (node: DiscardedNode) => void;
 };
@@ -60,7 +86,7 @@ function blockingHistory(history: SendHistoryRow[], groupId: string, now: Date) 
         (r.status === "sent" ||
           r.status === "queued" ||
           r.status === "sending" ||
-          (r.status === "failed" && r.reason === UNKNOWN_RESULT_REASON)),
+          (r.status === "failed" && isUnknownResultReason(r.reason))),
     )
     .map((r) => ({
       group_id: groupId,
@@ -86,6 +112,16 @@ export async function selectOffer(input: SelectOfferInput): Promise<SelectionRes
   const deadlineAt = Date.now() + total;
   const history = blockingHistory(input.history, groupId, now);
   const keyword = keywordOf(filters);
+  const hosts = { imageHosts: input.imageHosts, ...(input.linkHosts ? { linkHosts: input.linkHosts } : {}) };
+  const rejected = new Set(
+    input.history
+      .filter((r) => r.itemId != null && isOfferRejection(r))
+      .filter((r) => {
+        const at = r.attemptedAt ?? r.createdAt;
+        return !(at instanceof Date) || Number.isNaN(at.getTime()) || now.getTime() - at.getTime() < REJECTION_BLOCK_MS;
+      })
+      .map((r) => String(r.itemId)),
+  );
 
   let sawEligibleButRepeated = false;
   for (let page = 1; page <= maxPages; page++) {
@@ -100,10 +136,12 @@ export async function selectOffer(input: SelectOfferInput): Promise<SelectionRes
     }
     const usable: ProductOfferNode[] = [];
     for (const n of result.nodes) {
-      const why = n && typeof n === "object" ? invalidNodeReason(n) : "no_invalido";
+      const why = n && typeof n === "object" ? invalidNodeReason(n, hosts) : "no_invalido";
       if (why) {
         const id = (n as { itemId?: unknown } | null)?.itemId;
         input.onDiscard?.({ itemId: id == null ? null : String(id), reason: why });
+      } else if (rejected.has(String(n.itemId))) {
+        input.onDiscard?.({ itemId: String(n.itemId), reason: "recusada_recentemente" });
       } else usable.push(n);
     }
     const passing = filterOffers(usable as unknown as OfferLike[], filters) as unknown as ProductOfferNode[];
@@ -122,7 +160,7 @@ export async function selectOffer(input: SelectOfferInput): Promise<SelectionRes
 
 export function createOfferSelector(
   source: OfferSource,
-  options: { timeoutMs?: number; maxPages?: number; onDiscard?: (n: DiscardedNode) => void } = {},
+  options: { imageHosts: readonly string[]; linkHosts?: readonly string[]; timeoutMs?: number; maxPages?: number; onDiscard?: (n: DiscardedNode) => void },
 ): OfferSelector {
   return (input) =>
     selectOffer({
@@ -134,6 +172,8 @@ export function createOfferSelector(
       dedupeDays: input.dedupeDays,
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.maxPages !== undefined ? { maxPages: options.maxPages } : {}),
+      imageHosts: options.imageHosts,
+      ...(options.linkHosts ? { linkHosts: options.linkHosts } : {}),
       ...(options.onDiscard ? { onDiscard: options.onDiscard } : {}),
     });
 }

@@ -27,7 +27,7 @@ function world(start: string) {
 describe("T7-04 + T7-05 com cliente Shopee real contra o servidor simulado", () => {
   it("seleciona oferta pelo cliente de packages/shopee, reexecuta 2x sem duplicata e libera no dia 8", async () => {
     const shopee = createShopeeClient({ appId: "test-app-id", secret: "test-secret" }, { endpoint: mock.url, timeoutMs: 2_000 });
-    const selectOffer = createOfferSelector(shopee, { timeoutMs: 5_000 });
+    const selectOffer = createOfferSelector(shopee, { timeoutMs: 5_000, imageHosts: ["example.com"] });
     const w = world("2026-10-13T16:00:00Z");
     const run = () => runSchedulerTick({ store: w.store, now: w.clock.now, selectOffer, dedupeDays: 7 });
     const sentItems = () => w.store.sends.filter((s) => s.status === "queued" || s.status === "sent");
@@ -64,7 +64,7 @@ describe("T7-04 + T7-05 com cliente Shopee real contra o servidor simulado", () 
     const r = await runSchedulerTick({
       store: w.store,
       now: w.clock.now,
-      selectOffer: createOfferSelector(hang, { timeoutMs: 30 }),
+      selectOffer: createOfferSelector(hang, { timeoutMs: 30, imageHosts: ["example.com"] }),
     });
     expect(r.errors).toBe(1);
     expect(w.store.sends).toHaveLength(0);
