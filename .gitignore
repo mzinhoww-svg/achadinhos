@@ -11,3 +11,5 @@ coverage/
 supabase/.temp/
 .maestri/
 STOP
+next-env.d.ts
+*.tsbuildinfo
