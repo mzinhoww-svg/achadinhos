@@ -54,7 +54,24 @@ importers:
         specifier: ^5.0.4
         version: 5.0.4(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
-  apps/worker: {}
+  apps/worker:
+    dependencies:
+      '@achadinhos/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@achadinhos/shopee':
+        specifier: workspace:*
+        version: link:../../packages/shopee
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.20.5)(lightningcss@1.33.0)
 
   packages/alerts:
     devDependencies:
