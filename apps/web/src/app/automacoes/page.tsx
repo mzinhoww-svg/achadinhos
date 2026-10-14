@@ -8,13 +8,15 @@ import { IconBolt, IconPlus } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/table";
 import { estimatePostsPerDay } from "@/lib/estimate";
-import { account, automations, isEmptyPreview } from "@/lib/mock";
+import { account, isEmptyPreview } from "@/lib/mock";
+import { container, viewSession } from "@/server/context";
 
 export const metadata: Metadata = { title: "Automações" };
 
 export default async function AutomacoesPage({ searchParams }: { searchParams: Promise<{ vazio?: string }> }) {
-  const empty = isEmptyPreview(await searchParams);
-  const list = empty ? [] : automations;
+  const c = await container();
+  const session = await viewSession(c, isEmptyPreview(await searchParams));
+  const list = session ? await c.automations.list(session.accountId) : [];
   const atLimit = list.length >= account.maxAutomations;
 
   return (

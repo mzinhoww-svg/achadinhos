@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
-  transpilePackages: ["@achadinhos/creative"],
+  transpilePackages: ["@achadinhos/creative", "@achadinhos/domain", "@achadinhos/telegram"],
   devIndicators: false,
 };
 

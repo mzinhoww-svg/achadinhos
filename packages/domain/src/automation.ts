@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeDays, isValidTimeZone } from "./timezone.js";
+import { normalizeDays, isValidTimeZone } from "./timezone";
 
 export const FREQUENCY_MIN_ENUM = [15, 30, 60] as const;
 export const MAX_AUTOMATIONS_PER_ACCOUNT = 5;
