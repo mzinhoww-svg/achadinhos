@@ -251,12 +251,15 @@ export class ShopeeClient {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(this.endpoint, {
-        method: "POST",
-        headers,
-        body,
-        signal: controller.signal,
-      });
+      response = await abortable(
+        this.fetchImpl(this.endpoint, {
+          method: "POST",
+          headers,
+          body,
+          signal: controller.signal,
+        }),
+        controller.signal,
+      );
     } catch (error) {
       clearTimeout(timer);
       if (controller.signal.aborted) {
@@ -274,7 +277,7 @@ export class ShopeeClient {
 
     let json: unknown;
     try {
-      json = await response.json();
+      json = await abortable(response.json(), controller.signal);
     } catch (error) {
       clearTimeout(timer);
       if (controller.signal.aborted) {
@@ -316,6 +319,16 @@ export class ShopeeClient {
 
     return parsed.data;
   }
+}
+
+/** Rejeita quando o signal aborta, mesmo que o fetch/corpo ignore o signal (timeout cobre a leitura do corpo). */
+function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error("aborted"));
+    if (signal.aborted) return onAbort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }
 
 export function createShopeeClient(

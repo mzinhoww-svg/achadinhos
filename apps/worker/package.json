@@ -1,1 +1,20 @@
-{ "name": "@achadinhos/worker", "private": true, "version": "0.0.0", "scripts": { "test": "echo \"sem testes ainda\"" } }
+{
+  "name": "@achadinhos/worker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@achadinhos/creative": "workspace:*",
+    "@achadinhos/shopee": "workspace:*",
+    "@achadinhos/telegram": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
