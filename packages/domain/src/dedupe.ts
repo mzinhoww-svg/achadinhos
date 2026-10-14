@@ -1,4 +1,4 @@
-import { getZonedParts } from "./timezone.js";
+import { getZonedParts } from "./timezone";
 
 export const REPEATED = "repetida";
 export const DEDUPE_DAYS_DEFAULT = 7;
