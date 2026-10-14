@@ -93,7 +93,7 @@ export default async function EnviosPage({ searchParams }: { searchParams: Promi
         )}
       </div>
 
-      <EnviosLive initial={view} accountId={session.accountId} empty={empty} />
+      <EnviosLive initial={view} accountId={session.accountId} empty={empty} realtimeToken={session.accessToken ?? null} />
     </>
   );
 }

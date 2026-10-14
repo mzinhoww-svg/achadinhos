@@ -1,6 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": ".", "noEmit": true },
+  "compilerOptions": {
+    "rootDir": "../..",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true
+  },
   "include": ["src", "tests"],
   "exclude": ["node_modules", "dist"]
 }
