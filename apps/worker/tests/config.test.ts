@@ -74,3 +74,21 @@ describe("loadConfig — endurecimento", () => {
     expect(() => loadConfig({ ...base, CLAIM_LEASE_MS: "10000", EXTERNAL_TIMEOUT_MS: "9000" })).toThrow(ConfigError);
   });
 });
+
+describe("loadConfig — entrada do worker", () => {
+  const base = { DATABASE_URL: "postgres://worker:pw@db.example.com:5432/postgres" };
+  it("defaults: executor 5 s, alerta de parado 10 min, shutdown 30 s", () => {
+    const c = loadConfig(base);
+    expect(c.executorPollMs).toBe(5_000);
+    expect(c.stallAlertMs).toBe(600_000);
+    expect(c.shutdownGraceMs).toBe(30_000);
+    expect(c.alertEmailTo).toBeUndefined();
+  });
+  it("recusa e-mail de alerta inválido e poll abaixo de 1 s", () => {
+    expect(() => loadConfig({ ...base, ALERT_EMAIL_TO: "nao-e-email" })).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, EXECUTOR_POLL_MS: "10" })).toThrow(ConfigError);
+  });
+  it("alerta de parado precisa ser maior que o heartbeat stale", () => {
+    expect(() => loadConfig({ ...base, WORKER_STALL_ALERT_MS: "60000" })).toThrow(ConfigError);
+  });
+});
