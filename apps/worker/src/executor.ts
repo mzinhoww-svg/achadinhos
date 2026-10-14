@@ -23,8 +23,8 @@ import { downloadProductImage, ImageRejectedError } from "./image.ts";
 import { StepTimeoutError, withTimeout } from "./timeouts.ts";
 import { DEFAULT_SHOPEE_LINK_HOSTS, isAllowedLink, isHttpsUrl } from "./links.ts";
 
-/** Todo motivo de resultado desconhecido termina com este sufixo; o índice de dedupe (SQL) usa o mesmo. */
-export const UNKNOWN_RESULT_SUFFIX = "_resultado_desconhecido";
+import { UNKNOWN_RESULT_SUFFIX } from "@achadinhos/domain";
+export { UNKNOWN_RESULT_SUFFIX };
 const MAX_TITLE_LENGTH = 500;
 const FINISH_ATTEMPTS = 3;
 const FINISH_BACKOFF_MS = 100;

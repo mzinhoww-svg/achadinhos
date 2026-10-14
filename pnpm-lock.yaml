@@ -71,6 +71,9 @@ importers:
       '@achadinhos/creative':
         specifier: workspace:*
         version: link:../../packages/creative
+      '@achadinhos/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@achadinhos/shopee':
         specifier: workspace:*
         version: link:../../packages/shopee

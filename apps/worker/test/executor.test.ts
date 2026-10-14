@@ -8,6 +8,7 @@ import {
   type ExecutorDeps,
   type FinishArgs,
 } from "../src/executor.ts";
+import { isUnknownResultReason } from "@achadinhos/domain";
 import { PNG } from "./helpers.ts";
 
 const SECRET_TOKEN = "123456:SUPER-SECRET-TOKEN";
@@ -219,6 +220,7 @@ describe("resultado desconhecido (QA 3, Farol B2)", () => {
     const reason = (s.finished[0]![1] as { reason: string }).reason;
     expect(reason).toBe("telegram_timeout_resultado_desconhecido");
     expect(reason.endsWith(UNKNOWN_RESULT_SUFFIX)).toBe(true);
+    expect(isUnknownResultReason(reason)).toBe(true); // o predicado que a seleção de ofertas deve usar
     await s.close();
   });
 
