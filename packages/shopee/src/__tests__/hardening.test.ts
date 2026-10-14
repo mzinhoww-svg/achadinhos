@@ -13,7 +13,9 @@ import {
 import { startMockShopeeServer } from "../mock-server/index.js";
 
 const APP_ID = "test-app-id";
-const SECRET = "canary-secret-7f3a9c";
+// Canário montado em runtime: não existe como literal no repositório (gitleaks).
+const SECRET = ["canary", "secret", String(Date.now()), "x7f3a"].join("-");
+const USERINFO_PW = ["pw", String(Date.now())].join("");
 
 const node = (over: Record<string, unknown> = {}) => ({
   itemId: 1,
@@ -96,9 +98,9 @@ describe("R2 — endpoint https + allowlist", () => {
   });
   it("mensagem do erro não ecoa o secret nem credenciais da URL", () => {
     try {
-      make("https://user:hunter2@evil.example/graphql")();
+      make(`https://user:${USERINFO_PW}@evil.example/graphql`)();
     } catch (e) {
-      expect(String((e as Error).message)).not.toContain("hunter2");
+      expect(String((e as Error).message)).not.toContain(USERINFO_PW);
     }
   });
 });
