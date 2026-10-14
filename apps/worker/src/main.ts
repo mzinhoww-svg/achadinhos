@@ -1,16 +1,10 @@
 import { loadConfig, ConfigError, type WorkerConfig } from "./config.js";
 import { createLogger, type Logger } from "./logger.js";
+import { createSqlBuildDeps } from "./sql/build-deps.js";
 import { createWorkerRuntime, type RuntimeDeps, type WorkerRuntime } from "./runtime.js";
 
 export type BuildDeps = (config: WorkerConfig, log: Logger) => Promise<Omit<RuntimeDeps, "config" | "log">>;
 
-/**
- * Adaptadores de produção (SchedulerStore/claim_next_send/Vault sobre Postgres) ainda não existem:
- * falhar fechado é melhor do que subir um worker com portas em memória.
- */
-export const defaultBuildDeps: BuildDeps = async () => {
-  throw new Error("adaptador de produção ausente: falta o adaptador SQL do worker (Postgres/Vault)");
-};
 
 export type StartResult =
   | { ok: true; runtime: WorkerRuntime; config: WorkerConfig; log: Logger }
@@ -34,7 +28,7 @@ export async function startWorker(opts: {
   // o segredo mais sensível do processo é registrado antes de qualquer outra coisa
   log.addSecret(config.databaseUrl.reveal());
   try {
-    const parts = await (opts.buildDeps ?? defaultBuildDeps)(config, log);
+    const parts = await (opts.buildDeps ?? createSqlBuildDeps({ env: opts.env }))(config, log);
     const runtime = createWorkerRuntime({
       config: {
         tickIntervalMs: config.tickIntervalMs,

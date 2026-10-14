@@ -4,3 +4,6 @@ export * from "./queue.js";
 export * from "./scheduler-store.js";
 export * from "./send-context.js";
 export * from "./vault.js";
+export * from "./build-deps.js";
+export * from "./clock.js";
+export * from "./creative-store.js";
