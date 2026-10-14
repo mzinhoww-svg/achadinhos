@@ -56,15 +56,25 @@ Ordem sugerida, cada passo com ponto de parada:
 
 ### 3.1 Conexão com o banco (IPv6 e pooler)
 
-O host direto do Supabase (`db.<ref>.supabase.co`) é IPv6 e o plano free não inclui o complemento IPv4: um VPS sem IPv6 não conecta. `DATABASE_URL` do worker **deve** ser a connection string do **pooler em modo transaction**, compatível com `pg_advisory_xact_lock` do claim (decisão 001, A3; lock de sessão continua proibido). `DATABASE_URL` entra no `addSecret` do logger.
+O host direto do Supabase (`db.<ref>.supabase.co`) é IPv6 e o plano free não inclui o complemento IPv4: um VPS sem IPv6 não conecta. `DATABASE_URL` do worker **deve** ser a connection string do **pooler em modo transaction** (porta **6543**; a 5432 do pooler é modo sessão), compatível com `pg_advisory_xact_lock` do claim (decisão 001, A3; lock de sessão continua proibido). `DATABASE_URL` entra no `addSecret` do logger.
+
+**Prepared statements:** o modo transaction não aceita prepared statements nomeados. O cliente Postgres do adaptador (T7-12) deve rodar sem eles (`prepare: false` no `postgres`, ou queries parametrizadas sem nome no `pg`). Verificar no teste de conexão do passo 4.
 
 ### 3.2 Monitor externo e limite único do alerta
 
-- **Limite único: 3 minutos** (decisão 003, H5), igual em todos os documentos e no código. Definir `WORKER_STALL_ALERT_MS=180000` no `EnvironmentFile`; o padrão de 10 min do #30 e dos alertas (#8) **não** vale em produção. O #30 deve alinhar o padrão a 180000 ou o runbook fixa a variável.
+- **Limite único: 3 minutos** (decisão 003, H5), igual em todos os documentos e no código. O `loadConfig` do #30 exige `WORKER_STALL_ALERT_MS` **estritamente maior** que `HEARTBEAT_STALE_MS` (padrão 180000), então o par obrigatório no `EnvironmentFile` é:
+
+  ```
+  HEARTBEAT_STALE_MS=120000      # 2 x tick de 60 s (mínimo aceito)
+  WORKER_STALL_ALERT_MS=180000   # 3 min
+  ```
+
+  Só `WORKER_STALL_ALERT_MS=180000` com o padrão de `HEARTBEAT_STALE_MS` **não sobe** (`ConfigError`). O padrão de 600000 do código e dos alertas (#8) não vale em produção.
 - O `checkStalled` roda dentro do processo do worker: com processo morto ou VPS fora, ninguém alerta. Por isso é obrigatório um monitor **fora do VPS**:
-  - opção A (preferida, R$ 0): ping gratuito (healthchecks.io ou UptimeRobot) chamado pelo worker a cada tick, com período de 1 min e tolerância de 2 min, e-mail ao falhar;
+  - opção A (preferida, R$ 0): healthchecks.io (free, período mínimo de 1 min, e-mail) chamado pelo worker a cada tick **bem-sucedido**, com período de 1 min e tolerância de 2 min. UptimeRobot só se o monitor de heartbeat estiver no plano free: **confirmar no dia**;
   - opção B (R$ 0): `pg_cron` no Supabase + função que lê o heartbeat persistido (`checkWorkerStalled`) e dispara o e-mail.
 - Sem um dos dois, o item "alerta em 3 min" do checklist F **não é cumprível** e não pode ser marcado.
+- **O ping ainda não existe no código** (o #30 tem só `checkStalled` interno e `checkWorkerStalled`, que ninguém agenda). Tarefa a abrir: o worker envia o ping só depois de um tick sem exceção, com a URL do monitor tratada como segredo. Até lá o item F fica `parcial`.
 
 ### 3.3 Limites que o plano precisa contar
 
