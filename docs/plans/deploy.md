@@ -11,6 +11,7 @@ Autor: Farol (Planejador). Data: 2026-10-14. Base: decisões 001–003, `docs/se
 | Banco, Auth, Vault, Realtime | Supabase | — |
 | Worker (`apps/worker`) | VPS LetsCloud, Node + systemd | service role (ou role dedicada, H3), lido de `EnvironmentFile` 0600; segredos da Shopee/Telegram só via Vault |
 | E-mail de alerta | provedor transacional (a escolher) | chave de API no env do worker |
+| Monitor externo (fora do VPS) | ping gratuito (healthchecks.io ou UptimeRobot) ou `pg_cron` no Supabase | URL de ping no env do worker (tratada como segredo) |
 
 Fluxo de segredo: o painel grava no Vault por RPC só de escrita; só o worker lê.
 
@@ -44,11 +45,36 @@ Leitura: o MVP cabe com folga **enquanto Vercel e Supabase ficarem no free**. Qu
 Ações de Aurimar (já em `docs/ACTIONS.md`): credenciais Shopee, bot do Telegram, projeto Supabase novo, provedor de e-mail. Sem elas nada é publicado.
 
 Ordem sugerida, cada passo com ponto de parada:
-1. **Supabase**: criar projeto, aplicar migrações, rodar pgTAP contra ele, conferir advisors (RLS ligado em todas as tabelas, sem função `SECURITY DEFINER` exposta). Gerar a role dedicada do worker.
+1. **Supabase**: criar projeto, aplicar migrações, rodar pgTAP **e** o contrato `tests/contract` contra ele (hoje só em container), conferir advisors (RLS ligado em todas as tabelas, sem função `SECURITY DEFINER` exposta). Gerar a role dedicada do worker.
 2. **Vercel**: configurar apenas `NEXT_PUBLIC_SUPABASE_URL` e anon key; `ACHADINHOS_DEMO_SESSION` **ausente** em todos os ambientes (parecer #11, R1).
 3. **VPS**: criar usuário de serviço sem shell, SSH só por chave, `ufw` só com SSH, atualizações automáticas, NTP, `TZ=UTC`; unit systemd com `Restart=always` e `EnvironmentFile` 0600 fora do repo.
-4. **Worker**: subir com `LOG_LEVEL=info`, um canal de teste e `enqueue_send_now` manual; observar heartbeat e e-mail de alerta.
+4. **Worker**: subir com `LOG_LEVEL=info`, `DATABASE_URL` do pooler (seção 3.1), um canal de teste e `enqueue_send_now` manual.
+   - Testar a conexão com o banco **antes** de qualquer outra coisa (falha aqui trava o deploy no primeiro minuto).
+   - Matar o processo de propósito e confirmar que o e-mail do monitor externo chega em até 3 min (seção 3.2).
+   - Testar "bot removido do grupo" e "Shopee fora do ar" no canal de teste antes do primeiro envio real.
 5. **Primeiro envio real** só em grupo de teste, com a conta de teste do bot.
+
+### 3.1 Conexão com o banco (IPv6 e pooler)
+
+O host direto do Supabase (`db.<ref>.supabase.co`) é IPv6 e o plano free não inclui o complemento IPv4: um VPS sem IPv6 não conecta. `DATABASE_URL` do worker **deve** ser a connection string do **pooler em modo transaction**, compatível com `pg_advisory_xact_lock` do claim (decisão 001, A3; lock de sessão continua proibido). `DATABASE_URL` entra no `addSecret` do logger.
+
+### 3.2 Monitor externo e limite único do alerta
+
+- **Limite único: 3 minutos** (decisão 003, H5), igual em todos os documentos e no código. Definir `WORKER_STALL_ALERT_MS=180000` no `EnvironmentFile`; o padrão de 10 min do #30 e dos alertas (#8) **não** vale em produção. O #30 deve alinhar o padrão a 180000 ou o runbook fixa a variável.
+- O `checkStalled` roda dentro do processo do worker: com processo morto ou VPS fora, ninguém alerta. Por isso é obrigatório um monitor **fora do VPS**:
+  - opção A (preferida, R$ 0): ping gratuito (healthchecks.io ou UptimeRobot) chamado pelo worker a cada tick, com período de 1 min e tolerância de 2 min, e-mail ao falhar;
+  - opção B (R$ 0): `pg_cron` no Supabase + função que lê o heartbeat persistido (`checkWorkerStalled`) e dispara o e-mail.
+- Sem um dos dois, o item "alerta em 3 min" do checklist F **não é cumprível** e não pode ser marcado.
+
+### 3.3 Limites que o plano precisa contar
+
+| Recurso | Limite (free) | Estimativa | Ação |
+|---|---|---|---|
+| Storage dos criativos | 1 GB | PNG ~46 KB × até 200/dia × 30 ≈ 280 MB/mês; enche em ~3–4 meses | expiração: apagar o objeto 7 dias após o envio (alinhado à antirrepetição) + alerta de uso (80%) |
+| Egress | 5 GB/mês | irrelevante para 1 operador | registrar o limite |
+| Conexões Realtime | 200 | irrelevante para 1 operador | registrar o limite |
+| Vault | fora do export semanal (D2) | — | se o projeto Supabase se perder, App ID/Secret e tokens são digitados de novo; registrar no runbook |
+| Banco | 500 MB | histórico de envios cresce linearmente | revisar retenção junto com o storage |
 
 ## 4. Riscos e decisões que o plano deixa abertas
 
@@ -57,8 +83,9 @@ Ordem sugerida, cada passo com ponto de parada:
 | D1 | Vercel Hobby vs. uso comercial | Aurimar decide: aceitar o risco de termos no MVP, pagar Pro (estoura o teto) ou servir o painel pelo VPS |
 | D2 | Supabase free pausa e não tem backup | Export semanal de contas/automações/grupos (decisão 003, H6); aceitar perda do histórico de envios no MVP |
 | D3 | Service role no VPS ignora RLS | Role Postgres dedicada ao worker antes do primeiro deploy (H3); aqui ainda aberta |
-| D4 | Ponto único de falha (1 VPS) | Aceito no MVP; `Restart=always`, alerta em 3 min, fila concorrente-segura permite subir outro nó |
+| D4 | Ponto único de falha (1 VPS) | Aceito no MVP; `Restart=always`, alerta em 3 min **via monitor externo** (3.2), fila concorrente-segura permite subir outro nó |
 | D5 | Câmbio e preços de terceiros | Reconferir no dia da contratação; atualizar `STATUS.md` |
+| D6 | Servir o painel pelo VPS (alternativa ao Hobby) | Cabe no teto (R$ 0 extra), mas move TLS, atualização e `next start` para a operação; estimar ~½ dia de montagem e manutenção recorrente antes de escolher |
 
 ## 5. Texto sugerido para `STATUS.md` (seção Orçamento)
 
@@ -70,11 +97,20 @@ Ordem sugerida, cada passo com ponto de parada:
 | E-mail transacional | R$ 0 (free tier) | provedor a escolher |
 | **Total base** | **R$ 25/mês** | teto R$ 100; nenhum gasto realizado |
 
-## 6. O que bloqueia o primeiro deploy (visão de planejamento)
+## 6. O que bloqueia o primeiro deploy
 
-Depende da auditoria final da T7 (security-checklist D, E, B, F), que só roda quando o PR do Balanço (worker-entry + e2e) abrir. Bloqueios já conhecidos, herdados dos pareceres anteriores:
-- `blockingHistory` do agendador comparar por igualdade em vez de `endsWith("_resultado_desconhecido")` (parecer #14).
-- Claim sem filtro de grupo ativo/janela e `automation_id` ausente em `sends` (gates T7-10).
-- `addSecret` em todo segredo no logger e role dedicada do Vault/worker (pareceres #16, #19).
-- Flag `ACHADINHOS_DEMO_SESSION` bloqueada em produção (parecer #11, R1).
+Estado verificado contra a `main` em 2026-10-14 (comentário do QA no #29). Resolvido: `blockingHistory` por sufixo `_resultado_desconhecido` (#14 mergeado).
+
+Continuam abertos:
+- Grupo com bot removido continua agendado e consome o teto (#30, devolvido).
+- `public.sends` fora da publicação `supabase_realtime`; cliente Realtime `null`.
+- Adaptadores SQL do `SchedulerStore`, do claim e do `ValidationStore` (`vault.read` com `account_id`).
+- `addSecret` dos segredos lidos do Vault (Shopee/Telegram) ao ler; o #30 já registra `DATABASE_URL`.
+- Role Postgres dedicada ao worker e ao Vault (decisão 003, H3; D3).
+- Heartbeat persistido e exposto; monitor externo (3.2).
+- CI sem `next build` e sem pgTAP (issue #26).
+- Executor sem o downloader seguro do #23.
+- RPC `enqueue_send_now` sem adaptador no web.
+- Claim sem filtro de grupo ativo/janela e `automation_id` ausente em `sends` (gates T7-10; reconferir no #30).
+- Flag `ACHADINHOS_DEMO_SESSION` bloqueada em produção (#11, R1).
 - Credenciais reais e provedor de e-mail definidos.
