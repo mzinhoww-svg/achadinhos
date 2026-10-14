@@ -27,7 +27,7 @@ export async function seedAccount(db: PGlite, n = 1): Promise<Seed> {
     "insert into public.channels (account_id, kind, config_secret_id) values ($1,'telegram',$2) returning id",
     [acc.account_id, tok.id],
   );
-  await db.query("insert into public.shopee_credentials (account_id, app_id, secret_id, status) values ($1,'app-1',$2,'valid')", [
+  await db.query("insert into public.shopee_credentials (account_id, app_id, secret_id, status) values ($1,'app-1',$2,'validated')", [
     acc.account_id,
     shp.id,
   ]);

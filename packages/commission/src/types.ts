@@ -115,8 +115,8 @@ export interface CommissionRepository {
   totalsByGroup?(): Record<string, number>;
   statusHistory?(): readonly StatusChangeEvent[];
   history?(): readonly StatusChangeEvent[];
-  getLastCollectedAt?(): number | undefined | null;
-  setLastCollectedAt?(value: number): void;
+  getLastCollectedAt?(): number | undefined | null | Promise<number | undefined | null>;
+  setLastCollectedAt?(value: number): void | Promise<void>;
 }
 
 export interface CommissionRepositoryPort extends CommissionRepository {}

@@ -38,12 +38,13 @@ describe("timeout cobre a leitura do corpo em cada cliente", () => {
   });
 
   it("download de imagem: corpo estancado vira ImageRejectedError(timeout)", async () => {
-    const viaStalled = ((_u: string, init?: RequestInit) => fetch(stalled.url, init)) as unknown as typeof fetch;
+    const viaStalled = ((_u: string, init?: RequestInit) => fetch(`${stalled.url}/image`, init)) as unknown as typeof fetch;
     await expect(
       downloadProductImage("https://cf.shopee.com.br/file/x", {
         allowedHosts: ["cf.shopee.com.br"],
         maxBytes: 1000,
         timeoutMs: 150,
+        resolveHost: async () => ["93.184.216.34"],
         fetch: viaStalled,
       }),
     ).rejects.toMatchObject({ code: "timeout" });

@@ -1,13 +1,11 @@
 import type {
   CollectOptions,
   CollectResult,
-  Commission,
   CommissionRepository,
   ConversionSource,
   ConversionSourcePort,
 } from "./types.js";
 import { normalizeConversion, toSeconds } from "./normalizer.js";
-import { InMemoryCommissionRepository } from "./repository.js";
 
 function isRepository(value: unknown): value is CommissionRepository {
   if (!value || typeof value !== "object") return false;
@@ -155,7 +153,7 @@ export class CommissionCollector {
     const endSeconds = toSeconds(opts.purchaseTimeEnd ?? nowSeconds) ?? nowSeconds;
     const lookback = opts.lookbackSeconds ?? 6 * 60 * 60;
     const overlap = opts.overlapSeconds ?? 10 * 60;
-    const rawLast = this.repository.getLastCollectedAt?.();
+    const rawLast = await Promise.resolve(this.repository.getLastCollectedAt?.());
     const last = rawLast === null || rawLast === undefined ? null : (toSeconds(rawLast) ?? rawLast);
     const startSeconds =
       toSeconds(opts.purchaseTimeStart as unknown) ??
@@ -211,7 +209,7 @@ export class CommissionCollector {
     }
 
     const collectedAt = endSeconds;
-    this.repository.setLastCollectedAt?.(collectedAt);
+    await Promise.resolve(this.repository.setLastCollectedAt?.(collectedAt));
 
     return { inserted, updated, skipped, total, pages, collectedAt };
   }
