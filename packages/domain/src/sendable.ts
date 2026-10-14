@@ -9,12 +9,6 @@ export const DEFAULT_SHOPEE_LINK_HOSTS = ["shopee.com.br", "shp.ee", "shope.ee",
 export const MAX_LINK_LENGTH = 300;
 export const MAX_URL_LENGTH = 2000;
 export const MAX_TITLE_LENGTH = 500;
-export const UNKNOWN_RESULT_SUFFIX = "_resultado_desconhecido";
-
-/** Resultado desconhecido: a mensagem pode ter chegado ao grupo. Qualquer motivo com o sufixo. */
-export function isUnknownResultReason(reason: unknown): boolean {
-  return typeof reason === "string" && reason.endsWith(UNKNOWN_RESULT_SUFFIX);
-}
 
 /** https, sem credenciais embutidas, host exato ou subdomínio de um host permitido, tamanho limitado. */
 export function isAllowedLink(raw: unknown, hosts: readonly string[], maxLength = MAX_LINK_LENGTH): boolean {

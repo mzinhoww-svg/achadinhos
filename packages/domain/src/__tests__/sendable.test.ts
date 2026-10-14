@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SHOPEE_LINK_HOSTS,
-  UNKNOWN_RESULT_SUFFIX,
   isAllowedImageUrl,
   isAllowedLink,
-  isUnknownResultReason,
   sendableOfferField,
 } from "../sendable";
 
@@ -46,16 +44,5 @@ describe("helpers", () => {
     expect(isAllowedLink("https://s.shopee.com.br/x", DEFAULT_SHOPEE_LINK_HOSTS)).toBe(true);
     expect(isAllowedLink("https://notshopee.com.br/x", DEFAULT_SHOPEE_LINK_HOSTS)).toBe(false);
     expect(isAllowedImageUrl("https://[::1]/a.jpg", ["susercontent.com"])).toBe(false);
-  });
-  it("resultado desconhecido por sufixo", () => {
-    expect(UNKNOWN_RESULT_SUFFIX).toBe("_resultado_desconhecido");
-    for (const r of [
-      "lease_expirado_resultado_desconhecido",
-      "telegram_timeout_resultado_desconhecido",
-      "telegram_transporte_resultado_desconhecido",
-      "telegram_resposta_invalida_resultado_desconhecido",
-    ]) expect(isUnknownResultReason(r)).toBe(true);
-    expect(isUnknownResultReason("telegram_400")).toBe(false);
-    expect(isUnknownResultReason(null)).toBe(false);
   });
 });

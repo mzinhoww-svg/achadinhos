@@ -10,9 +10,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
-    "zod": "^3.23.8",
     "@achadinhos/domain": "workspace:*",
-    "@achadinhos/shopee": "workspace:*"
+    "@achadinhos/shopee": "workspace:*",
+    "@achadinhos/telegram": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

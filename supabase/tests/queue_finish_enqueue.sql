@@ -101,8 +101,10 @@ SELECT is(public.finish_send('51000000-0000-0000-0000-000000000007','sent', NULL
 SELECT is((SELECT status || '/' || reason FROM public.sends WHERE id='51000000-0000-0000-0000-000000000007'),
   'failed/lease_expirado_resultado_desconhecido', 'a linha fica failed com resultado desconhecido (at-most-once)');
 SELECT ok(EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'sends_dedupe_idx'
-                    AND indexdef LIKE '%lease_expirado_resultado_desconhecido%'),
-  'o índice de dedupe cobre exatamente esse caso (A5)');
+                    AND position('resultado' in indexdef) > 0
+                    AND position('desconhecido' in indexdef) > 0
+                    AND position('lease_expirado' in indexdef) = 0),
+  'o índice de dedupe cobre esse caso e os motivos do executor (A5)');
 
 -- lease vencido mas ainda não reapado: o worker consegue finalizar
 SELECT pg_temp.mk('51000000-0000-0000-0000-000000000008','77777777-7777-7777-7777-777777777772','sending');
