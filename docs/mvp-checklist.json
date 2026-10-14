@@ -30,7 +30,7 @@
       "titulo": "Automações CRUD com limite de 5",
       "aceite": "Validação testada e 6a automação recusada",
       "fase": "F2",
-      "status": "concluida (CRUD, limite de 5 no banco, QA aprovado)",
+      "status": "parcial (UI e schema na main; falta adaptador Supabase sob RLS)",
       "depende_credencial": false
     },
     {
@@ -46,7 +46,7 @@
       "titulo": "Worker agendador a cada minuto",
       "aceite": "Relógio simulado: borda de janela e virada de dia em America/Cuiaba",
       "fase": "F3",
-      "status": "em_revisao (agendador PR #14)",
+      "status": "parcial (lógica na main; falta adaptador SQL do SchedulerStore e worker-entry, PR #30)",
       "depende_credencial": false
     },
     {
@@ -54,7 +54,7 @@
       "titulo": "Antirrepetição 7 dias",
       "aceite": "Reexecução do worker 2x sem duplicata",
       "fase": "F3",
-      "status": "em_revisao (antirrepetição PR #14)",
+      "status": "parcial (regra na main; depende do adaptador SQL do histórico)",
       "depende_credencial": false
     },
     {
@@ -62,7 +62,7 @@
       "titulo": "Fila: 1 por canal, 60 s, teto 200, prioridade 100",
       "aceite": "Concorrência com 2 workers sem envio duplo",
       "fase": "F3",
-      "status": "parcial (SQL da fila na main; executor PR #13 em revisão)",
+      "status": "parcial (SQL + executor na main; falta worker-entry que liga claim -> executor -> finish_send; executor ainda não usa o downloader seguro do #23)",
       "depende_credencial": false
     },
     {
@@ -86,7 +86,7 @@
       "titulo": "Envios: cards, lista 30 dias, Realtime",
       "aceite": "E2E: status muda e tela atualiza sem recarregar",
       "fase": "F4",
-      "status": "implementado; falta e2e de Realtime",
+      "status": "parcial (tela e polling na main; Realtime desligado: getRealtimeClient() nulo e sends fora da publicação supabase_realtime)",
       "depende_credencial": false
     },
     {
@@ -102,7 +102,7 @@
       "titulo": "Alertas por e-mail",
       "aceite": "Teste com transporte de e-mail simulado",
       "fase": "F5",
-      "status": "concluida (transporte simulado)",
+      "status": "parcial (alertas com transporte simulado; falta heartbeat exposto e provedor real)",
       "depende_credencial": false
     },
     {
@@ -110,7 +110,7 @@
       "titulo": "Onboarding e estados vazios",
       "aceite": "QA visual 390x844 e 1440x900",
       "fase": "F4",
-      "status": "concluida (QA aprovado)",
+      "status": "parcial (UI na main; 'validado' depende do laço de validação #28 e de persistência)",
       "depende_credencial": false
     }
   ]
