@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeDays } from "./timezone.js";
+import { normalizeDays, isValidTimeZone } from "./timezone.js";
 
 export const FREQUENCY_MIN_ENUM = [15, 30, 60] as const;
 export const MAX_AUTOMATIONS_PER_ACCOUNT = 5;
@@ -25,6 +25,7 @@ export function normalizeAutomationInput(value: unknown): unknown {
     price_max: "priceMax",
     window_start_time: "windowStart",
     window_end_time: "windowEnd",
+    time_zone: "timeZone",
   };
   for (const [k, target] of Object.entries(map)) {
     if (v[k] !== undefined && out[target] === undefined) out[target] = v[k];
@@ -91,6 +92,9 @@ const baseAutomationSchema = z
     windowStart: z.string().regex(timeRegex, "Horário inválido"),
     windowEnd: z.string().regex(timeRegex, "Horário inválido"),
     frequencyMin: z.union([z.literal(15), z.literal(30), z.literal(60)]),
+    timeZone: z.string().refine((v) => isValidTimeZone(v), "Fuso horário inválido").optional(),
+    timezone: z.string().refine((v) => isValidTimeZone(v), "Fuso horário inválido").optional(),
+    tz: z.string().refine((v) => isValidTimeZone(v), "Fuso horário inválido").optional(),
     header: z.string().max(80).optional().nullable(),
     footer: z.string().max(200).optional().nullable(),
     groups: z.array(z.string()).optional(),

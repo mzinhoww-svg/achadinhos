@@ -9,8 +9,8 @@ INSERT INTO auth.users (id, aud, role, email) VALUES
 INSERT INTO public.accounts (account_id, user_id) VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111');
 
-INSERT INTO public.sends (id, account_id, status) VALUES
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'queued');
+INSERT INTO public.sends (id, account_id, status, idempotency_key) VALUES
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'queued', 'k-insert-only');
 
 -- direct update blocked
 SELECT throws_ok(
@@ -28,14 +28,18 @@ SELECT throws_ok(
   'sends direct delete blocked'
 );
 
--- status event applies
-INSERT INTO public.send_status_events (account_id, send_id, old_status, new_status)
-  VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'queued', 'sent');
+-- T7-01 (M1): o estado manda no log; uma transicao valida gera o evento
+UPDATE public.sends
+   SET status='sending', lease_expires_at = now() + interval '120 seconds', attempted_at = now()
+ WHERE id='cccccccc-cccc-cccc-cccc-cccccccccccc';
+UPDATE public.sends SET status='sent', finished_at = now(), sent_at = now()
+ WHERE id='cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 SELECT is(
-  (SELECT status FROM public.sends WHERE id='cccccccc-cccc-cccc-cccc-cccccccccccc'),
-  'sent',
-  'send_status_event updates send.status'
+  (SELECT array_agg(new_status ORDER BY changed_at, new_status) FROM public.send_status_events
+    WHERE send_id='cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ARRAY['sending','sent'],
+  'transicoes de sends geram send_status_events'
 );
 
 -- event update/delete blocked
