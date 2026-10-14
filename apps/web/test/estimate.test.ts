@@ -10,8 +10,10 @@ describe("estimatePostsPerDay", () => {
     expect(r.capped).toBe(200);
     expect(r.hitCap).toBe(true);
   });
-  it("janela invertida ou vazia = 0", () => {
-    expect(minutesBetween("20:00", "08:00")).toBe(0);
+  it("janela que cruza a meia-noite soma 24h (22:00→02:00 = 4h)", () => {
+    expect(minutesBetween("22:00", "02:00")).toBe(240);
+  });
+  it("janela vazia = 0", () => {
     expect(estimatePostsPerDay({ groups: 3, windowStart: "10:00", windowEnd: "10:00", frequencyMin: 60 }).capped).toBe(0);
   });
   it("zero grupos = 0", () => {

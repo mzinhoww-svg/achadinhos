@@ -5,10 +5,13 @@ import { z } from "zod";
 import {
   ConversionReportResponseSchema,
   HttpsUrlSchema,
+  ProductOfferV2RawResponseSchema,
+  parseOfferNodes,
   GenerateShortLinkResponseSchema,
   ProductOfferV2ResponseSchema,
 } from "./schemas.js";
 import type {
+  DiscardedNode,
   ConversionReportParams,
   GenerateShortLinkParams,
   ProductOfferV2Params,
@@ -23,6 +26,13 @@ import {
   ShopeeTimeoutError,
   ShopeeTimestampError,
 } from "./errors.js";
+
+export type ProductOfferPage = {
+  nodes: z.infer<typeof ProductOfferV2ResponseSchema>["productOfferV2"]["nodes"];
+  pageInfo: z.infer<typeof ProductOfferV2ResponseSchema>["productOfferV2"]["pageInfo"];
+  /** Nós descartados na validação por nó (índice e nomes de campo, sem conteúdo). */
+  discarded: DiscardedNode[];
+};
 
 export type ShopeeCredentials = {
   appId: string;
@@ -164,7 +174,7 @@ export class ShopeeClient {
 
   async productOfferV2(
     params: ProductOfferV2Params = {},
-  ): Promise<z.infer<typeof ProductOfferV2ResponseSchema>["productOfferV2"]> {
+  ): Promise<ProductOfferPage> {
     const query = `query ProductOfferV2(
       $keyword: String
       $shopId: Int
@@ -219,9 +229,14 @@ export class ShopeeClient {
     const data = await this.request(
       query,
       params as Record<string, unknown>,
-      ProductOfferV2ResponseSchema,
+      ProductOfferV2RawResponseSchema,
     );
-    return data.productOfferV2;
+    const { nodes, discarded } = parseOfferNodes(data.productOfferV2.nodes);
+    if (nodes.length === 0 && discarded.length > 0) {
+      // Nada aproveitável: falha fechada em vez de página "vazia" enganosa.
+      throw new ShopeeSchemaError("all product nodes failed validation", "SCHEMA");
+    }
+    return { nodes, pageInfo: data.productOfferV2.pageInfo, discarded };
   }
 
   async generateShortLink(
@@ -362,7 +377,7 @@ export class ShopeeClient {
           throw new ShopeeTimeoutError("Shopee request timed out", "TIMEOUT");
         }
         throw new ShopeeNetworkError(
-          error instanceof Error ? error.message : "network error",
+          `network error (${error instanceof Error ? error.name : "unknown"})`,
           "NETWORK",
         );
       }
@@ -411,7 +426,7 @@ export class ShopeeClient {
         if (first) {
           const code = first.extensions?.code;
           if (first.message.toLowerCase().includes("signature") || code === 10020) {
-            return new ShopeeSignatureError(first.message, String(code ?? "SIGNATURE"), status);
+            return new ShopeeSignatureError("Shopee rejected the request signature", String(code ?? "SIGNATURE"), status);
           }
         }
       }
@@ -437,12 +452,12 @@ export class ShopeeClient {
       const message = first.message;
       const lower = message.toLowerCase();
       if (lower.includes("signature") || code === 10020) {
-        throw new ShopeeSignatureError(message, String(code ?? "SIGNATURE"));
+        throw new ShopeeSignatureError("Shopee rejected the request signature", String(code ?? "SIGNATURE"));
       }
       if (lower.includes("timestamp")) {
-        throw new ShopeeTimestampError(message, String(code ?? "TIMESTAMP"));
+        throw new ShopeeTimestampError("Shopee rejected the request timestamp", String(code ?? "TIMESTAMP"));
       }
-      throw new ShopeeGraphQLError(message, String(code ?? "GRAPHQL"));
+      throw new ShopeeGraphQLError("Shopee returned a GraphQL error", String(code ?? "GRAPHQL"));
     }
 
     const parsed = schema.safeParse(envelope.data.data);

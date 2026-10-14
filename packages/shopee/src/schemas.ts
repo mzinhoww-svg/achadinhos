@@ -9,7 +9,8 @@ export const HttpsUrlSchema = z
   .url()
   .refine((value) => {
     try {
-      return new URL(value).protocol === "https:";
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password;
     } catch {
       return false;
     }
@@ -36,6 +37,42 @@ export const ProductOfferV2NodeSchema = z.object({
   periodStartTime: z.number(),
   periodEndTime: z.number(),
 });
+
+export type DiscardedNode = { index: number; fields: string[] };
+
+/** Envelope da página: os nós são validados um a um (ver `parseOfferNodes`). */
+export const ProductOfferV2RawResponseSchema = z.object({
+  productOfferV2: z.object({
+    nodes: z.array(z.unknown()),
+    pageInfo: z.lazy(() => PageInfoSchema),
+  }),
+});
+
+/**
+ * Valida cada nó isoladamente: um inválido é descartado (só índice e nomes de
+ * campo, nunca o conteúdo da resposta) sem derrubar nem deixar passar os demais.
+ */
+export function parseOfferNodes(raw: unknown[]): {
+  nodes: z.infer<typeof ProductOfferV2NodeSchema>[];
+  discarded: DiscardedNode[];
+} {
+  const nodes: z.infer<typeof ProductOfferV2NodeSchema>[] = [];
+  const discarded: DiscardedNode[] = [];
+  raw.forEach((item, index) => {
+    const parsed = ProductOfferV2NodeSchema.safeParse(item);
+    if (parsed.success) {
+      nodes.push(parsed.data);
+      return;
+    }
+    const fields = [
+      ...new Set(
+        parsed.error.issues.map((issue) => (typeof issue.path[0] === "string" ? issue.path[0] : "(node)")),
+      ),
+    ];
+    discarded.push({ index, fields });
+  });
+  return { nodes, discarded };
+}
 
 export const PageInfoSchema = z.object({
   page: z.number().optional(),

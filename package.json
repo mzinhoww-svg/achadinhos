@@ -6,6 +6,7 @@
   "scripts": {
     "test": "pnpm -r --if-present test",
     "test:db": "supabase test db --local",
+    "test:db:concurrency": "bash supabase/tests/concurrency/claim_next_send.sh",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint"
   }
