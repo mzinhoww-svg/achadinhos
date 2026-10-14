@@ -109,6 +109,11 @@ async function seed(c: Container) {
   const deps = { repo: c.connections, vault: c.vault, telegram: c.telegram };
   await saveShopee(deps, S, { appId: "18350000042", secret: "demo-secret-nao-real-0042" });
   const tg = await saveTelegram(deps, S, { token: "1000000001:DEMO-token-nao-real-000000000000" });
+  // No demo não há worker validando: marca como validado para o checklist refletir uma conta pronta.
+  const vs = await c.connections.getShopee(DEMO_ACCOUNT);
+  if (vs) await c.connections.saveShopee({ ...vs, status: "validated", validatedAt: new Date().toISOString() });
+  const vc = await c.connections.getChannel(DEMO_ACCOUNT);
+  if (vc) await c.connections.saveChannel({ ...vc, status: "validated", validatedAt: new Date().toISOString() });
   for (const g of tg.groups.slice(0, 3)) await setGroupActive(deps, S, { groupId: g.id, active: true });
   const ids = tg.groups.map((g) => g.id);
   const sn = c.sendNow as MemorySendNow;

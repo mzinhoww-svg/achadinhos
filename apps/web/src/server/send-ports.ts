@@ -53,6 +53,8 @@ export interface SendNowRepo {
    * `queued` e prioridade 100, chave de idempotência por clique. A UI não envia status nem prioridade.
    */
   enqueueSendNow(accountId: string, groupId: string, offerId: string): Promise<EnqueueResult>;
+  /** Ofertas já vistas pela conta (tabela `offers`), mais recentes primeiro. */
+  listOffers(accountId: string): Promise<OfferCandidate[]>;
   /** Envios `sent` do item nos grupos desde `since` (só para avisar repetição; não bloqueia). */
   recentSent(accountId: string, itemId: string, groupIds: string[], since: Date): Promise<{ groupId: string; at: Date }[]>;
 }

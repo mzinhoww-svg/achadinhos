@@ -63,6 +63,13 @@ export class MemorySendNow implements SendNowRepo, SendsRepo {
     return { sendId: row.id, duplicate: false };
   }
 
+  async listOffers(accountId: string) {
+    return [...this.offers.entries()]
+      .filter(([k]) => k.startsWith(`${accountId}:`))
+      .map(([, v]) => ({ ...v.offer }))
+      .reverse();
+  }
+
   async recentSent(accountId: string, itemId: string, groupIds: string[], since: Date) {
     return this.store
       .filter((s) => s.accountId === accountId && s.itemId === itemId && s.status === "sent" && s.sentAt && s.sentAt >= since && groupIds.includes(s.groupId))
