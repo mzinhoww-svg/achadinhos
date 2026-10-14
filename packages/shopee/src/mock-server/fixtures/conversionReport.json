@@ -1,0 +1,41 @@
+{
+  "data": {
+    "conversionReport": {
+      "nodes": [
+        {
+          "purchaseTime": 1700000000,
+          "clickTime": 1699999000,
+          "conversionId": "conv-mock-1",
+          "totalCommission": 3.5,
+          "sellerCommission": 2.1,
+          "shopeeCommissionCapped": 1.4,
+          "buyerType": "NEW",
+          "device": "APP",
+          "utmContent": "mock-sub-ids",
+          "orders": [
+            {
+              "orderId": "order-mock-1",
+              "orderStatus": "COMPLETED",
+              "items": [
+                {
+                  "itemId": 900001,
+                  "itemName": "Produto de Teste Shopee",
+                  "shopName": "Loja Teste",
+                  "itemPrice": 19.9,
+                  "qty": 1,
+                  "itemTotalCommission": 3.5,
+                  "attributionType": "LAST_CLICK"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "pageInfo": {
+        "limit": 50,
+        "hasNextPage": false,
+        "scrollId": "scroll-mock-1"
+      }
+    }
+  }
+}
