@@ -1,3 +1,4 @@
+import type { SendRecord, SendStatusValue, SendsRepo } from "./envios-ports";
 import type { ConnectionsRepo } from "./ports";
 import { SendNowError, type EnqueueResult, type OfferCandidate, type SendNowRepo } from "./send-ports";
 
@@ -12,12 +13,15 @@ export interface SendRow {
   idempotencyKey: string;
   scheduledFor: Date;
   sentAt: Date | null;
+  reason: string | null;
+  automationName: string | null;
+  shortLink: string | null;
 }
 
 let seq = 0;
 
 /** Memória que imita o contrato da RPC `enqueue_send_now`; no banco a regra vive na função SECURITY DEFINER. */
-export class MemorySendNow implements SendNowRepo {
+export class MemorySendNow implements SendNowRepo, SendsRepo {
   private offers = new Map<string, { id: string; offer: OfferCandidate }>();
   private store: SendRow[] = [];
 
@@ -53,6 +57,7 @@ export class MemorySendNow implements SendNowRepo {
     const row: SendRow = {
       id: `snd_${(++seq).toString(36)}`, accountId, groupId, offerId, itemId: offer[1].offer.itemId,
       status: "queued", priority: 100, idempotencyKey: key, scheduledFor: this.now(), sentAt: null,
+      reason: null, automationName: null, shortLink: null,
     };
     this.store.push(row);
     return { sendId: row.id, duplicate: false };
@@ -73,6 +78,50 @@ export class MemorySendNow implements SendNowRepo {
     this.store.push({
       id: `snd_${(++seq).toString(36)}`, accountId, groupId, offerId: "hist", itemId, status: "sent", priority: 0,
       idempotencyKey: `hist:${groupId}:${itemId}:${at.getTime()}`, scheduledFor: at, sentAt: at,
+      reason: null, automationName: null, shortLink: null,
     });
+  }
+
+  /** Só para testes e para a semente do modo demo: linha de histórico com status e horário arbitrários. */
+  seed(o: { accountId: string; groupId: string; offerId: string; status: SendStatusValue; at: Date; reason?: string; priority?: number; automationName?: string; shortLink?: string }) {
+    const item = [...this.offers.entries()].find(([k, v]) => k.startsWith(`${o.accountId}:`) && v.id === o.offerId);
+    const row: SendRow = {
+      id: `snd_${(++seq).toString(36)}`, accountId: o.accountId, groupId: o.groupId, offerId: o.offerId,
+      itemId: item?.[1].offer.itemId ?? "", status: o.status, priority: o.priority ?? 0,
+      idempotencyKey: `seed:${seq}`, scheduledFor: o.at, sentAt: o.status === "sent" ? o.at : null,
+      reason: o.reason ?? null, automationName: o.automationName ?? null, shortLink: o.shortLink ?? null,
+    };
+    this.store.push(row);
+    return row.id;
+  }
+
+  /** Simula o worker (claim/finish) para testes e demo. Só avança; estado final não muda. */
+  transition(accountId: string, id: string, status: SendStatusValue, reason?: string): boolean {
+    const r = this.store.find((s) => s.accountId === accountId && s.id === id);
+    if (!r || r.status === "sent" || r.status === "failed" || r.status === "skipped") return false;
+    r.status = status;
+    r.reason = reason ?? null;
+    if (status === "sent") r.sentAt = this.now();
+    return true;
+  }
+
+  async timezone(_accountId: string) {
+    return "America/Cuiaba";
+  }
+
+  async list(accountId: string, since: Date): Promise<SendRecord[]> {
+    const groups = await this.connections.listGroups(accountId);
+    return this.store
+      .filter((s) => s.accountId === accountId && (s.status === "queued" || s.status === "sending" || (s.sentAt ?? s.scheduledFor) >= since))
+      .map((s) => {
+        const offer = [...this.offers.entries()].find(([k, v]) => k.startsWith(`${accountId}:`) && v.id === s.offerId);
+        const g = groups.find((x) => x.id === s.groupId);
+        return {
+          id: s.id, status: s.status, reason: s.reason, priority: s.priority, groupId: g?.id ?? null,
+          scheduledFor: s.scheduledFor, sentAt: s.sentAt, offerTitle: offer?.[1].offer.title ?? null,
+          groupName: g?.name ?? null, automationName: s.automationName,
+          shortLink: s.shortLink ?? (offer ? null : null),
+        };
+      });
   }
 }
