@@ -57,8 +57,8 @@ SELECT has_index('public','sends','sends_dedupe_idx','índice de dedupe');
 SELECT has_index('public','sends','sends_inflight_pair_uidx','unique parcial (group_id, offer_id) em voo');
 SELECT matches(
   (SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='sends_dedupe_idx'),
-  'lease_expirado_resultado_desconhecido',
-  'dedupe cobre failed com resultado desconhecido (A5/M4)');
+  'LIKE|~~.*\\_resultado\\_desconhecido',
+  'dedupe cobre failed com qualquer motivo terminado em _resultado_desconhecido (A5/M4, Farol B2 do #13)');
 
 -- M4: segundo queued do mesmo (group, offer) é recusado enquanto o primeiro está em voo
 SELECT throws_ok(
