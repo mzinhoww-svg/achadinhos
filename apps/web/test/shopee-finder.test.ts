@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startMockServer, ShopeeClient } from "@achadinhos/shopee";
+import { ShopeeClient } from "@achadinhos/shopee";
+import { startMockShopeeServer as startMockServer } from "@achadinhos/shopee/testing";
 import { createShopeeFinder, createShopeeLinks } from "@/server/shopee-finder";
 
 let mock: Awaited<ReturnType<typeof startMockServer>>;
