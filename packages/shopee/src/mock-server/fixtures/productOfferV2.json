@@ -1,0 +1,34 @@
+{
+  "data": {
+    "productOfferV2": {
+      "nodes": [
+        {
+          "itemId": 900001,
+          "productName": "Produto de Teste Shopee",
+          "productLink": "https://shopee.com.br/produto-teste-i.1.900001",
+          "offerLink": "https://shopee.com.br/produto-teste-i.1.900001?af=mock",
+          "imageUrl": "https://example.com/mock-product.png",
+          "priceMin": 19.9,
+          "priceMax": 29.9,
+          "priceDiscountRate": 15,
+          "sales": 120,
+          "ratingStar": 4.7,
+          "commissionRate": 0.12,
+          "sellerCommissionRate": 0.07,
+          "shopeeCommissionRate": 0.05,
+          "commission": 2.4,
+          "shopId": 5001,
+          "shopName": "Loja Teste",
+          "shopType": 2,
+          "periodStartTime": 1700000000,
+          "periodEndTime": 1700086400
+        }
+      ],
+      "pageInfo": {
+        "page": 1,
+        "limit": 20,
+        "hasNextPage": false
+      }
+    }
+  }
+}
