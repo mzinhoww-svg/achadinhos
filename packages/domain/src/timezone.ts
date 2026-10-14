@@ -62,16 +62,13 @@ export function normalizeDays(values: unknown): number[] {
 }
 
 export function getTimeZoneOffsetMs(timeZone: string, instant: Date): number {
-  try {
-    const tzStr = instant.toLocaleString("en-US", { timeZone });
-    const utcStr = instant.toLocaleString("en-US", { timeZone: "UTC" });
-    const tz = Date.parse(tzStr);
-    const utc = Date.parse(utcStr);
-    if (Number.isNaN(tz) || Number.isNaN(utc)) return 0;
-    return tz - utc;
-  } catch {
-    return 0;
-  }
+  if (!(instant instanceof Date) || Number.isNaN(instant.getTime())) throw new RangeError("Invalid date");
+  const tzStr = instant.toLocaleString("en-US", { timeZone });
+  const utcStr = instant.toLocaleString("en-US", { timeZone: "UTC" });
+  const tz = Date.parse(tzStr);
+  const utc = Date.parse(utcStr);
+  if (Number.isNaN(tz) || Number.isNaN(utc)) throw new RangeError("Invalid timezone or date");
+  return tz - utc;
 }
 
 export interface ZonedParts {
@@ -89,7 +86,8 @@ export interface ZonedParts {
 
 export function getZonedParts(date: Date | string | number, timeZone: string = DEFAULT_TIMEZONE): ZonedParts {
   const instant = date instanceof Date ? date : new Date(date);
-  const dt = Number.isNaN(instant.getTime()) ? new Date(0) : instant;
+  if (Number.isNaN(instant.getTime())) throw new RangeError("Invalid date");
+  const dt = instant;
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
@@ -180,11 +178,15 @@ export function resolveWindow(cfg: WindowConfig): { start: string; end: string; 
 }
 
 export function isWithinWindow(date: Date | string | number, cfg: WindowConfig): boolean {
-  const { start, end, days, tz } = resolveWindow(cfg);
-  const parts = getZonedParts(date, tz);
-  const s = toMin(start);
-  const e = toMin(end);
-  const m = parts.minutesOfDay;
+  try {
+    const instant = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(instant.getTime())) return false;
+    const { start, end, days, tz } = resolveWindow(cfg);
+    const parts = getZonedParts(instant, tz);
+    const s = toMin(start);
+    const e = toMin(end);
+    const m = parts.minutesOfDay;
+    if (s === e) return false;
   // days: cross-midnight early portion belongs to previous day
   if (s < e) {
     if (!days.includes(parts.weekday)) return false;
@@ -198,8 +200,11 @@ export function isWithinWindow(date: Date | string | number, cfg: WindowConfig):
     }
     return false;
   }
-  // s === e: full day only if all days? treat as never? We'll treat as whole day when included
-  return days.includes(parts.weekday);
+  // s === e: janela vazia
+  return false;
+  } catch {
+    return false;
+  }
 }
 
 export const isInsideWindow = isWithinWindow;

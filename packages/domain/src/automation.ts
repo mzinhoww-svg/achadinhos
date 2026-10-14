@@ -100,7 +100,13 @@ const baseAutomationSchema = z
   })
   .passthrough();
 
-export const automationSchema = z.preprocess(normalizeAutomationInput, baseAutomationSchema);
+export const automationSchema = z.preprocess(
+  normalizeAutomationInput,
+  baseAutomationSchema.refine((d) => d.windowStart !== d.windowEnd, {
+    path: ["windowEnd"],
+    message: "Janela inválida: início e fim não podem ser iguais",
+  }),
+);
 export const AutomationSchema = automationSchema;
 export const automationValidationSchema = automationSchema;
 export const automationZodSchema = automationSchema;

@@ -69,12 +69,13 @@ export function _calculateNextRunAtStrict(
   const { start, end, freq, days, tz } = cfg;
   const sMin = Number(start.split(":")[0]) * 60 + Number(start.split(":")[1]);
   const eMin = Number(end.split(":")[0]) * 60 + Number(end.split(":")[1]);
-  const duration = sMin < eMin ? eMin - sMin : sMin > eMin ? 24 * 60 - sMin + eMin : 24 * 60;
+  const duration = sMin < eMin ? eMin - sMin : sMin > eMin ? 24 * 60 - sMin + eMin : 0;
   // slots offsets from start
   const offsets: number[] = [];
   for (let off = 0; off < duration; off += freq) {
     offsets.push(off);
   }
+  if (duration <= 0) return safeNow;
   if (offsets.length === 0) offsets.push(0);
 
   const nowParts = getZonedParts(safeNow, tz);
@@ -212,11 +213,24 @@ export const getDueGroups = selectDueGroups;
 // advance
 export function advanceNextRunAt(group: GroupLike, automation: AutomationConfig, now?: Date | string | number): Date {
   const current = asDate(group.next_run_at ?? group.nextRunAt) ?? new Date();
-  const base = now ?? current;
-  // calculate next after current slot
-  const next = _calculateNextRunAtStrict(new Date(current.getTime() + 1000), automation);
-  return next;
+  const baseNow = now == null ? new Date() : (now instanceof Date ? now : new Date(now as string | number));
+  const isMissed = current.getTime() < baseNow.getTime();
+  // avança a partir de max(next_run_at, now), pulando slots vencidos
+  const searchFrom = isMissed
+    ? baseNow
+    : new Date(current.getTime() + 1000);
+  return _calculateNextRunAtStrict(searchFrom, automation as Record<string, unknown>);
 }
+
+export function hasMissedSlot(group: GroupLike, now: Date | string | number = new Date()): boolean {
+  const current = asDate(group.next_run_at ?? group.nextRunAt);
+  if (!current) return false;
+  const n = now instanceof Date ? now : new Date(now as string | number);
+  return current.getTime() < n.getTime();
+}
+
+export const missedSlot = hasMissedSlot;
+export const shouldSkipVencido = hasMissedSlot;
 
 export const advance = advanceNextRunAt;
 

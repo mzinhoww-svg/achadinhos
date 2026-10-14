@@ -49,7 +49,8 @@ export function estimatePostsPerDay(input: EstimateInput): { raw: number; capped
   const safeGroups = Math.max(0, Number(groups) || 0);
   const safeFreq = freq === 15 || freq === 30 || freq === 60 ? freq : 30;
   const mins = windowMinutes(start, end);
-  const raw = safeGroups * Math.floor(mins / safeFreq);
+  const slots = mins <= 0 ? 0 : Math.ceil(mins / safeFreq);
+  const raw = safeGroups * slots;
   const safeRaw = Math.max(0, raw);
   const safeCap = Math.max(0, Number(cap) || 0);
   return { raw: safeRaw, capped: Math.min(safeRaw, safeCap), hitCap: safeRaw > safeCap };
