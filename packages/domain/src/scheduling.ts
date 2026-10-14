@@ -1,4 +1,4 @@
-import { getZonedParts, resolveWindow, wallToUtc, DEFAULT_TIMEZONE, normalizeDays, getTimeZoneOffsetMs } from "./timezone.js";
+import { getZonedParts, resolveWindow, wallToUtc, DEFAULT_TIMEZONE, normalizeDays, getTimeZoneOffsetMs } from "./timezone";
 
 export interface GroupLike {
   id?: string;
