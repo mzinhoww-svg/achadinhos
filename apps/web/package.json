@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "ACHADINHOS_DEMO_SESSION=1 next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -25,6 +25,10 @@
     "@fontsource/figtree": "^5.3.0",
     "next": "^16.4.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@achadinhos/domain": "workspace:*",
+    "@achadinhos/telegram": "workspace:*",
+    "zod": "^3.23.8",
+    "server-only": "^0.0.1"
   }
 }
