@@ -16,6 +16,9 @@ importers:
       '@achadinhos/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@achadinhos/shopee':
+        specifier: workspace:*
+        version: link:../../packages/shopee
       '@achadinhos/telegram':
         specifier: workspace:*
         version: link:../../packages/telegram

@@ -14,6 +14,13 @@ const items = [
   { href: "/envios", label: "Envios", short: "Envios", Icon: IconSend },
 ];
 
+/** "Mandar agora" aparece só na barra lateral; no celular a barra inferior tem 5 abas e o atalho fica em Envios. */
+const sideItems = [
+  ...items.slice(0, 4),
+  { href: "/mandar-agora", label: "Mandar agora", short: "Mandar", Icon: IconBolt },
+  items[4]!,
+];
+
 function useActive() {
   const pathname = usePathname();
   return (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -42,7 +49,7 @@ export function SideNav() {
   const isActive = useActive();
   return (
     <nav aria-label="Principal" className="flex h-full flex-col gap-1">
-      {items.map(({ href, label, Icon }) => {
+      {sideItems.map(({ href, label, Icon }) => {
         const active = isActive(href);
         return (
           <Link
