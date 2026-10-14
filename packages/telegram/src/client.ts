@@ -118,12 +118,17 @@ export class TelegramClient {
         this.upsertGroup(msgChat, "unknown" as TelegramGroup["status"]);
       }
       const chatMember = upd.chat_member;
-      if (
-        chatMember &&
-        chatMember.chat.type !== "private" &&
-        this.botId !== undefined && chatMember.new_chat_member.user.id === this.botId
-      ) {
-        this.upsertGroup(chatMember.chat, chatMember.new_chat_member.status);
+      // chat_member updates always come from another member (the bot's own
+      // changes arrive as my_chat_member). Only trust them when getMe succeeded
+      // and the affected user is the bot itself; if getMe failed we stay
+      // fail-closed and never let another user's membership change deactivate
+      // a known group.
+      if (chatMember && chatMember.chat.type !== "private") {
+        if (this.botId === undefined) {
+          // getMe unavailable: ignore this update entirely (fail-closed).
+        } else if (chatMember.new_chat_member?.user?.id === this.botId) {
+          this.upsertGroup(chatMember.chat, chatMember.new_chat_member.status);
+        }
       }
     }
   }

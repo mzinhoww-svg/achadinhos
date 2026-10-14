@@ -170,4 +170,26 @@ describe("TelegramClient discoverGroups fail-closed", () => {
     expect(group?.active).toBe(true);
     expect(group?.status).toBe("administrator");
   });
+
+  it("does not deactivate group from another user's chat_member when getMe fails", async () => {
+    const server = createMockTelegramServer();
+    const client = new TelegramClient("t", { transport: server.transport });
+    server.setRateLimit("getMe", 3);
+    server.enqueueMyChatMember({ chatId: -3002, title: "G4", newStatus: "administrator" });
+    server.enqueueUpdate({
+      update_id: 12,
+      chat_member: {
+        chat: { id: -3002, type: "supergroup", title: "G4" },
+        from: { id: 77, is_bot: false, first_name: "Admin" },
+        date: 1,
+        old_chat_member: { user: { id: 77, is_bot: false, first_name: "Admin" }, status: "member" },
+        new_chat_member: { user: { id: 77, is_bot: false, first_name: "Admin" }, status: "left" },
+      },
+    });
+    await client.getUpdates();
+    const group = client.listGroups().find((g) => g.chatId === -3002);
+    expect(group).toBeTruthy();
+    expect(group?.active).toBe(true);
+    expect(group?.status).toBe("administrator");
+  });
 });
