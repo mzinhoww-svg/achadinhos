@@ -6,7 +6,7 @@ import {
   isAllowedLink,
   isUnknownResultReason,
   sendableOfferField,
-} from "../sendable.js";
+} from "../sendable";
 
 const ok = {
   title: "Fone",

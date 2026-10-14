@@ -10,7 +10,7 @@ import {
 } from "@achadinhos/domain";
 import type { ProductOfferV2Params } from "@achadinhos/shopee";
 import { withDeadline } from "./deadline.js";
-import type { OfferSelector, ProductOfferNode, SelectionInput, SelectionResult, SendHistoryRow } from "./ports.js";
+import type { OfferSelector, ProductOfferNode, SelectionInput, SelectionResult, SendHistoryRow } from "./scheduler-ports.js";
 
 /** Motivo do reaper (decisão 001 A4/A5); o critério de bloqueio é o sufixo `_resultado_desconhecido`. */
 export const UNKNOWN_RESULT_REASON = "lease_expirado_resultado_desconhecido";

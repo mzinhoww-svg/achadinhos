@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { selectOffer } from "../offer-selection.js";
-import type { SendHistoryRow } from "../ports.js";
+import { selectOffer } from "../../src/offer-selection.js";
+import type { SendHistoryRow } from "../../src/scheduler-ports.js";
 import { node } from "./helpers.js";
 
 const HOSTS = { imageHosts: ["img", "susercontent.com"] };

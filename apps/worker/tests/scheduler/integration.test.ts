@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClock } from "@achadinhos/domain";
-import { createShopeeClient, startMockServer } from "@achadinhos/shopee";
-import { createOfferSelector } from "../offer-selection.js";
-import { runSchedulerTick } from "../scheduler.js";
-import { MemoryStore } from "../memory-store.js";
+import { createShopeeClient } from "@achadinhos/shopee";
+import { startMockShopeeServer as startMockServer } from "@achadinhos/shopee/testing";
+import { createOfferSelector } from "../../src/offer-selection.js";
+import { runSchedulerTick } from "../../src/scheduler.js";
+import { MemoryStore } from "../../src/memory-store.js";
 import { CUIABA } from "./helpers.js";
 
 let mock: Awaited<ReturnType<typeof startMockServer>>;

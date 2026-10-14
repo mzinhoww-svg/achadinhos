@@ -1,5 +1,3 @@
-import { isIP } from "node:net";
-
 /**
  * Critério ÚNICO de "oferta enviável", compartilhado entre a seleção (T7-05) e o
  * executor (T7-06). Dois validadores independentes deixavam a seleção escolher
@@ -41,11 +39,12 @@ export function isHttpsUrl(raw: unknown, maxLength = MAX_URL_LENGTH): boolean {
   }
 }
 
-/** Mesma regra do download da imagem (decisão 002 C1): https, sem IP literal, host na allowlist. */
+/** Mesma regra do download da imagem (decisão 002 C1): https, sem IP literal, host na allowlist. Sem `node:net` para o pacote seguir utilizável no navegador. */
 export function isAllowedImageUrl(raw: unknown, hosts: readonly string[]): boolean {
   if (!isHttpsUrl(raw)) return false;
   const host = new URL(raw as string).hostname.toLowerCase();
-  if (isIP(host) !== 0 || host.startsWith("[")) return false;
+  // WHATWG URL normaliza IPv4 (hex/decimal) para dotted-decimal e IPv6 vem entre colchetes
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.startsWith("[")) return false;
   return hosts.some((h) => host === h || host.endsWith(`.${h}`));
 }
 

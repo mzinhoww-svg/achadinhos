@@ -1,4 +1,4 @@
-import type { ProductOfferNode } from "../ports.js";
+import type { ProductOfferNode } from "../../src/scheduler-ports.js";
 
 export const CUIABA = "America/Cuiaba";
 

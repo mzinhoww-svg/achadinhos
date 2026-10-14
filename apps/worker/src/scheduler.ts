@@ -1,5 +1,5 @@
 import { advanceNextRunAt, isWithinWindow, resolveWindow, _calculateNextRunAtStrict } from "@achadinhos/domain";
-import type { AutomationRow, DueGroup, OfferSelector, SchedulerStore, SelectionResult } from "./ports.js";
+import type { AutomationRow, DueGroup, OfferSelector, SchedulerStore, SelectionResult } from "./scheduler-ports.js";
 
 export const DEFAULT_DEDUPE_DAYS = 7;
 const DEFAULT_LIMIT = 200;

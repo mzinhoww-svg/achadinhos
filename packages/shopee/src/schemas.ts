@@ -2,14 +2,28 @@ import { z } from "zod";
 
 const stringOrNumber = z.union([z.string(), z.number()]);
 
+/** URL https não vazia; entra em mensagem pública ou download (auditoria R4). */
+export const HttpsUrlSchema = z
+  .string()
+  .min(1)
+  .url()
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }, "must be an https URL");
+
 export const ProductOfferV2NodeSchema = z.object({
   itemId: z.number(),
-  productName: z.string(),
-  productLink: z.string(),
-  offerLink: z.string(),
-  imageUrl: z.string(),
-  priceMin: z.number(),
-  priceMax: z.number(),
+  productName: z.string().min(1),
+  productLink: HttpsUrlSchema,
+  offerLink: HttpsUrlSchema,
+  imageUrl: HttpsUrlSchema,
+  priceMin: z.number().nonnegative(),
+  priceMax: z.number().nonnegative(),
   priceDiscountRate: z.number(),
   sales: z.number(),
   ratingStar: z.number(),
@@ -23,6 +37,42 @@ export const ProductOfferV2NodeSchema = z.object({
   periodStartTime: z.number(),
   periodEndTime: z.number(),
 });
+
+export type DiscardedNode = { index: number; fields: string[] };
+
+/** Envelope da página: os nós são validados um a um (ver `parseOfferNodes`). */
+export const ProductOfferV2RawResponseSchema = z.object({
+  productOfferV2: z.object({
+    nodes: z.array(z.unknown()),
+    pageInfo: z.lazy(() => PageInfoSchema),
+  }),
+});
+
+/**
+ * Valida cada nó isoladamente: um inválido é descartado (só índice e nomes de
+ * campo, nunca o conteúdo da resposta) sem derrubar nem deixar passar os demais.
+ */
+export function parseOfferNodes(raw: unknown[]): {
+  nodes: z.infer<typeof ProductOfferV2NodeSchema>[];
+  discarded: DiscardedNode[];
+} {
+  const nodes: z.infer<typeof ProductOfferV2NodeSchema>[] = [];
+  const discarded: DiscardedNode[] = [];
+  raw.forEach((item, index) => {
+    const parsed = ProductOfferV2NodeSchema.safeParse(item);
+    if (parsed.success) {
+      nodes.push(parsed.data);
+      return;
+    }
+    const fields = [
+      ...new Set(
+        parsed.error.issues.map((issue) => (typeof issue.path[0] === "string" ? issue.path[0] : "(node)")),
+      ),
+    ];
+    discarded.push({ index, fields });
+  });
+  return { nodes, discarded };
+}
 
 export const PageInfoSchema = z.object({
   page: z.number().optional(),
@@ -40,7 +90,7 @@ export const ProductOfferV2ResponseSchema = z.object({
 
 export const GenerateShortLinkResponseSchema = z.object({
   generateShortLink: z.object({
-    shortLink: z.string(),
+    shortLink: HttpsUrlSchema,
   }),
 });
 

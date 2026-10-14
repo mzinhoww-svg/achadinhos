@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createClock } from "@achadinhos/domain";
-import { runSchedulerTick } from "../scheduler.js";
-import { MemoryStore } from "../memory-store.js";
-import type { OfferSelector } from "../ports.js";
+import { runSchedulerTick } from "../../src/scheduler.js";
+import { MemoryStore } from "../../src/memory-store.js";
+import type { OfferSelector } from "../../src/scheduler-ports.js";
 import { CUIABA, node } from "./helpers.js";
 
 const picks: OfferSelector = async () => ({ kind: "offer", offer: node() });

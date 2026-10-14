@@ -6,7 +6,7 @@ import type {
   SchedulerStore,
   SchedulerTx,
   SendHistoryRow,
-} from "./ports.js";
+} from "./scheduler-ports.js";
 
 type GroupState = {
   automationId: string;
