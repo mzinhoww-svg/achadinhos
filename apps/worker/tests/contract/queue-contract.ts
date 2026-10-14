@@ -99,7 +99,7 @@ export function runQueueContract(name: string, factory: HarnessFactory): void {
         await h.enqueue({ channelId: CH });
         const w = h.newWorker();
         const c = (await w.claimNextSend(CH))!;
-        expect(await w.finishSend(c.id, { status: "sent" })).toBe(true);
+        expect(await w.finishSend(c.id, { status: "sent", externalMessageId: "m-ok" })).toBe(true);
         expect(await w.finishSend(c.id, { status: "failed", reason: "x" })).toBe(false);
         expect((await h.get(c.id)).status).toBe("sent");
       });
@@ -113,7 +113,7 @@ export function runQueueContract(name: string, factory: HarnessFactory): void {
         try {
           const w = h.newWorker();
           const c = (await w.claimNextSend(CH))!;
-          await w.finishSend(c.id, { status: "sent" });
+          await w.finishSend(c.id, { status: "sent", externalMessageId: "m-ok" });
           const skewed = realNow() + 3_600_000; // worker 1 h adiantado
           Date.now = () => skewed;
           expect(await h.newWorker().claimNextSend(CH)).toBeNull();
