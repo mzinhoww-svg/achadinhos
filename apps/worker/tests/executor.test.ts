@@ -10,7 +10,7 @@ import {
   type FinishArgs,
 } from "../src/executor.js";
 import { isUnknownResultReason } from "@achadinhos/domain";
-import { PNG } from "./helpers.js";
+import { PNG, pngResponse, publicResolve } from "./helpers.js";
 
 const SECRET_TOKEN = "123456:SUPER-SECRET-TOKEN";
 const TIMEOUTS = { clientsMs: 2000, shortLinkMs: 5000, downloadMs: 5000, renderMs: 5000, storeMs: 5000, telegramMs: 5000, finishMs: 2000 };
@@ -52,7 +52,8 @@ async function setup(over: Partial<ExecutorDeps> = {}, shopeeSecret = "sec") {
     allowedImageHosts: ["cf.shopee.com.br"],
     maxImageBytes: 1000,
     clients: async () => ({ shopee, telegram }),
-    fetchImage: (async () => new Response(PNG)) as unknown as typeof fetch,
+    fetchImage: (async () => pngResponse()) as unknown as typeof fetch,
+    resolveHost: publicResolve,
     renderCreative: async () => PNG,
     creativeStore: { put: async (_png, id) => ({ photoUrl: `https://signed.example/${id}?token=T`, objectPath: `creatives/${id}.png` }) },
     finish: async (id, args) => (finished.push([id, args]), true),
@@ -165,6 +166,35 @@ describe("validação da oferta antes de qualquer chamada externa (QA B1)", () =
   });
 });
 
+describe("imagem segura (T7-13)", () => {
+  it("host da allowlist que resolve para IP interno => failed imagem_endereco_interno, sem render nem envio", async () => {
+    const renderCreative = vi.fn(async () => PNG);
+    const s = await setup({ resolveHost: async () => ["169.254.169.254"], renderCreative });
+    await s.executor.run(send);
+    expect(renderCreative).not.toHaveBeenCalled();
+    expect(s.sendPhoto).not.toHaveBeenCalled();
+    expect(s.finished[0]![1]).toEqual({ status: "failed", reason: "imagem_endereco_interno" });
+    await s.close();
+  });
+  it("redirect da imagem para fora da allowlist => failed imagem_host", async () => {
+    const s = await setup({
+      fetchImage: (async () =>
+        new Response(null, { status: 302, headers: { location: "https://evil.example/x.png" } })) as unknown as typeof fetch,
+    });
+    await s.executor.run(send);
+    expect(s.finished[0]![1]).toEqual({ status: "failed", reason: "imagem_host" });
+    await s.close();
+  });
+  it("sem resolveHost injetado usa o DNS real (não há atalho sem checagem)", async () => {
+    const s = await setup({ resolveHost: undefined, fetchImage: (async () => pngResponse()) as unknown as typeof fetch });
+    // host inexistente (.invalid, RFC 6761) nunca resolve: falha fechada, sem chamar o fetch
+    await s.executor.run(withOffer({ imageUrl: "https://cf.shopee.com.br.invalid/a.png" }));
+    expect(s.finished[0]![1]).toMatchObject({ status: "failed" });
+    expect(s.sendPhoto).not.toHaveBeenCalled();
+    await s.close();
+  });
+});
+
 describe("links (QA B2, Farol B1)", () => {
   const stubShopee = (shortLink: unknown) => ({ generateShortLink: async () => ({ shortLink }) as never });
   it.each(["", "   ", "javascript:alert(1)", "http://shope.ee/x", "https://evil.example/phish", "https://evil.com/shopee.com.br", "https://shope.ee.evil.com/x", `https://shope.ee/${"a".repeat(400)}`])(
@@ -174,7 +204,8 @@ describe("links (QA B2, Farol B1)", () => {
       const ex = createSendExecutor({
         leaseMs: 60_000, timeouts: TIMEOUTS, allowedImageHosts: ["cf.shopee.com.br"], maxImageBytes: 1000,
         clients: async () => ({ shopee: stubShopee(link), telegram: s.telegram }),
-        fetchImage: (async () => new Response(PNG)) as unknown as typeof fetch,
+        fetchImage: (async () => pngResponse()) as unknown as typeof fetch,
+    resolveHost: publicResolve,
         renderCreative: async () => PNG,
         creativeStore: { put: async () => ({ photoUrl: "https://signed.example/x", objectPath: "p" }) },
         finish: async (id, a) => (s.finished.push([id, a]), true),
@@ -212,7 +243,8 @@ describe("resultado desconhecido (QA 3, Farol B2)", () => {
       leaseMs: 7000, timeouts: { ...TIMEOUTS, clientsMs: 100, shortLinkMs: 100, downloadMs: 100, renderMs: 100, storeMs: 100, telegramMs: 100, finishMs: 100 },
       allowedImageHosts: ["cf.shopee.com.br"], maxImageBytes: 1000,
       clients: async () => ({ shopee: { generateShortLink: async () => ({ shortLink: "https://shope.ee/x" }) } as never, telegram: s.telegram }),
-      fetchImage: (async () => new Response(PNG)) as unknown as typeof fetch,
+      fetchImage: (async () => pngResponse()) as unknown as typeof fetch,
+    resolveHost: publicResolve,
       renderCreative: async () => PNG,
       creativeStore: { put: async () => ({ photoUrl: "https://signed.example/x", objectPath: "p" }) },
       finish: async (id, a) => (s.finished.push([id, a]), true),

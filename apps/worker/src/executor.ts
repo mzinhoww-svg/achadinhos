@@ -104,6 +104,8 @@ export interface ExecutorDeps {
   /** Hosts aceitos para productUrl e shortLink; padrão: Shopee. */
   linkHosts?: string[];
   fetchImage?: typeof fetch;
+  /** DNS da imagem (padrão: lookup real). O IP resolvido é sempre checado contra faixas internas. */
+  resolveHost?: ((host: string) => Promise<string[]>) | undefined;
   /** Em produção: `renderCreativePng` de @achadinhos/creative/render. */
   renderCreative: (input: RenderInput) => Promise<Uint8Array>;
   /** Persiste o PNG (bucket privado) e devolve URL assinada de vida curta (decisão 002 C5). */
@@ -229,6 +231,7 @@ export function createSendExecutor(deps: ExecutorDeps) {
           maxBytes: deps.maxImageBytes,
           timeoutMs: Math.max(1, Math.min(t.downloadMs, deadline - Date.now())),
           ...(deps.fetchImage ? { fetch: deps.fetchImage } : {}),
+          resolveHost: deps.resolveHost,
         });
         const dataUri = `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`;
         const png = await step(
