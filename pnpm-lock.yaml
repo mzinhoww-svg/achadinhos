@@ -80,6 +80,9 @@ importers:
       '@achadinhos/alerts':
         specifier: workspace:*
         version: link:../../packages/alerts
+      '@achadinhos/commission':
+        specifier: workspace:*
+        version: link:../../packages/commission
       '@achadinhos/creative':
         specifier: workspace:*
         version: link:../../packages/creative
@@ -126,6 +129,9 @@ importers:
 
   packages/commission:
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.9
+        version: 0.5.9
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.5

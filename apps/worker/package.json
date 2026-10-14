@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@achadinhos/alerts": "workspace:*",
+    "@achadinhos/commission": "workspace:*",
     "@achadinhos/creative": "workspace:*",
     "@achadinhos/domain": "workspace:*",
     "@achadinhos/shopee": "workspace:*",

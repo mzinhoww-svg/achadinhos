@@ -30,17 +30,6 @@ function cloneCommission(c: StoredCommission): StoredCommission {
   };
 }
 
-function fieldsEqual(a: StoredCommission, b: Commission): boolean {
-  return (
-    a.checkoutId === b.checkoutId &&
-    String(a.accountId ?? "") === String(b.accountId ?? "") &&
-    a.subIds.join("\u0000") === [...b.subIds].join("\u0000") &&
-    String(a.purchaseTime) === String(b.purchaseTime) &&
-    a.estimatedCommission === b.estimatedCommission &&
-    a.status === b.status
-  );
-}
-
 export class InMemoryCommissionRepository implements CommissionRepository {
   private readonly recordMap = new Map<string, StoredCommission>();
   private readonly eventList: StatusChangeEvent[] = [];
