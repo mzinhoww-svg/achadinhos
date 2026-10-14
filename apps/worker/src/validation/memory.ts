@@ -45,6 +45,7 @@ export class MemoryValidationStore implements ValidationStore {
       lastError: row.lastError,
       validatedAt: row.validatedAt,
       attempts: row.attempts,
+      verificationSentAt: row.verificationSentAt,
     };
   }
 
@@ -69,8 +70,29 @@ export class MemoryValidationStore implements ValidationStore {
     Object.assign(row, { status: "validated", lastError: null, validatedAt: at, claimed: false });
   }
 
-  async markInvalid(task: ValidationTask, lastError: string): Promise<void> {
-    Object.assign(this.row(task), { status: "invalid", lastError, claimed: false });
+  async markInvalid(
+    task: ValidationTask,
+    lastError: string,
+    _at?: Date,
+    options?: { clearVerification?: boolean },
+  ): Promise<void> {
+    const row = this.row(task);
+    if (options?.clearVerification) row.verificationSentAt = null;
+    Object.assign(row, { status: "invalid", lastError, claimed: false });
+  }
+
+  /** Simula o painel pedindo nova validação (contrato em `ValidationStore.markInvalid`). */
+  requeue(id: string): void {
+    const row = this.rows.get(id);
+    if (!row) throw new Error(`unknown task ${id}`);
+    Object.assign(row, {
+      status: "pending_validation",
+      lastError: null,
+      validatedAt: null,
+      attempts: 0,
+      verificationSentAt: null,
+      claimed: false,
+    });
   }
 
   async markVerificationSent(task: ValidationTask, at: Date): Promise<void> {

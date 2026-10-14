@@ -45,8 +45,21 @@ export type ValidationTask =
 export interface ValidationStore {
   claimPending(limit: number): Promise<ValidationTask[]>;
   markValidated(task: ValidationTask, at: Date): Promise<void>;
-  /** `lastError` já saneado (texto fixo, nunca derivado da resposta externa). */
-  markInvalid(task: ValidationTask, lastError: string, at: Date): Promise<void>;
+  /**
+   * `lastError` já saneado (texto fixo, nunca derivado da resposta externa).
+   * `clearVerification`: falha definitiva da API (nada foi entregue), então
+   * `verification_sent_at` volta a nulo e uma nova validação pode postar.
+   * Sem a opção a marca é mantida (entrega possível: timeout/transporte).
+   *
+   * Contrato do painel: pedir nova validação = status `pending_validation`,
+   * `attempts = 0`, `verification_sent_at = NULL`, `last_error = NULL`.
+   */
+  markInvalid(
+    task: ValidationTask,
+    lastError: string,
+    at: Date,
+    options?: { clearVerification?: boolean },
+  ): Promise<void>;
   /**
    * Falha transitória: volta a `pending_validation`, attempts + 1.
    * `clearVerification`: o envio da verificação foi recusado sem entrega
@@ -78,7 +91,7 @@ export interface ValidationLogger {
 
 export type Outcome =
   | { status: "validated" }
-  | { status: "invalid"; error: string }
+  | { status: "invalid"; error: string; clearVerification?: true }
   | { status: "retry"; error: string }
   /** Recusado sem entrega (429): pode reenviar a verificação com segurança. */
   | { status: "retry"; error: string; clearVerification: true };

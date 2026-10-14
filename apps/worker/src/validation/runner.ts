@@ -110,7 +110,14 @@ async function processTask(task: ValidationTask, deps: ValidationDeps): Promise<
       await write(deps.store.markValidated(task, now()));
       deps.logger.info("validation.validated", ctx);
     } else if (outcome.status === "invalid") {
-      await write(deps.store.markInvalid(task, outcome.error, now()));
+      await write(
+        deps.store.markInvalid(
+          task,
+          outcome.error,
+          now(),
+          outcome.clearVerification ? { clearVerification: true } : undefined,
+        ),
+      );
       deps.logger.info("validation.invalid", ctx);
     } else if (task.attempts + 1 >= maxAttempts) {
       await write(deps.store.markInvalid(task, MESSAGES.exhausted, now()));

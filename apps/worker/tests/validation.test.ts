@@ -477,6 +477,56 @@ describe("validação de credenciais (T7-08)", () => {
     });
   });
 
+  describe("revalidar depois de falha definitiva (ciclo 2 do QA)", () => {
+    it("NoAccess (nada entregue) → re-enfileirar → permissão ajustada → validated", async () => {
+      const store = new MemoryValidationStore([groupTask()]);
+      tg.setChatAccess("-1001", false);
+      await runValidationOnce(deps(store));
+      expect(store.result("grp-1").status).toBe("invalid");
+      expect(store.result("grp-1").lastError).toMatch(/permiss/i);
+      expect(store.result("grp-1").verificationSentAt).toBeNull();
+
+      tg.setChatAccess("-1001", true);
+      store.requeue("grp-1"); // painel: usuário pede nova validação
+      await runValidationOnce(deps(store));
+      expect(store.result("grp-1").status).toBe("validated");
+      expect(tg.getSentMessages()).toHaveLength(1);
+    });
+
+    it.each([
+      ["removido", (id: string) => tg.removeBotFromChat(id)],
+      ["bloqueado", (id: string) => tg.blockBotInChat(id)],
+      ["não encontrado", (id: string) => tg.setChatNotFound(id)],
+    ])("falha definitiva %s limpa a marca de verificação", async (_n, arrange) => {
+      arrange("-1001");
+      const store = new MemoryValidationStore([groupTask()]);
+      await runValidationOnce(deps(store));
+      expect(store.result("grp-1").status).toBe("invalid");
+      expect(store.result("grp-1").verificationSentAt).toBeNull();
+    });
+
+    it("timeout/transporte (entrega possível) mantém a marca", async () => {
+      const flaky: TelegramTransport = {
+        call: async () => {
+          throw new Error("socket hang up");
+        },
+      };
+      const store = new MemoryValidationStore([groupTask()]);
+      await runValidationOnce(deps(store, { createTelegram: (t) => new TelegramClient({ token: t, transport: flaky }) }));
+      expect(store.result("grp-1").status).toBe("invalid");
+      expect(store.result("grp-1").verificationSentAt).not.toBeNull();
+    });
+
+    it("requeue zera attempts e a marca; sem requeue, marca antiga segue sem repostar", async () => {
+      const store = new MemoryValidationStore([groupTask({ attempts: 2, verificationSentAt: new Date() })]);
+      store.requeue("grp-1");
+      const r = store.result("grp-1");
+      expect(r.attempts).toBe(0);
+      expect(r.verificationSentAt).toBeNull();
+      expect(r.status).toBe("pending_validation");
+    });
+  });
+
   it("log de falha de gravação traz só o tipo do erro, sem mensagem", async () => {
     const base = new MemoryValidationStore([shopeeTask()]);
     const store = {

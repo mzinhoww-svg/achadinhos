@@ -77,6 +77,14 @@ export async function validateTelegramGroup(
     const outcome = classifyTelegram(error, MESSAGES.groupNoRights);
     // Qualquer outra falha transitória pode ter entregue a mensagem: não repostar.
     if (outcome.status === "retry") return invalid(MESSAGES.verificationUnknown);
+    // Resposta definitiva da API (ok:false) ou token recusado antes do envio:
+    // nada foi entregue, então revalidar depois de corrigir é seguro.
+    if (
+      outcome.status === "invalid" &&
+      (error instanceof TelegramApiError || error instanceof InvalidTokenError)
+    ) {
+      return { ...outcome, clearVerification: true };
+    }
     return outcome;
   }
 }
