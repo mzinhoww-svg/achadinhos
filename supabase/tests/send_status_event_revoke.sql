@@ -9,8 +9,8 @@ INSERT INTO auth.users (id, aud, role, email) VALUES
 INSERT INTO public.accounts (account_id, user_id) VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111');
 
-INSERT INTO public.sends (id, account_id, status) VALUES
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'queued');
+INSERT INTO public.sends (id, account_id, status, idempotency_key) VALUES
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'queued', 'k-revoke');
 
 -- as authenticated user, inserting a status event must be denied
 SELECT set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
