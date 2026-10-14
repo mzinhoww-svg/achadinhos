@@ -5,7 +5,9 @@ import { productPlaceholder } from "../src/placeholder.ts";
 /** PNG de produto de verdade (decodificável), gerado do placeholder — sem rede. */
 export function productPng(hue = 340, label = "FONE", size = 800): Uint8Array {
   const dataUri = productPlaceholder(hue, label);
-  const svg = Buffer.from(dataUri.split(",")[1]!, "base64").toString("utf8");
+  // O rótulo do placeholder usa `font-family="sans-serif"` (fonte do SO): fixture dependia da plataforma e o
+  // snapshot divergia no Linux do CI. A foto de teste não carrega texto; as fontes do criativo são embutidas.
+  const svg = Buffer.from(dataUri.split(",")[1]!, "base64").toString("utf8").replace(/<text[\s\S]*?<\/text>/g, "");
   return new Resvg(svg, { fitTo: { mode: "width", value: size } }).render().asPng();
 }
 
