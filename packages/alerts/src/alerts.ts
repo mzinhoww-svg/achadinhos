@@ -25,6 +25,7 @@ interface InternalAlertState {
 }
 
 export class AlertService {
+  private readonly inflight = new Map<string, Promise<AlertResult>>();
   private readonly transport: EmailTransport;
   private readonly now: () => number;
   private readonly toDefault: string | string[];
@@ -118,17 +119,18 @@ export class AlertService {
     return this.sendCause(cause, context);
   }
 
-  private async sendCause(cause: AlertInput, context?: AlertContext): Promise<AlertResult> {
+  private async sendCauseLocked(cause: AlertInput, context?: AlertContext): Promise<AlertResult> {
     const reason = normalizeCause(cause);
+    const key = alertDedupeKey(reason, context);
     const now = this.now();
     const recipients = this.toDefault;
 
-    // dedup: um alerta por causa até resolver
-    if (this.state.active.has(reason)) {
+    // dedup: um alerta por causa (com escopo) até resolver
+    if (this.state.active.has(key)) {
       return { sent: false, duplicate: true, reason, recipients, cause: reason };
     }
     // debounce por tempo (opcional)
-    const last = this.state.lastSentAt.get(reason) ?? 0;
+    const last = this.state.lastSentAt.get(key) ?? 0;
     if (this.cooldownMs > 0 && now - last < this.cooldownMs) {
       return { sent: false, duplicate: true, reason, recipients, cause: reason };
     }
@@ -136,14 +138,33 @@ export class AlertService {
     const sanitizedContext = sanitizeContext(context as Record<string, unknown>);
     const message = this.buildMessage(reason, sanitizedContext, recipients);
 
-    await this.dispatch(message);
+    // marca ativo antes do envio para bloquear disparos concorrentes
+    this.state.active.add(key);
+    try {
+      await this.dispatch(message);
+    } catch (err) {
+      this.state.active.delete(key);
+      throw err;
+    }
 
-    this.state.active.add(reason);
-    this.state.lastSentAt.set(reason, now);
+    this.state.lastSentAt.set(key, now);
     this.state.history.push({ cause: reason, at: now, message, context: sanitizedContext });
 
     return { sent: true, duplicate: false, reason, recipients, cause: reason };
   }
+
+  private async sendCause(cause: AlertInput, context?: AlertContext): Promise<AlertResult> {
+    const reason = normalizeCause(cause);
+    const key = alertDedupeKey(reason, context);
+    const existing = this.inflight.get(key);
+    if (existing) return existing;
+    const promise = this.sendCauseLocked(cause, context).finally(() => {
+      this.inflight.delete(key);
+    });
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
 
   private buildMessage(reason: string, context: Record<string, unknown>, recipients: string | string[]): EmailMessage {
     const subject = `${this.subjectPrefix} ${subjectFor(reason)}`;
@@ -195,7 +216,10 @@ export class AlertService {
       this.state.active.clear();
       return;
     }
-    this.state.active.delete(String(cause));
+    const wanted = String(cause);
+    for (const key of [...this.state.active]) {
+      if (baseCause(key) === wanted) this.state.active.delete(key);
+    }
   }
 
   clear(cause?: string): void {
@@ -218,11 +242,11 @@ export class AlertService {
   }
 
   isAlertActive(cause: string): boolean {
-    return this.state.active.has(String(cause));
+    return [...this.state.active].some((k) => baseCause(k) === String(cause));
   }
 
   isActive(cause: string): boolean {
-    return this.state.active.has(String(cause));
+    return this.isAlertActive(cause);
   }
 
   hasActive(): boolean {
@@ -230,7 +254,7 @@ export class AlertService {
   }
 
   getActiveCauses(): string[] {
-    return [...this.state.active];
+    return [...new Set([...this.state.active].map(baseCause))];
   }
 
   listActive(): string[] {
@@ -254,14 +278,17 @@ export class AlertService {
 
   // ---------- Heartbeat ----------
   checkHeartbeat(lastHeartbeatAt: number | Date, now?: number | Date): Promise<AlertResult> | AlertResult {
-    const nowMs = now !== undefined ? toMillis(now) : this.now();
+    const nowMs = (now !== undefined && Number.isFinite(toMillis(now))) ? toMillis(now) : this.now();
     const lastMs = toMillis(lastHeartbeatAt);
-    if (nowMs - lastMs > this.heartbeatThresholdMs) {
+    const stale = !Number.isFinite(lastMs) || nowMs - lastMs > this.heartbeatThresholdMs;
+    if (stale) {
       return this.sendCause(ALERT_CAUSE_WORKER_NO_HEARTBEAT, {
-        lastHeartbeatAt: new Date(lastMs).toISOString(),
-        ageMs: nowMs - lastMs,
+        lastHeartbeatAt: Number.isFinite(lastMs) ? new Date(lastMs).toISOString() : undefined,
+        ageMs: Number.isFinite(lastMs) ? nowMs - lastMs : undefined,
       });
     }
+    // recuperação: heartbeat saudável limpa a causa ativa
+    this.ack(ALERT_CAUSE_WORKER_NO_HEARTBEAT);
     return Promise.resolve({ sent: false, duplicate: false, reason: ALERT_CAUSE_WORKER_NO_HEARTBEAT, recipients: this.toDefault, cause: ALERT_CAUSE_WORKER_NO_HEARTBEAT });
   }
 
@@ -345,6 +372,32 @@ export { AlertService as AlertManager };
 export { AlertService as EmailAlertService };
 export { AlertService as AlertDispatcher };
 export { AlertService as AlertClient };
+
+function alertDedupeKey(reason: string, context?: AlertContext): string {
+  const scopeFields = [
+    "accountId", "account_id", "group", "groupId", "group_id",
+    "channel", "channelId", "channel_id", "to", "recipient", "target",
+  ];
+  const scope: Record<string, unknown> = {};
+  if (context && typeof context === "object") {
+    for (const field of scopeFields) {
+      const value = (context as Record<string, unknown>)[field];
+      if (value !== undefined && value !== null) scope[field] = value;
+    }
+  }
+  const scopeStr = Object.keys(scope).length
+    ? JSON.stringify(Object.keys(scope).sort().reduce((acc, k) => {
+        acc[k] = scope[k];
+        return acc;
+      }, {} as Record<string, unknown>))
+    : "";
+  return scopeStr ? `${reason}::${scopeStr}` : reason;
+}
+
+function baseCause(key: string): string {
+  const idx = key.indexOf("::");
+  return idx === -1 ? key : key.slice(0, idx);
+}
 
 function normalizeCause(cause: AlertInput): string {
   if (typeof cause === "string") return cause || "alert";

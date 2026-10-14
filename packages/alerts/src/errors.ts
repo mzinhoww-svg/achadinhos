@@ -38,9 +38,11 @@ export function redactSecrets(text: string, extra?: string[]): string {
       out = out.split(s).join("[REDACTED]");
     }
   }
-  // generic long tokens in auth headers
+  out = out.replace(/bot\d+:[A-Za-z0-9_-]+/g, "bot[REDACTED]");
   out = out.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]");
   out = out.replace(/x-api-key:\s*[^\s]+/gi, "x-api-key: [REDACTED]");
+  out = out.replace(/Signature\s*=\s*[^,\s)]+/gi, "Signature=[REDACTED]");
+  out = out.replace(/Credential\s*=\s*[^,\s)]+/gi, "Credential=[REDACTED]");
   return out;
 }
 
@@ -49,15 +51,35 @@ export function safeErrorMessage(err: unknown, extraSecrets?: string[]): string 
   return redactSecrets(String(err), extraSecrets);
 }
 
+const BLOCKED_CONTEXT_KEYS = new Set([
+  "secret", "secretId", "secret_id", "token", "password",
+  "apiKey", "api_key", "apikey", "authorization", "signature",
+  "appSecret", "app_secret", "secretKey", "secret_key",
+]);
+
 export function sanitizeContext(context?: Record<string, unknown>, extraSecrets?: string[]): Record<string, unknown> {
   if (!context) return {};
-  const blocked = new Set(["secret", "secretId", "secret_id", "token", "password", "apiKey", "api_key", "apikey", "authorization"]);
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(context)) {
-    if (blocked.has(k)) continue;
-    if (typeof v === "string") out[k] = redactSecrets(v, extraSecrets);
-    else if (v instanceof Error) out[k] = redactSecrets(v.message, extraSecrets);
-    else out[k] = v;
+    if (BLOCKED_CONTEXT_KEYS.has(k)) continue;
+    out[k] = sanitizeValue(v, extraSecrets);
   }
   return out;
+}
+
+function sanitizeValue(value: unknown, extraSecrets?: string[]): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") return redactSecrets(value, extraSecrets);
+  if (value instanceof Error) return redactSecrets(value.message, extraSecrets);
+  if (Array.isArray(value)) return value.map((v) => sanitizeValue(v, extraSecrets));
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (BLOCKED_CONTEXT_KEYS.has(k)) continue;
+      out[k] = sanitizeValue(v, extraSecrets);
+    }
+    return out;
+  }
+  return value;
 }

@@ -124,10 +124,14 @@ export class HttpEmailTransport implements EmailTransport {
   async send(message: EmailMessage): Promise<EmailSendResult> {
     const controller = new AbortController();
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, this.timeoutMs);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(new EmailTimeoutError(redactSecrets("Timeout while sending email")));
+      }, this.timeoutMs);
+    });
 
     const body = JSON.stringify({
       from: message.from ?? this.from,
@@ -156,31 +160,13 @@ export class HttpEmailTransport implements EmailTransport {
         signal: controller.signal,
       });
 
-      const response = await Promise.race([
-        fetchPromise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => {
-            timedOut = true;
-            controller.abort();
-            reject(new EmailTimeoutError("Timeout while sending email"));
-          }, this.timeoutMs),
-        ),
-      ]);
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
 
       let text = "";
       try {
-        text = await Promise.race([
-          response.text(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => {
-              timedOut = true;
-              controller.abort();
-              reject(new EmailTimeoutError("Timeout while reading email response"));
-            }, this.timeoutMs),
-          ),
-        ]);
+        text = await Promise.race([response.text(), timeoutPromise]);
       } catch (cause) {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         if (timedOut || isAbortError(cause)) {
           throw new EmailTimeoutError(redactSecrets("Timeout while sending email"));
         }
@@ -189,14 +175,7 @@ export class HttpEmailTransport implements EmailTransport {
         });
       }
 
-      clearTimeout(timer);
-
-      let data: unknown = {};
-      try {
-        data = text.trim() === "" ? {} : JSON.parse(text);
-      } catch {
-        data = { raw: text };
-      }
+      if (timer) clearTimeout(timer);
 
       if (!response.ok) {
         throw new EmailTransportError(
@@ -204,7 +183,32 @@ export class HttpEmailTransport implements EmailTransport {
         );
       }
 
+      let data: unknown;
+      try {
+        data = text.trim() === "" ? {} : JSON.parse(text);
+      } catch {
+        throw new EmailTransportError(redactSecrets(`Invalid email provider response: ${text.slice(0, 200)}`));
+      }
+
+      if (data && typeof data === "object") {
+        const obj = data as Record<string, unknown>;
+        if ("error" in obj || "errors" in obj || obj.ok === false || obj.success === false || obj.accepted === false) {
+          throw new EmailTransportError(redactSecrets(`Email provider rejected request: ${text.slice(0, 200)}`));
+        }
+      }
+
       const id = extractId(data);
+      const accepted =
+        id !== undefined ||
+        (data !== null && typeof data === "object" && (
+          (data as Record<string, unknown>).accepted === true ||
+          (data as Record<string, unknown>).ok === true ||
+          (data as Record<string, unknown>).success === true
+        ));
+      if (!accepted) {
+        throw new EmailTransportError(redactSecrets(`Invalid email provider response: ${text.slice(0, 200)}`));
+      }
+
       return { accepted: true, id, messageId: id, to: message.to, subject: message.subject };
     } catch (cause) {
       clearTimeout(timer);
