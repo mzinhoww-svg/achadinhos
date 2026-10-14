@@ -109,6 +109,11 @@ export class HttpEmailTransport implements EmailTransport {
     return redactSecrets(text, [this.#apiKey]);
   }
 
+  /** Nunca anexa a causa original: ela pode carregar a chave (log/serializador percorre `cause`). */
+  #safeCause(cause: unknown): Error {
+    return new Error(this.#redact(cause instanceof Error ? cause.message : String(cause)));
+  }
+
   get url(): string {
     return this.endpoint;
   }
@@ -175,7 +180,7 @@ export class HttpEmailTransport implements EmailTransport {
           throw new EmailTimeoutError(this.#redact("Timeout while sending email"));
         }
         throw new EmailTransportError(this.#redact(`Network error while sending email: ${safeErrorMessage(cause as unknown, [this.#apiKey])}`), {
-          cause,
+          cause: this.#safeCause(cause),
         });
       }
 
@@ -221,7 +226,7 @@ export class HttpEmailTransport implements EmailTransport {
       }
       if (cause instanceof EmailTransportError) throw cause;
       throw new EmailTransportError(this.#redact(`Network error while sending email: ${safeErrorMessage(cause as unknown, [this.#apiKey])}`), {
-        cause,
+        cause: this.#safeCause(cause),
       });
     }
   }

@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
   EmailConfigError,
@@ -113,5 +114,17 @@ describe("createEmailTransportFromEnv", () => {
     expect(r.sent).toBe(true);
     expect(calls).toHaveLength(1);
     expect(String(JSON.parse(String(calls[0]!.init.body)).subject)).toContain("3 min");
+  });
+
+  it("erro de rede: a chave não sobra em error.cause (inspect/JSON)", async () => {
+    const boom = (async () => {
+      throw new Error(`ECONNREFUSED x-api-key=${KEY}`);
+    }) as unknown as typeof fetch;
+    const t = createEmailTransportFromEnv(ENV, { fetch: boom });
+    const err = await t.send({ to: "a@b.test", subject: "s", text: "x" }).catch((e) => e);
+    expect(inspect(err, { depth: 6 })).not.toContain(KEY);
+    expect(JSON.stringify(err, Object.getOwnPropertyNames(err))).not.toContain(KEY);
+    const cause = (err as { cause?: unknown }).cause;
+    if (cause !== undefined) expect(inspect(cause, { depth: 6 })).not.toContain(KEY);
   });
 });
