@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { saveAutomationAction } from "@/app/automacoes/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,11 +75,33 @@ export function AutomationForm({
   const windowInvalid = start === end;
   const editing = Boolean(initial.id);
   const limitReached = !editing && automationsUsed >= maxAutomations;
-  const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
-  const formError = state && !state.ok && !state.fieldErrors ? state.message : state && !state.ok && state.code === "limit" ? state.message : undefined;
+  const errors: Record<string, string> = state && !state.ok ? (state.fieldErrors ?? {}) : {};
+  const errorList = Object.values(errors);
+  const failure = state && !state.ok ? state : null;
+  const summaryRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (failure) summaryRef.current?.focus();
+  }, [failure]);
 
   return (
     <form action={action} className="grid items-start gap-6 lg:grid-cols-[1fr_20rem]" noValidate>
+      {failure && (
+        <div
+          ref={summaryRef}
+          tabIndex={-1}
+          data-error-summary
+          role="alert"
+          aria-live="assertive"
+          className="rounded-panel border border-err/40 bg-err-50 p-4 text-sm text-err lg:col-span-2"
+        >
+          <p className="font-semibold">{failure.message}</p>
+          {errorList.length > 0 && (
+            <ul className="mt-1.5 list-disc pl-5">
+              {errorList.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
       <div className="grid gap-6">
         <Card title="Identificação">
@@ -90,31 +112,31 @@ export function AutomationForm({
 
         <Card title="Filtros de oferta" description="Só entram ofertas que passam em todos os filtros.">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Categoria" htmlFor="category">
-              <Select id="category" name="category" defaultValue={initial.category}>
+            <Field label="Categoria" htmlFor="category" error={errors.category}>
+              <Select id="category" name="category" defaultValue={initial.category} aria-invalid={!!errors.category} aria-describedby="category-msg">
                 <option value="">Todas</option>
                 {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
               </Select>
             </Field>
-            <Field label="Preço máximo (R$)" htmlFor="max-price" hint="Deixe em branco para não limitar.">
-              <Input id="max-price" name="maxPrice" inputMode="decimal" placeholder="150" defaultValue={initial.maxPrice} />
+            <Field label="Preço máximo (R$)" htmlFor="max-price" error={errors.maxPrice} hint="Deixe em branco para não limitar.">
+              <Input id="max-price" name="maxPrice" inputMode="decimal" placeholder="150" defaultValue={initial.maxPrice} aria-invalid={!!errors.maxPrice} aria-describedby="max-price-msg" />
             </Field>
-            <Field label="Desconto mínimo (%)" htmlFor="min-discount">
-              <Input id="min-discount" name="minDiscount" inputMode="numeric" defaultValue={initial.minDiscount} />
+            <Field label="Desconto mínimo (%)" htmlFor="min-discount" error={errors.minDiscount}>
+              <Input id="min-discount" name="minDiscount" inputMode="numeric" defaultValue={initial.minDiscount} aria-invalid={!!errors.minDiscount} aria-describedby="min-discount-msg" />
             </Field>
-            <Field label="Comissão mínima (%)" htmlFor="min-commission">
-              <Input id="min-commission" name="minCommission" inputMode="decimal" defaultValue={initial.minCommission} />
+            <Field label="Comissão mínima (%)" htmlFor="min-commission" error={errors.minCommission}>
+              <Input id="min-commission" name="minCommission" inputMode="decimal" defaultValue={initial.minCommission} aria-invalid={!!errors.minCommission} aria-describedby="min-commission-msg" />
             </Field>
-            <Field label="Avaliação mínima" htmlFor="min-rating">
-              <Select id="min-rating" name="minRating" defaultValue={initial.minRating}>
+            <Field label="Avaliação mínima" htmlFor="min-rating" error={errors.minRating}>
+              <Select id="min-rating" name="minRating" defaultValue={initial.minRating} aria-invalid={!!errors.minRating} aria-describedby="min-rating-msg">
                 <option value="0">Qualquer</option>
                 <option value="4">4,0 ou mais</option>
                 <option value="4.5">4,5 ou mais</option>
                 <option value="4.8">4,8 ou mais</option>
               </Select>
             </Field>
-            <Field label="Vendas mínimas" htmlFor="min-sales">
-              <Input id="min-sales" name="minSales" inputMode="numeric" defaultValue={initial.minSales} />
+            <Field label="Vendas mínimas" htmlFor="min-sales" error={errors.minSales}>
+              <Input id="min-sales" name="minSales" inputMode="numeric" defaultValue={initial.minSales} aria-invalid={!!errors.minSales} aria-describedby="min-sales-msg" />
             </Field>
           </div>
         </Card>
@@ -125,7 +147,7 @@ export function AutomationForm({
             <div className="flex flex-wrap gap-2">
               {DAYS.map((d, i) => <Chip key={d} label={d} defaultChecked={initial.days.includes(i)} name="days" value={i} />)}
             </div>
-            {errors.days && <p role="alert" className="mt-2 text-sm text-err">{errors.days}</p>}
+            {errors.days && <p role="alert" aria-live="assertive" className="mt-2 text-sm text-err">{errors.days}</p>}
           </fieldset>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <Field label="Início da janela" htmlFor="start" error={errors.windowStart}>
@@ -134,8 +156,8 @@ export function AutomationForm({
             <Field label="Fim da janela" htmlFor="end" error={windowInvalid ? "Início e fim não podem ser iguais." : errors.windowEnd}>
               <Input id="end" name="windowEnd" type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-invalid={windowInvalid} aria-describedby="end-msg" />
             </Field>
-            <Field label="Frequência" htmlFor="freq" hint={end < start ? "A janela termina no dia seguinte." : undefined}>
-              <Select id="freq" name="frequencyMin" value={freq} onChange={(e) => setFreq(Number(e.target.value) as 15 | 30 | 60)}>
+            <Field label="Frequência" htmlFor="freq" error={errors.frequencyMin} hint={end < start ? "A janela termina no dia seguinte." : undefined}>
+              <Select id="freq" name="frequencyMin" value={freq} onChange={(e) => setFreq(Number(e.target.value) as 15 | 30 | 60)} aria-invalid={!!errors.frequencyMin} aria-describedby="freq-msg">
                 <option value={15}>A cada 15 min</option>
                 <option value={30}>A cada 30 min</option>
                 <option value={60}>A cada 60 min</option>
@@ -160,16 +182,16 @@ export function AutomationForm({
               ))}
             </div>
           </fieldset>
-          {errors.groupIds && <p id="groups-error" role="alert" className="mt-2 text-sm text-err">{errors.groupIds}</p>}
+          {errors.groupIds && <p id="groups-error" role="alert" aria-live="assertive" className="mt-2 text-sm text-err">{errors.groupIds}</p>}
         </Card>
 
         <Card title="Texto da mensagem" description="Opcional. A imagem, o preço e o link curto entram automaticamente.">
           <div className="grid gap-4">
-            <Field label="Cabeçalho" htmlFor="header">
-              <Input id="header" name="header" placeholder="Achadinho do dia" maxLength={80} defaultValue={initial.header} />
+            <Field label="Cabeçalho" htmlFor="header" error={errors.header}>
+              <Input id="header" name="header" placeholder="Achadinho do dia" maxLength={80} defaultValue={initial.header} aria-invalid={!!errors.header} aria-describedby="header-msg" />
             </Field>
-            <Field label="Rodapé" htmlFor="footer">
-              <Textarea id="footer" name="footer" placeholder="Preço pode mudar a qualquer momento." maxLength={200} rows={2} defaultValue={initial.footer} />
+            <Field label="Rodapé" htmlFor="footer" error={errors.footer}>
+              <Textarea id="footer" name="footer" placeholder="Preço pode mudar a qualquer momento." maxLength={200} rows={2} defaultValue={initial.footer} aria-invalid={!!errors.footer} aria-describedby="footer-msg" />
             </Field>
           </div>
         </Card>
@@ -186,7 +208,6 @@ export function AutomationForm({
           </p>
           {est.hitCap && <div className="mt-3"><Badge tone="warn">Limitado ao teto de {dailyCap}/canal por dia</Badge></div>}
           <p className="mt-4 text-sm text-ink-2">Antirrepetição: a mesma oferta não volta ao mesmo grupo por 7 dias.</p>
-          {formError && <p role="alert" className="mt-3 text-sm font-medium text-err">{formError}</p>}
           <div className="mt-5 grid gap-2">
             <Button type="submit" loading={pending} disabled={limitReached || windowInvalid}>{editing ? "Salvar alterações" : "Salvar automação"}</Button>
             <Button type="button" variant="ghost" href="/automacoes">Cancelar</Button>

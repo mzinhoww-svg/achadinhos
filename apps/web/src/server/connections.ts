@@ -1,3 +1,4 @@
+import "server-only";
 import { z } from "zod";
 import type { ConnectionsRepo, SecretVault, TelegramGateway, ValidationStatus } from "./ports";
 import { sanitizeText } from "./sanitize";
@@ -113,13 +114,18 @@ export async function getConnections(deps: ConnectionDeps, session: Session) {
   return {
     shopee: shopee ? toPublicShopee(shopee) : null,
     telegram: channel
-      ? ({ botName: channel.botName, status: channel.status, validatedAt: channel.validatedAt, lastError: channel.lastError, groups: groups.map(toPublicGroup) } satisfies PublicTelegram)
+      ? ({ botName: channel.botName, status: channel.status, validatedAt: channel.validatedAt, lastError: publicError(channel.lastError), groups: groups.map(toPublicGroup) } satisfies PublicTelegram)
       : null,
   };
 }
 
+/** `last_error` pode vir do worker: redige token e limita o tamanho antes de chegar à UI. */
+export function publicError(e: string | null): string | null {
+  return e === null ? null : sanitizeText(e).slice(0, 300);
+}
+
 function toPublicShopee(r: { appId: string; secretLast4: string; status: ValidationStatus; validatedAt: string | null; lastError: string | null }): PublicShopee {
-  return { appId: r.appId, secretLast4: r.secretLast4, status: r.status, validatedAt: r.validatedAt, lastError: r.lastError };
+  return { appId: r.appId, secretLast4: r.secretLast4, status: r.status, validatedAt: r.validatedAt, lastError: publicError(r.lastError) };
 }
 function toPublicGroup(g: { id: string; name: string; chatType: string; subId: string; active: boolean; members: number }): PublicGroup {
   return { id: g.id, name: g.name, chatType: g.chatType, subId: g.subId, active: g.active, members: g.members };

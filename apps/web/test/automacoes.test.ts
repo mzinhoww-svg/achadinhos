@@ -87,3 +87,40 @@ describe("T8-05 estimativa (packages/domain)", () => {
     expect(r.hitCap).toBe(hitCap);
   });
 });
+
+describe("QA ciclo 1 — erros de validação com mensagem por campo, em português", () => {
+  const msgs = async (bad: Record<string, unknown>) => {
+    const b = build();
+    const err = await createAutomation(d(b), S, { ...valid, ...bad }).catch((e) => e);
+    return err.fieldErrors as Record<string, string>;
+  };
+  it.each([
+    ["maxPrice negativo", { filters: { priceMax: -1 } }, "maxPrice"],
+    ["maxPrice não numérico", { filters: { priceMax: Number.NaN } }, "maxPrice"],
+    ["minDiscount acima de 100", { filters: { minDiscount: 999 } }, "minDiscount"],
+    ["minCommission não numérico", { filters: { minCommission: Number.NaN } }, "minCommission"],
+    ["minRating acima de 5", { filters: { minRating: 9 } }, "minRating"],
+    ["header com 5000 caracteres", { header: "x".repeat(5000) }, "header"],
+    ["footer com 5000 caracteres", { footer: "x".repeat(5000) }, "footer"],
+    ["frequência inválida", { frequencyMin: 45 }, "frequencyMin"],
+    ["nome vazio", { name: "" }, "name"],
+  ])("%s → erro na chave do campo do formulário", async (_t, bad, key) => {
+    const e = await msgs(bad);
+    expect(Object.keys(e)).toContain(key);
+    expect(Object.keys(e)).not.toContain("filters");
+    // nada de mensagem padrão do zod em inglês
+    expect(Object.values(e).join(" ")).not.toMatch(/Number must|String must|Invalid input|Expected|Required/);
+  });
+  it("filtro numérico digitado errado nunca é descartado em silêncio", async () => {
+    const b = build();
+    await expect(createAutomation(d(b), S, { ...valid, filters: { minCommission: Number.NaN } })).rejects.toMatchObject({ code: "invalid" });
+    expect(await listAutomations(d(b), S)).toHaveLength(0);
+  });
+  it("editar automação pausada não a reativa", async () => {
+    const b = build();
+    const a = await createAutomation(d(b), S, valid);
+    await b.automations.update("acc_A", a.id, { ...a, status: "paused" });
+    const upd = await updateAutomation(d(b), S, { id: a.id, ...valid, name: "Outro nome" });
+    expect(upd.status).toBe("paused");
+  });
+});

@@ -76,3 +76,16 @@ describe("T8-03 Conexões Telegram", () => {
     expect(again.groups[0]).toMatchObject({ id: first.groups[0]!.id, subId: first.groups[0]!.subId, active: true });
   });
 });
+
+describe("Farol R2 — last_error saneado e limitado na leitura", () => {
+  it("getConnections redige token e corta em 300 caracteres", async () => {
+    const b = build();
+    await b.connections.saveShopee({
+      accountId: "acc_A", appId: "18350000042", secretId: "v1", secretLast4: "0042", status: "invalid", validatedAt: null,
+      lastError: `falhou com bot${TOKEN_CANARY} ${"x".repeat(500)}`,
+    });
+    const view = await getConnections(deps(b), { accountId: "acc_A", userId: "u" });
+    expect(view.shopee!.lastError).not.toContain(TOKEN_CANARY);
+    expect(view.shopee!.lastError!.length).toBeLessThanOrEqual(300);
+  });
+});

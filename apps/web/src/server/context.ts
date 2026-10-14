@@ -12,7 +12,16 @@ export interface Container {
   sessions: SessionProvider;
 }
 
-const DEMO = () => process.env.ACHADINHOS_DEMO_SESSION === "1";
+/**
+ * Sessão demo = bypass de autenticação: nunca em produção. Em `next start` local de QA exige a segunda variável
+ * explícita; em produção da Vercel nunca, com ou sem ela.
+ */
+const DEMO = () => {
+  if (process.env.ACHADINHOS_DEMO_SESSION !== "1") return false;
+  if (process.env.VERCEL_ENV === "production") return false;
+  if (process.env.NODE_ENV === "production") return process.env.ACHADINHOS_DEMO_LOCAL_BUILD === "1";
+  return true;
+};
 export const DEMO_ACCOUNT = "demo";
 export const DEMO_EMPTY_ACCOUNT = "demo-vazio";
 

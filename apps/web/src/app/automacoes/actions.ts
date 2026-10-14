@@ -18,7 +18,7 @@ function toInput(fd: FormData) {
   if (category) filters.category = category;
   for (const [form, key] of [["maxPrice", "priceMax"], ["minDiscount", "minDiscount"], ["minCommission", "minCommission"], ["minRating", "minRating"], ["minSales", "minSales"]] as const) {
     const n = num(form);
-    if (n !== undefined && Number.isFinite(n)) filters[key] = n;
+    if (n !== undefined) filters[key] = n; // NaN segue até o servidor, que devolve erro por campo
   }
   return {
     id: fd.get("id") ? String(fd.get("id")) : undefined,
