@@ -109,18 +109,36 @@ O host direto do Supabase (`db.<ref>.supabase.co`) é IPv6 e o plano free não i
 
 ## 6. O que bloqueia o primeiro deploy
 
-Estado verificado contra a `main` em 2026-10-14 (comentário do QA no #29). Resolvido: `blockingHistory` por sufixo `_resultado_desconhecido` (#14 mergeado).
+Estado verificado em 2026-10-14 contra a `main` (#30 mergeado) e as auditorias do Planejador nos PRs #33–#38. Resolvido: `blockingHistory` por sufixo `_resultado_desconhecido` (#14); bot sem acesso desativa o grupo na porta do runtime (#30); flag demo bloqueada em produção (#38); `finished_at` do `skipped` e `hasOpenSend` por prefixo (#37).
 
-Continuam abertos:
-- Grupo com bot removido continua agendado e consome o teto (#30, devolvido).
-- `public.sends` fora da publicação `supabase_realtime`; cliente Realtime `null`.
-- Adaptadores SQL do `SchedulerStore`, do claim e do `ValidationStore` (`vault.read` com `account_id`).
-- `addSecret` dos segredos lidos do Vault (Shopee/Telegram) ao ler; o #30 já registra `DATABASE_URL`.
-- Role Postgres dedicada ao worker e ao Vault (decisão 003, H3; D3).
-- Heartbeat persistido e exposto; monitor externo (3.2).
-- CI sem `next build` e sem pgTAP (issue #26).
-- Executor sem o downloader seguro do #23.
-- RPC `enqueue_send_now` sem adaptador no web.
-- Claim sem filtro de grupo ativo/janela e `automation_id` ausente em `sends` (gates T7-10; reconferir no #30).
-- Flag `ACHADINHOS_DEMO_SESSION` bloqueada em produção (#11, R1).
-- Credenciais reais e provedor de e-mail definidos.
+### Antes de aplicar qualquer migração
+- **Versões de migração duplicadas:** #34, #35, #36 e #38 usam `20261015120000`; a segunda a aplicar falha em `schema_migrations`. Renomear com timestamps únicos e acrescentar um passo de CI que liste versões repetidas.
+- **Projeto Supabase:** cadastro aberto desligado (convite/allowlist) — `web_account()` cria conta para qualquer autenticado; pgTAP e `tests/contract` rodados contra o projeto real; validar que `CREATE ROLE achadinhos_worker … IN ROLE service_role` e `ALTER ROLE … SET role` funcionam com o `postgres` do hospedado.
+
+### Banco e privilégios
+- Privilégio por coluna em `shopee_credentials` e `channels`: `status`, `validation_status`, `validated_at`, `last_error`, `secret_id`, `config_secret_id` só por RPC `DEFINER` ou worker (#38 R1).
+- `REVOKE TRUNCATE, UPDATE, DELETE` das tabelas insert-only (`sends`, `commissions`, `commission_events`) de `service_role` e da role do worker; `REVOKE INSERT ON commissions FROM authenticated` (#36 R2, R3).
+- `worker_read_secret` com escopo de conta pelo nome `achadinhos/<conta>/…` (#37 R3).
+- `CHECK` em `days` (0–6, não vazio) e `window_start <> window_end`; cota de segredos não anexados no Vault com limpeza de órfãos (#38 R3, R4).
+- `sub_id` sem dígitos do chat id (#38 R5).
+
+### Worker (PR de ligação)
+- Chamar `assertWorkerRole` na partida e montar o cliente só por `openPgClient()`; variável `DATABASE_CA_CERT_FILE` para a CA do Supabase (#37 R1, R4).
+- `groups.deactivate` com adaptador SQL e `AND g.active` no `claim_next_send`; `queued` de grupo desativado vira `skipped/grupo_inativo` (#30 R2, #37 R5).
+- `addSecret` de todo valor lido do Vault (#37 R6); TTL de `queued` (#30 R1); `tsx` fora de `devDependencies` ou build compilado (#30 R5).
+- Guarda de IP com `node:net.BlockList` e `maxPixels` ≈ 4 Mpx, com repasse pelo worker (#33 R1, R3).
+- Semântica de preço (`priceMin`/`priceMax` ≠ preço original) confirmada com resposta real (#37 R7; decisão 004).
+
+### Alertas e observabilidade
+- Monitor externo ao VPS com ping a cada tick bem-sucedido (3.2); o código do ping ainda não existe.
+- Limiar único de 180000 ms entre `createHeartbeatMonitor` e `AlertService`; par `HEARTBEAT_STALE_MS=120000` / `WORKER_STALL_ALERT_MS=180000` (#35 R1).
+- Destinatário `ALERT_EMAIL_TO` obrigatório e sem literal pessoal no código (#35 R2).
+- Tick com todos os grupos em erro não pode contar como saudável (#30 R3).
+
+### Painel
+- Token do Realtime preenchido no servidor depois de `getUser()`; verificação servidor de que `NEXT_PUBLIC_SUPABASE_ANON_KEY` não é `service_role`; publicação de `sends` só com as colunas que a tela usa (#34 R2, R3, R5).
+- Adaptador da busca de oferta (consulta à Shopee fora do web) para o "Mandar agora" funcionar em produção.
+
+### Processo
+- CI com `next build` e pgTAP (issue #26).
+- Credenciais reais (Shopee, Telegram, Supabase) e provedor de e-mail definidos (`docs/ACTIONS.md`).
