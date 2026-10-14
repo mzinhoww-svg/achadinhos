@@ -76,6 +76,16 @@ describe("snapshot PNG por fixture (tolerância de pixel)", () => {
       if (!update) console.warn(`snapshot criado: ${name}`);
       return;
     }
-    expect(diffRatio(png, readFileSync(file))).toBeLessThan(0.002);
+    const ratio = diffRatio(png, readFileSync(file));
+    if (ratio >= 0.002) {
+      const A = decodePng(png), B = decodePng(readFileSync(file));
+      let minX = 1e9, minY = 1e9, maxX = -1, maxY = -1, maxD = 0;
+      for (let i = 0; i < A.rgba.length; i += 4) {
+        const d = Math.max(Math.abs(A.rgba[i]! - B.rgba[i]!), Math.abs(A.rgba[i + 1]! - B.rgba[i + 1]!), Math.abs(A.rgba[i + 2]! - B.rgba[i + 2]!));
+        if (d > 12) { const p = i / 4, x = p % 1080, y = (p / 1080) | 0; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); maxD = Math.max(maxD, d); }
+      }
+      console.log(`DIFFDEBUG ${name} ratio=${ratio} bbox=${minX},${minY}-${maxX},${maxY} maxDelta=${maxD}`);
+    }
+    expect(ratio).toBeLessThan(0.002);
   });
 });
