@@ -38,7 +38,11 @@ export default async function EnviosPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Envios" description="Histórico e fila. Falhas não são reenviadas sozinhas; use “Mandar agora” para tentar de novo." />
+      <PageHeader
+        title="Envios"
+        description="Histórico e fila. Falhas não são reenviadas sozinhas; use “Mandar agora” para tentar de novo."
+        actions={<Button href="/mandar-agora" icon={<IconSend width={18} height={18} />}>Mandar agora</Button>}
+      />
 
       <nav aria-label="Filtrar por status" className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
