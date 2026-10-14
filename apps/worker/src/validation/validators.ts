@@ -29,6 +29,8 @@ export const MESSAGES = {
   groupNotFound: "Grupo não encontrado pelo Telegram.",
   groupNoRights: "O bot não tem permissão para enviar mensagens no grupo.",
   secretMissing: "Segredo não encontrado no cofre; salve a credencial novamente.",
+  verificationUnknown:
+    "A mensagem de verificação foi enviada, mas não houve confirmação. Confira o grupo e valide novamente.",
   unavailable: "Serviço indisponível no momento; nova tentativa em instantes.",
   exhausted: "Não foi possível validar: serviço indisponível. Tente novamente.",
 } as const;
@@ -68,7 +70,14 @@ export async function validateTelegramGroup(
     await client.sendVerificationMessage(externalId);
     return { status: "validated" };
   } catch (error) {
-    return classifyTelegram(error, MESSAGES.groupNoRights);
+    // 429: o Telegram recusou, nada foi entregue → reenvio seguro.
+    if (error instanceof RateLimitedError) {
+      return { status: "retry", error: MESSAGES.unavailable, clearVerification: true };
+    }
+    const outcome = classifyTelegram(error, MESSAGES.groupNoRights);
+    // Qualquer outra falha transitória pode ter entregue a mensagem: não repostar.
+    if (outcome.status === "retry") return invalid(MESSAGES.verificationUnknown);
+    return outcome;
   }
 }
 

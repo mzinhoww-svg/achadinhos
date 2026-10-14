@@ -26,6 +26,8 @@ export type ValidationDeps = {
   /** Tentativas transitórias antes de marcar `invalid`. */
   maxAttempts?: number;
   batchSize?: number;
+  /** Quanto `stop()` espera o ciclo em voo antes de desistir. */
+  stopTimeoutMs?: number;
   createShopee?: (credentials: ShopeeCredentials) => ShopeeClient;
   createTelegram?: (token: string) => TelegramClient;
 };
@@ -33,6 +35,7 @@ export type ValidationDeps = {
 const DEFAULT_TASK_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_BATCH = 10;
+const DEFAULT_STOP_TIMEOUT_MS = 5_000;
 
 class TaskDeadline extends Error {}
 
@@ -44,7 +47,12 @@ function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
   return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
 
-async function evaluate(task: ValidationTask, deps: ValidationDeps): Promise<Outcome> {
+async function evaluate(
+  task: ValidationTask,
+  deps: ValidationDeps,
+  timeoutMs: number,
+  now: () => Date,
+): Promise<Outcome> {
   const secret = await deps.vault.read(task.secretId);
   if (secret === null || secret === "") {
     return { status: "invalid", error: MESSAGES.secretMissing };
@@ -57,8 +65,27 @@ async function evaluate(task: ValidationTask, deps: ValidationDeps): Promise<Out
       return validateShopee(createShopee({ appId: task.appId, secret }));
     case "telegram_channel":
       return validateTelegramToken(createTelegram(secret));
-    case "telegram_group":
-      return validateTelegramGroup(createTelegram(secret), task.externalId);
+    case "telegram_group": {
+      // Grupo real: no máximo UMA postagem. Já enviada antes → resultado
+      // desconhecido, não repostar.
+      if (task.verificationSentAt) {
+        return { status: "invalid", error: MESSAGES.verificationUnknown };
+      }
+      // Marca ANTES de postar; se a marcação falhar, não posta.
+      await withDeadline(deps.store.markVerificationSent(task, now()), timeoutMs);
+      try {
+        return await withDeadline(
+          validateTelegramGroup(createTelegram(secret), task.externalId),
+          timeoutMs,
+        );
+      } catch (error) {
+        if (error instanceof TaskDeadline) {
+          // Prazo estourou com a chamada ainda em voo: pode ter sido entregue.
+          return { status: "invalid", error: MESSAGES.verificationUnknown };
+        }
+        throw error;
+      }
+    }
   }
 }
 
@@ -71,34 +98,46 @@ async function processTask(task: ValidationTask, deps: ValidationDeps): Promise<
 
   let outcome: Outcome;
   try {
-    outcome = await withDeadline(evaluate(task, deps), timeoutMs);
+    outcome = await withDeadline(evaluate(task, deps, timeoutMs, now), timeoutMs);
   } catch {
     outcome = { status: "retry", error: MESSAGES.unavailable };
   }
 
+  // Toda gravação tem prazo próprio: banco lento nunca prende o lote.
+  const write = (work: Promise<void>) => withDeadline(work, timeoutMs);
   try {
     if (outcome.status === "validated") {
-      await deps.store.markValidated(task, now());
+      await write(deps.store.markValidated(task, now()));
       deps.logger.info("validation.validated", ctx);
     } else if (outcome.status === "invalid") {
-      await deps.store.markInvalid(task, outcome.error, now());
+      await write(deps.store.markInvalid(task, outcome.error, now()));
       deps.logger.info("validation.invalid", ctx);
     } else if (task.attempts + 1 >= maxAttempts) {
-      await deps.store.markInvalid(task, MESSAGES.exhausted, now());
+      await write(deps.store.markInvalid(task, MESSAGES.exhausted, now()));
       deps.logger.warn("validation.exhausted", { ...ctx, attempts: task.attempts + 1 });
     } else {
-      await deps.store.release(task, outcome.error, now());
+      const clear = "clearVerification" in outcome && outcome.clearVerification;
+      await write(
+        deps.store.release(task, outcome.error, now(), clear ? { clearVerification: true } : undefined),
+      );
       deps.logger.warn("validation.retry", { ...ctx, attempts: task.attempts + 1 });
     }
-  } catch {
-    // Gravação falhou: a tarefa fica com lease/estado antigo e será reprocessada.
-    deps.logger.error("validation.store_write_failed", ctx);
+  } catch (error) {
+    // A tarefa fica com o estado/lease antigo e será reprocessada. Só o tipo do erro.
+    deps.logger.error("validation.store_write_failed", { ...ctx, errorType: errorType(error) });
   }
+}
+
+function errorType(error: unknown): string {
+  return error instanceof TaskDeadline ? "Deadline" : error instanceof Error ? error.name : "unknown";
 }
 
 /** Um ciclo: pega tarefas pendentes e valida em paralelo, isolando falhas. */
 export async function runValidationOnce(deps: ValidationDeps): Promise<number> {
-  const tasks = await deps.store.claimPending(deps.batchSize ?? DEFAULT_BATCH);
+  const tasks = await withDeadline(
+    deps.store.claimPending(deps.batchSize ?? DEFAULT_BATCH),
+    deps.taskTimeoutMs ?? DEFAULT_TASK_TIMEOUT_MS,
+  );
   await Promise.all(tasks.map((task) => processTask(task, deps)));
   return tasks.length;
 }
@@ -118,8 +157,8 @@ export function startValidationLoop(
     while (!stopped) {
       try {
         await runValidationOnce(deps);
-      } catch {
-        deps.logger.error("validation.tick_failed");
+      } catch (error) {
+        deps.logger.error("validation.tick_failed", { errorType: errorType(error) });
       }
       if (stopped) break;
       await new Promise<void>((resolve) => {
@@ -134,7 +173,14 @@ export function startValidationLoop(
       stopped = true;
       if (timer) clearTimeout(timer);
       wake?.();
-      await loop;
+      // Limite: uma chamada em voo que ignora o prazo não pode prender o desligamento.
+      let timer2: NodeJS.Timeout | undefined;
+      await Promise.race([
+        loop,
+        new Promise<void>((resolve) => {
+          timer2 = setTimeout(resolve, deps.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS);
+        }),
+      ]).finally(() => clearTimeout(timer2));
     },
   };
 }

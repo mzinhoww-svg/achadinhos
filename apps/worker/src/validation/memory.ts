@@ -15,6 +15,7 @@ type Row = {
   validatedAt: Date | null;
   attempts: number;
   claimed: boolean;
+  verificationSentAt: Date | null;
 };
 
 export class MemoryValidationStore implements ValidationStore {
@@ -32,6 +33,7 @@ export class MemoryValidationStore implements ValidationStore {
       validatedAt: null,
       attempts: task.attempts,
       claimed: false,
+      verificationSentAt: task.kind === "telegram_group" ? (task.verificationSentAt ?? null) : null,
     });
   }
 
@@ -52,7 +54,11 @@ export class MemoryValidationStore implements ValidationStore {
       if (out.length >= limit) break;
       if (row.status === "pending_validation" && !row.claimed) {
         row.claimed = true;
-        out.push({ ...row.task, attempts: row.attempts });
+        out.push(
+          row.task.kind === "telegram_group"
+            ? { ...row.task, attempts: row.attempts, verificationSentAt: row.verificationSentAt }
+            : { ...row.task, attempts: row.attempts },
+        );
       }
     }
     return out;
@@ -67,8 +73,18 @@ export class MemoryValidationStore implements ValidationStore {
     Object.assign(this.row(task), { status: "invalid", lastError, claimed: false });
   }
 
-  async release(task: ValidationTask, lastError: string): Promise<void> {
+  async markVerificationSent(task: ValidationTask, at: Date): Promise<void> {
+    this.row(task).verificationSentAt = at;
+  }
+
+  async release(
+    task: ValidationTask,
+    lastError: string,
+    _at: Date,
+    options?: { clearVerification?: boolean },
+  ): Promise<void> {
     const row = this.row(task);
+    if (options?.clearVerification) row.verificationSentAt = null;
     row.attempts += 1;
     Object.assign(row, { status: "pending_validation", lastError, claimed: false });
   }

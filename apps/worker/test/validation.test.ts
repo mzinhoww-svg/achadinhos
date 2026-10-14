@@ -278,6 +278,7 @@ describe("validação de credenciais (T7-08)", () => {
         markValidated: store.markValidated.bind(store),
         markInvalid: store.markInvalid.bind(store),
         release: store.release.bind(store),
+        markVerificationSent: store.markVerificationSent.bind(store),
       };
       const loop = startValidationLoop({ ...deps(store), store: flaky, intervalMs: 30 });
       store.add(shopeeTask());
@@ -299,6 +300,7 @@ describe("validação de credenciais (T7-08)", () => {
           markValidated: store.markValidated.bind(store),
           markInvalid: store.markInvalid.bind(store),
           release: store.release.bind(store),
+          markVerificationSent: store.markVerificationSent.bind(store),
         },
         claimPending: async () => {
           inFlight += 1;
@@ -313,6 +315,183 @@ describe("validação de credenciais (T7-08)", () => {
       await loop.stop();
       expect(maxInFlight).toBe(1);
     });
+  });
+
+  describe("ciclo nunca trava (ciclo 1 do QA)", () => {
+    const hang = () => new Promise<never>(() => {});
+
+    it("markValidated pendurado não trava o lote: as outras tarefas concluem", async () => {
+      const base = new MemoryValidationStore([shopeeTask({ id: "a" }), channelTask({ id: "b" })]);
+      const store = {
+        claimPending: base.claimPending.bind(base),
+        markInvalid: base.markInvalid.bind(base),
+        release: base.release.bind(base),
+        markVerificationSent: base.markVerificationSent.bind(base),
+        markValidated: (t: ValidationTask, at: Date) => (t.id === "a" ? hang() : base.markValidated(t, at)),
+      };
+      const t0 = Date.now();
+      await runValidationOnce(deps(base, { store, taskTimeoutMs: 150 }));
+      expect(Date.now() - t0).toBeLessThan(1500);
+      expect(base.result("b").status).toBe("validated");
+      expect(logs.join("\n")).toContain("validation.store_write_failed");
+    });
+
+    it("markInvalid e release pendurados também são cortados", async () => {
+      vault = new MemoryVault({ "sec-1": "wrong" , "sec-2": TOKEN });
+      const base = new MemoryValidationStore([shopeeTask()]);
+      const store = {
+        claimPending: base.claimPending.bind(base),
+        markValidated: base.markValidated.bind(base),
+        markVerificationSent: base.markVerificationSent.bind(base),
+        markInvalid: hang,
+        release: hang,
+      };
+      const t0 = Date.now();
+      await runValidationOnce(deps(base, { store, taskTimeoutMs: 150 }));
+      expect(Date.now() - t0).toBeLessThan(1500);
+    });
+
+    it("claimPending pendurado: o ciclo termina e stop() retorna", async () => {
+      const base = new MemoryValidationStore([]);
+      const store = {
+        claimPending: hang,
+        markValidated: base.markValidated.bind(base),
+        markInvalid: base.markInvalid.bind(base),
+        release: base.release.bind(base),
+        markVerificationSent: base.markVerificationSent.bind(base),
+      };
+      const t0 = Date.now();
+      await expect(runValidationOnce(deps(base, { store, taskTimeoutMs: 100 }))).rejects.toThrow();
+      expect(Date.now() - t0).toBeLessThan(1000);
+
+      const loop = startValidationLoop({ ...deps(base, { store, taskTimeoutMs: 100 }), intervalMs: 20 });
+      await new Promise((r) => setTimeout(r, 60));
+      const s0 = Date.now();
+      await loop.stop();
+      expect(Date.now() - s0).toBeLessThan(1000);
+    });
+
+    it("stop() tem limite mesmo com tarefa em voo que ignora o prazo", async () => {
+      const base = new MemoryValidationStore([channelTask()]);
+      const slowTelegram = { call: hang } as unknown as TelegramTransport;
+      const loop = startValidationLoop({
+        ...deps(base, {
+          taskTimeoutMs: 5_000,
+          createTelegram: (t) => new TelegramClient({ token: t, transport: slowTelegram }),
+        }),
+        intervalMs: 10,
+        stopTimeoutMs: 100,
+      });
+      await new Promise((r) => setTimeout(r, 80));
+      const s0 = Date.now();
+      await loop.stop();
+      expect(Date.now() - s0).toBeLessThan(1000);
+    });
+  });
+
+  describe("verificação de grupo posta no máximo uma vez (ciclo 1 do QA)", () => {
+    it("envio mais lento que o prazo: 1 mensagem, estado final sem repostar em novos ciclos", async () => {
+      let sends = 0;
+      const slow: TelegramTransport = {
+        call: async (method: string) => {
+          if (method === "sendMessage") {
+            sends += 1;
+            await new Promise((r) => setTimeout(r, 400));
+          }
+          return { ok: true, result: { message_id: 1, date: 1, chat: { id: -1001, type: "supergroup" } } } as never;
+        },
+      };
+      const store = new MemoryValidationStore([groupTask()]);
+      const d = deps(store, {
+        taskTimeoutMs: 100,
+        createTelegram: (t) => new TelegramClient({ token: t, transport: slow }),
+      });
+      await runValidationOnce(d);
+      await runValidationOnce(d);
+      await runValidationOnce(d);
+      await new Promise((r) => setTimeout(r, 500));
+      expect(sends).toBe(1);
+      const r = store.result("grp-1");
+      expect(r.status).toBe("invalid");
+      expect(r.lastError).toMatch(/verifica/i);
+    });
+
+    it("erro de rede após o envio (resultado desconhecido) não reposta", async () => {
+      let sends = 0;
+      const flaky: TelegramTransport = {
+        call: async (method: string) => {
+          if (method === "sendMessage") {
+            sends += 1;
+            throw new Error("socket hang up");
+          }
+          return { ok: true, result: {} } as never;
+        },
+      };
+      const store = new MemoryValidationStore([groupTask()]);
+      const d = deps(store, { createTelegram: (t) => new TelegramClient({ token: t, transport: flaky }) });
+      await runValidationOnce(d);
+      await runValidationOnce(d);
+      expect(sends).toBe(1);
+      expect(store.result("grp-1").status).toBe("invalid");
+    });
+
+    it("tarefa que já tem verification_sent_at não envia de novo", async () => {
+      const store = new MemoryValidationStore([groupTask({ verificationSentAt: new Date("2026-10-14T11:00:00Z") })]);
+      await runValidationOnce(deps(store));
+      expect(tg.getSentMessages()).toHaveLength(0);
+      expect(store.result("grp-1").status).toBe("invalid");
+    });
+
+    it("429 (não entregue, resultado definitivo) permite novo envio depois", async () => {
+      tg.setRateLimit("sendMessage", 1);
+      const store = new MemoryValidationStore([groupTask()]);
+      await runValidationOnce(deps(store));
+      expect(store.result("grp-1").status).toBe("pending_validation");
+      tg.setRateLimit("sendMessage", null);
+      await runValidationOnce(deps(store));
+      expect(store.result("grp-1").status).toBe("validated");
+      expect(tg.getSentMessages()).toHaveLength(1);
+    });
+
+    it("a marcação de envio acontece antes do envio", async () => {
+      const order: string[] = [];
+      const base = new MemoryValidationStore([groupTask()]);
+      const store = {
+        claimPending: base.claimPending.bind(base),
+        markValidated: base.markValidated.bind(base),
+        markInvalid: base.markInvalid.bind(base),
+        release: base.release.bind(base),
+        markVerificationSent: async (t: ValidationTask, at: Date) => {
+          order.push("mark");
+          return base.markVerificationSent(t, at);
+        },
+      };
+      const rec: TelegramTransport = {
+        call: async (m: string) => {
+          order.push(m);
+          return { ok: true, result: { message_id: 1, date: 1, chat: { id: -1001, type: "supergroup" } } } as never;
+        },
+      };
+      await runValidationOnce(deps(base, { store, createTelegram: (t) => new TelegramClient({ token: t, transport: rec }) }));
+      expect(order.indexOf("mark")).toBeLessThan(order.indexOf("sendMessage"));
+    });
+  });
+
+  it("log de falha de gravação traz só o tipo do erro, sem mensagem", async () => {
+    const base = new MemoryValidationStore([shopeeTask()]);
+    const store = {
+      claimPending: base.claimPending.bind(base),
+      markInvalid: base.markInvalid.bind(base),
+      release: base.release.bind(base),
+      markVerificationSent: base.markVerificationSent.bind(base),
+      markValidated: async () => {
+        throw new TypeError(`write failed ${SECRET}`);
+      },
+    };
+    await runValidationOnce(deps(base, { store }));
+    const all = logs.join("\n");
+    expect(all).toContain("TypeError");
+    expect(all).not.toContain(SECRET);
   });
 
   it("nenhum log contém segredo ou token em nenhum cenário acima", async () => {

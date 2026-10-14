@@ -32,6 +32,8 @@ export type ValidationTask =
       /** chat_id do Telegram. */
       externalId: string;
       attempts: number;
+      /** Já postamos a verificação neste grupo? Se sim, nunca postar de novo. */
+      verificationSentAt?: Date | null;
     };
 
 /**
@@ -45,8 +47,22 @@ export interface ValidationStore {
   markValidated(task: ValidationTask, at: Date): Promise<void>;
   /** `lastError` já saneado (texto fixo, nunca derivado da resposta externa). */
   markInvalid(task: ValidationTask, lastError: string, at: Date): Promise<void>;
-  /** Falha transitória: volta a `pending_validation`, attempts + 1. */
-  release(task: ValidationTask, lastError: string, at: Date): Promise<void>;
+  /**
+   * Falha transitória: volta a `pending_validation`, attempts + 1.
+   * `clearVerification`: o envio da verificação foi recusado sem entrega
+   * (ex.: 429), então `verification_sent_at` volta a nulo e o reenvio é seguro.
+   */
+  release(
+    task: ValidationTask,
+    lastError: string,
+    at: Date,
+    options?: { clearVerification?: boolean },
+  ): Promise<void>;
+  /**
+   * Grava `verification_sent_at` ANTES de postar no grupo (grupo real, visível
+   * a outros membros). Resultado desconhecido depois disso nunca reposta.
+   */
+  markVerificationSent(task: ValidationTask, at: Date): Promise<void>;
 }
 
 /** Leitura do Vault (service role/role dedicada do worker). Nunca logar o retorno. */
@@ -63,4 +79,6 @@ export interface ValidationLogger {
 export type Outcome =
   | { status: "validated" }
   | { status: "invalid"; error: string }
-  | { status: "retry"; error: string };
+  | { status: "retry"; error: string }
+  /** Recusado sem entrega (429): pode reenviar a verificação com segurança. */
+  | { status: "retry"; error: string; clearVerification: true };
