@@ -138,19 +138,28 @@ describe("R3 — status HTTP e classificação 401/403", () => {
   });
 });
 
-describe("R4 — links e valores validados", () => {
-  const run = (n: Record<string, unknown>) =>
+describe("R4 — links e valores validados por nó", () => {
+  const page = (nodes: unknown[]) =>
+    new Response(
+      JSON.stringify({
+        data: { productOfferV2: { nodes, pageInfo: { limit: nodes.length, hasNextPage: false } } },
+      }),
+    );
+  const clientFor = (nodes: unknown[]) =>
     new ShopeeClient(
       { appId: APP_ID, secret: SECRET },
-      { endpoint: "http://127.0.0.1:1/graphql", fetch: (async () => offers(node(n))) as typeof fetch },
-    ).productOfferV2();
+      { endpoint: "http://127.0.0.1:1/graphql", fetch: (async () => page(nodes)) as typeof fetch },
+    );
   it("aceita nó válido", async () => {
-    expect((await run({})).nodes).toHaveLength(1);
+    const r = await clientFor([node()]).productOfferV2();
+    expect(r.nodes).toHaveLength(1);
+    expect(r.discarded).toEqual([]);
   });
   it.each([
     ["offerLink", ""],
     ["offerLink", "javascript:alert(1)"],
     ["offerLink", "http://shope.ee/x"],
+    ["offerLink", "https://user:pw@shope.ee/x"],
     ["productLink", "http://shopee.com.br/x"],
     ["productLink", ""],
     ["imageUrl", "data:image/png;base64,AAAA"],
@@ -158,10 +167,49 @@ describe("R4 — links e valores validados", () => {
     ["productName", ""],
     ["priceMin", -5],
     ["priceMax", -1],
-  ])("rejeita %s = %j", async (field, value) => {
-    await expect(run({ [field]: value })).rejects.toBeInstanceOf(ShopeeSchemaError);
+  ])("nó com %s = %j é descartado e o válido passa", async (field, value) => {
+    const good = node({ itemId: 2 });
+    const r = await clientFor([node({ itemId: 1, [field]: value }), good]).productOfferV2();
+    expect(r.nodes.map((n) => n.itemId)).toEqual([2]);
+    expect(r.discarded).toEqual([{ index: 0, fields: [field] }]);
   });
-  it.each(["", "javascript:alert(1)", "http://shope.ee/x"])(
+  it("nó inválido no meio de 10 preserva os 9 válidos e a ordem", async () => {
+    const nodes = Array.from({ length: 10 }, (_v, i) =>
+      node({ itemId: i + 1, ...(i === 4 ? { productLink: "" } : {}) }),
+    );
+    const r = await clientFor(nodes).productOfferV2();
+    expect(r.nodes.map((n) => n.itemId)).toEqual([1, 2, 3, 4, 6, 7, 8, 9, 10]);
+    expect(r.discarded).toEqual([{ index: 4, fields: ["productLink"] }]);
+  });
+  it("lixo que não é objeto ou itemId string vira descartado, não derruba a página", async () => {
+    const r = await clientFor([null, "x", 7, node({ itemId: "abc" }), node({ itemId: 9 })]).productOfferV2();
+    expect(r.nodes.map((n) => n.itemId)).toEqual([9]);
+    expect(r.discarded).toHaveLength(4);
+  });
+  it("descarte não carrega conteúdo da resposta (só índice e nomes de campo)", async () => {
+    const r = await clientFor([node({ offerLink: `javascript:${SECRET}` }), node()]).productOfferV2();
+    expect(JSON.stringify(r.discarded)).not.toContain(SECRET);
+  });
+  it("todos os nós inválidos falha fechado (ShopeeSchemaError)", async () => {
+    await expect(
+      clientFor([node({ offerLink: "" }), node({ imageUrl: "" })]).productOfferV2(),
+    ).rejects.toBeInstanceOf(ShopeeSchemaError);
+  });
+  it("página vazia é válida", async () => {
+    const r = await clientFor([]).productOfferV2();
+    expect(r.nodes).toEqual([]);
+  });
+  it("envelope quebrado (pageInfo ausente) continua falhando fechado", async () => {
+    const c = new ShopeeClient(
+      { appId: APP_ID, secret: SECRET },
+      {
+        endpoint: "http://127.0.0.1:1/graphql",
+        fetch: (async () => new Response(JSON.stringify({ data: { productOfferV2: { nodes: [node()] } } }))) as typeof fetch,
+      },
+    );
+    await expect(c.productOfferV2()).rejects.toBeInstanceOf(ShopeeSchemaError);
+  });
+  it.each(["", "javascript:alert(1)", "http://shope.ee/x", "https://u:p@shope.ee/x"])(
     "shortLink inválido %j falha fechado",
     async (shortLink) => {
       const c = new ShopeeClient(
@@ -178,13 +226,9 @@ describe("R4 — links e valores validados", () => {
     },
   );
   it("originUrl de entrada precisa ser https", async () => {
-    const c = new ShopeeClient(
-      { appId: APP_ID, secret: SECRET },
-      { endpoint: "http://127.0.0.1:1/graphql", fetch: (async () => offers(node())) as typeof fetch },
-    );
-    await expect(c.generateShortLink({ originUrl: "javascript:1" })).rejects.toBeInstanceOf(
-      ShopeeSchemaError,
-    );
+    await expect(
+      clientFor([node()]).generateShortLink({ originUrl: "javascript:1" }),
+    ).rejects.toBeInstanceOf(ShopeeSchemaError);
   });
 });
 
