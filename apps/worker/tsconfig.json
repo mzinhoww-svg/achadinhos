@@ -4,12 +4,16 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
-    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "jsx": "react-jsx",
-    "noEmit": true,
-    "types": ["node", "vitest/globals"]
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src"],
+  "exclude": ["tests", "node_modules", "dist"]
 }

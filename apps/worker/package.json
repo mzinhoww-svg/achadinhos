@@ -3,17 +3,20 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
+    "zod": "^3.23.8",
     "@achadinhos/shopee": "workspace:*",
     "@achadinhos/telegram": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.9"
+    "@types/node": "^22.20.5",
+    "typescript": "^5",
+    "vitest": "^2"
   }
 }
