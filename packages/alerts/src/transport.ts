@@ -1,5 +1,5 @@
 import type { AlertServiceOptions, EmailMessage, EmailSendResult, HttpEmailTransportOptions } from "./types";
-import { EmailTimeoutError, EmailTransportError, redactSecrets, safeErrorMessage } from "./errors";
+import { AlertError, EmailTimeoutError, EmailTransportError, redactSecrets, safeErrorMessage } from "./errors";
 
 export type { EmailMessage, EmailSendResult, HttpEmailTransportOptions, AlertServiceOptions };
 export type { EmailTransport } from "./types";
@@ -64,7 +64,7 @@ export const createMockEmailTransport = createInMemoryEmailTransport;
 export interface GenericHttpEmailTransportOptions extends HttpEmailTransportOptions {}
 
 export class HttpEmailTransport implements EmailTransport {
-  private readonly apiKey: string;
+  readonly #apiKey: string;
   private readonly endpoint: string;
   private readonly fetchFn: typeof fetch;
   private readonly timeoutMs: number;
@@ -92,7 +92,7 @@ export class HttpEmailTransport implements EmailTransport {
       opts.password ??
       readEnvKey();
     if (!resolved) throw new EmailTransportError("Email provider API key is required");
-    this.apiKey = resolved;
+    this.#apiKey = resolved;
     this.endpoint =
       opts.endpoint ??
       opts.url ??
@@ -103,6 +103,10 @@ export class HttpEmailTransport implements EmailTransport {
     this.timeoutMs = opts.timeoutMs ?? opts.timeout ?? 10000;
     this.from = opts.from;
     this.headers = { ...(opts.headers ?? {}) };
+  }
+
+  #redact(text: string): string {
+    return redactSecrets(text, [this.#apiKey]);
   }
 
   get url(): string {
@@ -129,7 +133,7 @@ export class HttpEmailTransport implements EmailTransport {
       timer = setTimeout(() => {
         timedOut = true;
         controller.abort();
-        reject(new EmailTimeoutError(redactSecrets("Timeout while sending email")));
+        reject(new EmailTimeoutError(this.#redact("Timeout while sending email")));
       }, this.timeoutMs);
     });
 
@@ -147,8 +151,8 @@ export class HttpEmailTransport implements EmailTransport {
 
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      authorization: `Bearer ${this.apiKey}`,
-      "x-api-key": this.apiKey,
+      authorization: `Bearer ${this.#apiKey}`,
+      "x-api-key": this.#apiKey,
       ...this.headers,
     };
 
@@ -168,9 +172,9 @@ export class HttpEmailTransport implements EmailTransport {
       } catch (cause) {
         if (timer) clearTimeout(timer);
         if (timedOut || isAbortError(cause)) {
-          throw new EmailTimeoutError(redactSecrets("Timeout while sending email"));
+          throw new EmailTimeoutError(this.#redact("Timeout while sending email"));
         }
-        throw new EmailTransportError(redactSecrets(`Network error while sending email: ${safeErrorMessage(cause as unknown, [this.apiKey])}`, [this.apiKey]), {
+        throw new EmailTransportError(this.#redact(`Network error while sending email: ${safeErrorMessage(cause as unknown, [this.#apiKey])}`), {
           cause,
         });
       }
@@ -179,7 +183,7 @@ export class HttpEmailTransport implements EmailTransport {
 
       if (!response.ok) {
         throw new EmailTransportError(
-          redactSecrets(`Email provider HTTP ${response.status}: ${text.slice(0, 200)}`),
+          this.#redact(`Email provider HTTP ${response.status}: ${text.slice(0, 200)}`),
         );
       }
 
@@ -187,13 +191,13 @@ export class HttpEmailTransport implements EmailTransport {
       try {
         data = text.trim() === "" ? {} : JSON.parse(text);
       } catch {
-        throw new EmailTransportError(redactSecrets(`Invalid email provider response: ${text.slice(0, 200)}`));
+        throw new EmailTransportError(this.#redact(`Invalid email provider response: ${text.slice(0, 200)}`));
       }
 
       if (data && typeof data === "object") {
         const obj = data as Record<string, unknown>;
         if ("error" in obj || "errors" in obj || obj.ok === false || obj.success === false || obj.accepted === false) {
-          throw new EmailTransportError(redactSecrets(`Email provider rejected request: ${text.slice(0, 200)}`));
+          throw new EmailTransportError(this.#redact(`Email provider rejected request: ${text.slice(0, 200)}`));
         }
       }
 
@@ -206,17 +210,17 @@ export class HttpEmailTransport implements EmailTransport {
           (data as Record<string, unknown>).success === true
         ));
       if (!accepted) {
-        throw new EmailTransportError(redactSecrets(`Invalid email provider response: ${text.slice(0, 200)}`));
+        throw new EmailTransportError(this.#redact(`Invalid email provider response: ${text.slice(0, 200)}`));
       }
 
       return { accepted: true, id, messageId: id, to: message.to, subject: message.subject };
     } catch (cause) {
       clearTimeout(timer);
       if (cause instanceof EmailTimeoutError || timedOut || isAbortError(cause)) {
-        throw new EmailTimeoutError(redactSecrets("Timeout while sending email"));
+        throw new EmailTimeoutError(this.#redact("Timeout while sending email"));
       }
       if (cause instanceof EmailTransportError) throw cause;
-      throw new EmailTransportError(redactSecrets(`Network error while sending email: ${safeErrorMessage(cause as unknown, [this.apiKey])}`), {
+      throw new EmailTransportError(this.#redact(`Network error while sending email: ${safeErrorMessage(cause as unknown, [this.#apiKey])}`), {
         cause,
       });
     }
@@ -279,4 +283,61 @@ function extractId(data: unknown): string | undefined {
     if (typeof v === "string" || typeof v === "number") return String(v);
   }
   return undefined;
+}
+
+const DEFAULT_EMAIL_TIMEOUT_MS = 10_000;
+const MAX_EMAIL_TIMEOUT_MS = 120_000;
+
+/** Configuração inválida do provedor de e-mail. Só nomes de variáveis, nunca valores. */
+export class EmailConfigError extends AlertError {
+  readonly vars: readonly string[];
+  constructor(vars: readonly string[]) {
+    super(`configuração de e-mail inválida: ${vars.join(", ")}`);
+    this.vars = vars;
+  }
+}
+
+/**
+ * Transporte HTTP genérico a partir do env (provedor intercambiável):
+ * EMAIL_PROVIDER_ENDPOINT (https, sem userinfo), EMAIL_PROVIDER_API_KEY,
+ * EMAIL_FROM e EMAIL_TIMEOUT_MS (opcional, timeout total por envio).
+ * `fetch` é injetável para testes: nenhum teste toca a rede.
+ */
+export function createEmailTransportFromEnv(
+  env: Record<string, string | undefined>,
+  opts: { fetch?: typeof fetch } = {},
+): HttpEmailTransport {
+  const bad: string[] = [];
+  const endpoint = env.EMAIL_PROVIDER_ENDPOINT?.trim();
+  const apiKey = env.EMAIL_PROVIDER_API_KEY;
+  const from = env.EMAIL_FROM?.trim();
+
+  let url: URL | null = null;
+  if (endpoint) {
+    try {
+      url = new URL(endpoint);
+    } catch {
+      url = null;
+    }
+  }
+  if (!url || url.protocol !== "https:" || url.username || url.password) bad.push("EMAIL_PROVIDER_ENDPOINT");
+  if (!apiKey || apiKey.trim() === "") bad.push("EMAIL_PROVIDER_API_KEY");
+  if (!from) bad.push("EMAIL_FROM");
+
+  let timeoutMs = DEFAULT_EMAIL_TIMEOUT_MS;
+  const rawTimeout = env.EMAIL_TIMEOUT_MS;
+  if (rawTimeout !== undefined && rawTimeout !== "") {
+    const n = /^\d{1,9}$/.test(rawTimeout) ? Number(rawTimeout) : Number.NaN;
+    if (!Number.isInteger(n) || n < 1 || n > MAX_EMAIL_TIMEOUT_MS) bad.push("EMAIL_TIMEOUT_MS");
+    else timeoutMs = n;
+  }
+  if (bad.length > 0) throw new EmailConfigError(bad);
+
+  return new HttpEmailTransport({
+    apiKey: apiKey!,
+    endpoint: endpoint!,
+    from,
+    timeoutMs,
+    fetch: opts.fetch,
+  });
 }
