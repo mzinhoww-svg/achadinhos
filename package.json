@@ -5,6 +5,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "test": "pnpm -r --if-present test",
+    "test:db": "supabase test db --local",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint"
   }
