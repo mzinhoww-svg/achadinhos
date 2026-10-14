@@ -254,7 +254,7 @@ describe("RLS e privilégios (sem passar pelos adaptadores)", () => {
 
   it("RPC não aceita segredo de outra conta nem de outro uso", async () => {
     const a = stack(A); const b = stack(B);
-    const idA = await a.vault.put("x", "shopee_secret", "valor-secreto-de-teste-1234");
+    const idA = await a.vault.put("x", "shopee_secret", SECRET_CANARY);
     const forged = await b.rpc("web_save_shopee", { p_app_id: "12345678", p_secret_id: idA, p_last4: "1234" });
     expect(forged.error?.code).toBe("42501");
     const wrongUse = await a.rpc("web_save_channel", { p_secret_id: idA, p_bot_name: "@x" });
