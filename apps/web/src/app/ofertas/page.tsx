@@ -9,15 +9,22 @@ import { IconSearch, IconStar, IconTag } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/table";
 import { formatBRL, formatInt } from "@/lib/format";
-import { discountOf, isEmptyPreview, offers } from "@/lib/mock";
+import { isEmptyPreview } from "@/lib/mock";
+import { container, viewSession } from "@/server/context";
+import { IconSend } from "@/components/ui/icons";
 
 export const metadata: Metadata = { title: "Ofertas" };
 
 export default async function OfertasPage({ searchParams }: { searchParams: Promise<{ vazio?: string; q?: string }> }) {
   const sp = await searchParams;
   const empty = isEmptyPreview(sp);
-  const q = (sp.q ?? "").trim().toLowerCase();
-  const list = empty ? [] : offers.filter((o) => !q || o.title.toLowerCase().includes(q) || o.category.toLowerCase().includes(q));
+  const q = (sp.q ?? "").trim().toLowerCase().slice(0, 80);
+  const c = await container();
+  const session = await viewSession(c, empty);
+  const all = session ? await c.sendNow.listOffers(session.accountId) : [];
+  const list = all
+    .filter((o) => !q || o.title.toLowerCase().includes(q) || o.shopName.toLowerCase().includes(q))
+    .map((o) => ({ ...o, hue: o.placeholderHue ?? 340, label: "", discount: o.oldPrice > o.price ? Math.round((1 - o.price / o.oldPrice) * 100) : 0 }));
 
   return (
     <>
@@ -26,7 +33,7 @@ export default async function OfertasPage({ searchParams }: { searchParams: Prom
       <Card className="mb-6">
         <form className="grid gap-4 sm:grid-cols-[1fr_12rem_auto] sm:items-end" role="search" aria-label="Filtrar ofertas">
           <Field label="Buscar" htmlFor="q">
-            <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Nome ou categoria" />
+            <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Nome do produto ou da loja" />
           </Field>
           <Field label="Ordenar por" htmlFor="sort">
             <Select id="sort" name="sort" defaultValue="desconto">
@@ -43,18 +50,27 @@ export default async function OfertasPage({ searchParams }: { searchParams: Prom
         <EmptyState
           icon={<IconTag />}
           title={q ? "Nenhuma oferta para essa busca" : "Nenhuma oferta ainda"}
-          action={<Button href={q ? "/ofertas" : "/automacoes/nova"} variant="secondary">{q ? "Limpar busca" : "Criar automação"}</Button>}
+          action={
+            q ? (
+              <Button href="/ofertas" variant="secondary">Limpar busca</Button>
+            ) : (
+              <>
+                <Button href="/mandar-agora" icon={<IconSend width={18} height={18} />}>Mandar agora</Button>
+                <Button href="/automacoes/nova" variant="secondary">Criar automação</Button>
+              </>
+            )
+          }
         >
           {q
-            ? "Tente outro nome ou categoria, ou limpe a busca para ver tudo."
-            : "As ofertas aparecem depois que uma automação busca produtos na Shopee. Conecte a Shopee e crie uma automação para começar."}
+            ? "Tente outro nome de produto ou loja, ou limpe a busca para ver tudo."
+            : "As ofertas aparecem depois que uma automação busca produtos ou que você manda uma oferta agora. Conecte a Shopee e crie uma automação para começar."}
         </EmptyState>
       ) : (
         <Card flush>
           <DataTable
             caption="Ofertas"
             rows={list}
-            rowKey={(o) => o.id}
+            rowKey={(o) => o.itemId}
             columns={[
               {
                 key: "title",
@@ -65,7 +81,7 @@ export default async function OfertasPage({ searchParams }: { searchParams: Prom
                     <ProductThumb offer={o} size={44} />
                     <span className="min-w-0">
                       <span className="line-clamp-2 font-semibold">{o.title}</span>
-                      <span className="text-xs text-ink-3">{o.category}</span>
+                      <span className="text-xs text-ink-3">{o.shopName}</span>
                     </span>
                   </span>
                 ),
@@ -80,7 +96,7 @@ export default async function OfertasPage({ searchParams }: { searchParams: Prom
                   </span>
                 ),
               },
-              { key: "off", header: "Desconto", cell: (o) => <Badge tone="warn">-{discountOf(o)}%</Badge> },
+              { key: "off", header: "Desconto", cell: (o) => <Badge tone="warn">-{o.discount}%</Badge> },
               { key: "comm", header: "Comissão", align: "right", cell: (o) => `${String(o.commissionRate).replace(".", ",")}%` },
               {
                 key: "rating",
