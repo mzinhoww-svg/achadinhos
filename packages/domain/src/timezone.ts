@@ -209,3 +209,20 @@ export function isWithinWindow(date: Date | string | number, cfg: WindowConfig):
 
 export const isInsideWindow = isWithinWindow;
 export const inWindow = isWithinWindow;
+
+
+export function isValidTimeZone(timeZone: unknown): boolean {
+  if (typeof timeZone !== "string" || timeZone.trim() === "") return false;
+  try {
+    // constructor throws RangeError for invalid IANA tz
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const isValidTimezone = isValidTimeZone;
+export const isTimeZoneValid = isValidTimeZone;
+export const isTimezoneValid = isValidTimeZone;
+export const validateTimeZone = isValidTimeZone;
