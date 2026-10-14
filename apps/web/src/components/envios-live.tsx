@@ -11,7 +11,7 @@ import { IconSend } from "@/components/ui/icons";
 import { DataTable } from "@/components/ui/table";
 import { countDay, type PublicSend } from "@/lib/envios-view";
 import { formatDateTime } from "@/lib/format";
-import { applySendChange, subscribeSends, type ConnectionState } from "@/lib/realtime";
+import { applySendChange, shouldPoll, subscribeSends, type ConnectionState } from "@/lib/realtime";
 import { getRealtimeClient } from "@/lib/realtime-client";
 import type { EnviosView } from "@/server/envios";
 
@@ -24,7 +24,7 @@ const CARDS = [
   { key: "skipped", label: "Ignorados hoje", tone: "text-ink-2" },
 ] as const;
 
-export function EnviosLive({ initial, accountId, empty }: { initial: EnviosView; accountId: string; empty: boolean }) {
+export function EnviosLive({ initial, accountId, empty, realtimeToken = null }: { initial: EnviosView; accountId: string; empty: boolean; realtimeToken?: string | null }) {
   const [items, setItems] = useState<PublicSend[]>(initial.items);
   const [today, setToday] = useState(initial.today);
   const [conn, setConn] = useState<ConnectionState | "polling">("polling");
@@ -52,27 +52,34 @@ export function EnviosLive({ initial, accountId, empty }: { initial: EnviosView;
     setToday(r.data.today);
   }, []);
 
+  // Assinatura Realtime (sob RLS). Sem env/JWT o cliente é null e só o polling abaixo atua.
   useEffect(() => {
     if (empty) return;
-    const client = getRealtimeClient();
-    if (client) {
-      return subscribeSends(
-        client,
-        accountId,
-        (change) => {
-          const r = applySendChange(itemsRef.current, change, accountId);
-          itemsRef.current = r.items;
-          setItems(r.items);
-          if (r.refresh) void reload();
-          else setToday(countDay(r.items, { start: new Date(winRef.current.start), end: new Date(winRef.current.end) }));
-        },
-        setConn,
-      );
+    const client = getRealtimeClient({ accessToken: realtimeToken });
+    if (!client) {
+      setConn("polling");
+      return;
     }
-    setConn("polling");
+    return subscribeSends(
+      client,
+      accountId,
+      (change) => {
+        const r = applySendChange(itemsRef.current, change, accountId);
+        itemsRef.current = r.items;
+        setItems(r.items);
+        if (r.refresh) void reload();
+        else setToday(countDay(r.items, { start: new Date(winRef.current.start), end: new Date(winRef.current.end) }));
+      },
+      setConn,
+    );
+  }, [accountId, empty, filterKey, realtimeToken, reload]);
+
+  // Fallback: releitura periódica sempre que a assinatura não está ao vivo (sem Realtime, conectando ou caída).
+  useEffect(() => {
+    if (empty || !shouldPoll(conn)) return;
     const t = setInterval(() => void reload(), POLL_MS);
     return () => clearInterval(t);
-  }, [accountId, empty, filterKey, reload]);
+  }, [conn, empty, reload]);
 
   const hasFilter = initial.filter.status !== "all" || initial.filter.groupId !== null;
 

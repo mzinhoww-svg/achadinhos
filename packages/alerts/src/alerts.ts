@@ -167,9 +167,9 @@ export class AlertService {
 
 
   private buildMessage(reason: string, context: Record<string, unknown>, recipients: string | string[]): EmailMessage {
-    const subject = `${this.subjectPrefix} ${subjectFor(reason)}`;
+    const subject = `${this.subjectPrefix} ${subjectFor(reason, this.heartbeatThresholdMs)}`;
     const lines: string[] = [];
-    lines.push(subjectLine(reason));
+    lines.push(subjectLine(reason, this.heartbeatThresholdMs));
     if (Object.keys(context).length > 0) {
       lines.push("");
       lines.push("Contexto (sanitizado):");
@@ -338,17 +338,22 @@ function readEnvRecipient(): string | string[] | undefined {
   return v || undefined;
 }
 
-function subjectFor(reason: string): string {
+function minutesLabel(ms: number): string {
+  const m = ms / 60_000;
+  return `${Number.isInteger(m) ? m : m.toFixed(1)} min`;
+}
+
+function subjectFor(reason: string, heartbeatThresholdMs: number): string {
   if (reason === ALERT_CAUSE_SHOPEE_CREDENTIAL_FAILED) return "credencial Shopee falhou";
   if (reason === ALERT_CAUSE_TELEGRAM_BOT_LOST_ACCESS) return "bot perdeu acesso a grupo";
-  if (reason === ALERT_CAUSE_WORKER_NO_HEARTBEAT) return "worker sem heartbeat (>10 min)";
+  if (reason === ALERT_CAUSE_WORKER_NO_HEARTBEAT) return `worker sem heartbeat (>${minutesLabel(heartbeatThresholdMs)})`;
   return reason;
 }
 
-function subjectLine(reason: string): string {
+function subjectLine(reason: string, heartbeatThresholdMs: number): string {
   if (reason === ALERT_CAUSE_SHOPEE_CREDENTIAL_FAILED) return "A credencial da Shopee falhou na validação.";
   if (reason === ALERT_CAUSE_TELEGRAM_BOT_LOST_ACCESS) return "O bot perdeu acesso a um grupo do Telegram.";
-  if (reason === ALERT_CAUSE_WORKER_NO_HEARTBEAT) return "O worker está sem heartbeat por mais de 10 minutos.";
+  if (reason === ALERT_CAUSE_WORKER_NO_HEARTBEAT) return `O worker está sem heartbeat por mais de ${minutesLabel(heartbeatThresholdMs)}.`;
   return `Alerta: ${reason}`;
 }
 
