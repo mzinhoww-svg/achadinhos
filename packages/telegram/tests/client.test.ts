@@ -147,3 +147,27 @@ describe("TelegramClient group discovery safety", () => {
     expect(client.listGroups({ activeOnly: true })).toHaveLength(0);
   });
 });
+
+describe("TelegramClient discoverGroups fail-closed", () => {
+  it("ignores chat_member updates when getMe is unavailable", async () => {
+    const server = createMockTelegramServer();
+    const client = new TelegramClient("t", { transport: server.transport });
+    server.setRateLimit("getMe", 3);
+    server.enqueueMyChatMember({ chatId: -3001, title: "G3", newStatus: "administrator" });
+    server.enqueueUpdate({
+      update_id: 11,
+      chat_member: {
+        chat: { id: -3001, type: "supergroup", title: "G3" },
+        from: { id: 55, is_bot: false, first_name: "Joao" },
+        date: 1,
+        old_chat_member: { user: { id: 55, is_bot: false, first_name: "Joao" }, status: "member" },
+        new_chat_member: { user: { id: 55, is_bot: false, first_name: "Joao" }, status: "left" },
+      },
+    });
+    await client.getUpdates();
+    const group = client.listGroups().find((g) => g.chatId === -3001);
+    expect(group).toBeTruthy();
+    expect(group?.active).toBe(true);
+    expect(group?.status).toBe("administrator");
+  });
+});

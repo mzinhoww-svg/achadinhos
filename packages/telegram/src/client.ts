@@ -121,7 +121,7 @@ export class TelegramClient {
       if (
         chatMember &&
         chatMember.chat.type !== "private" &&
-        (this.botId === undefined || chatMember.new_chat_member.user.id === this.botId)
+        this.botId !== undefined && chatMember.new_chat_member.user.id === this.botId
       ) {
         this.upsertGroup(chatMember.chat, chatMember.new_chat_member.status);
       }
