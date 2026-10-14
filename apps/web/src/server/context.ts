@@ -1,6 +1,9 @@
 import "server-only";
 import { MemoryAutomations, MemoryConnections, MemoryVault } from "./memory";
+import { MemorySendNow } from "./memory-sends";
 import type { AutomationsRepo, ConnectionsRepo, SecretVault, TelegramGateway } from "./ports";
+import type { OfferCandidate, OfferFinder, SendNowRepo, ShortLinkGateway } from "./send-ports";
+import { offers as demoOffers } from "@/lib/mock";
 import { createTelegramGateway } from "./telegram-gateway";
 import type { Session, SessionProvider } from "./session";
 
@@ -10,6 +13,9 @@ export interface Container {
   vault: SecretVault;
   telegram: TelegramGateway;
   sessions: SessionProvider;
+  sendNow: SendNowRepo;
+  finder: OfferFinder;
+  links: ShortLinkGateway;
 }
 
 /**
@@ -40,6 +46,47 @@ const demoTelegram: TelegramGateway = {
   },
 };
 
+const demoCandidates: OfferCandidate[] = demoOffers.map((o, i) => ({
+  itemId: String(9001 + i),
+  title: o.title,
+  imageUrl: `https://img.demo.invalid/${o.id}.jpg`,
+  productLink: `https://shopee.com.br/product/1/${9001 + i}`,
+  offerLink: `https://shopee.com.br/product/1/${9001 + i}?af=demo`,
+  price: o.price,
+  oldPrice: o.oldPrice,
+  commissionRate: o.commissionRate,
+  rating: o.rating,
+  sales: o.sales,
+  shopName: "Loja Demo",
+  placeholderHue: o.hue,
+}));
+const matches = (c: OfferCandidate, q: string) => c.title.toLowerCase().includes(q.toLowerCase());
+
+/** Shopee simulada do modo demo: catálogo fixo, sem rede. */
+const demoFinder: OfferFinder = {
+  async search(_a, keyword) {
+    return demoCandidates.filter((c) => matches(c, keyword));
+  },
+  async byItemId(_a, itemId) {
+    return demoCandidates.find((c) => c.itemId === itemId) ?? null;
+  },
+  async resolveShortUrl() {
+    return demoCandidates[0] ?? null;
+  },
+};
+const demoLinks: ShortLinkGateway = {
+  async generate(_a, originUrl) {
+    return `https://s.shopee.com.br/demo${(originUrl.length * 7919).toString(36)}`;
+  },
+};
+/** Sem adaptador configurado nenhuma consulta à Shopee acontece (a web não lê o Secret; decisão 003 H1). */
+const offlineFinder: OfferFinder = {
+  async search() { throw new Error("finder_not_configured"); },
+  async byItemId() { throw new Error("finder_not_configured"); },
+  async resolveShortUrl() { throw new Error("finder_not_configured"); },
+};
+const offlineLinks: ShortLinkGateway = { async generate() { throw new Error("links_not_configured"); } };
+
 /**
  * Sessão real (Supabase Auth) ainda não existe: sem a flag de demo, ninguém tem sessão e toda ação recusa.
  * No modo demo a conta vem do servidor (nunca do cliente).
@@ -59,6 +106,7 @@ async function seed(c: Container) {
   const tg = await saveTelegram(deps, S, { token: "1000000001:DEMO-token-nao-real-000000000000" });
   for (const g of tg.groups.slice(0, 3)) await setGroupActive(deps, S, { groupId: g.id, active: true });
   const ids = tg.groups.map((g) => g.id);
+  (c.sendNow as MemorySendNow).markSent(DEMO_ACCOUNT, ids[0]!, "9001", new Date(Date.now() - 2 * 86_400_000));
   const ad = { automations: c.automations, connections: c.connections };
   await createAutomation(ad, S, { name: "Eletrônicos até R$ 150", days: [0, 1, 2, 3, 4, 5, 6], windowStart: "08:00", windowEnd: "22:00", frequencyMin: 30, filters: { category: "Eletrônicos", minDiscount: 30, minCommission: 5, priceMax: 150, minRating: 4.5 }, header: "Achadinho do dia", footer: "Preço pode mudar a qualquer momento.", groupIds: [ids[0]!] });
   await createAutomation(ad, S, { name: "Casa e cozinha — manhã", days: [1, 2, 3, 4, 5], windowStart: "07:00", windowEnd: "12:00", frequencyMin: 60, filters: { category: "Casa e Cozinha", minDiscount: 25, minCommission: 4, priceMax: 200, minRating: 4.3 }, groupIds: [ids[1]!] });
@@ -68,12 +116,16 @@ const g = globalThis as { __achadinhos?: Promise<Container> };
 
 export function container(): Promise<Container> {
   g.__achadinhos ??= (async () => {
+    const connections = new MemoryConnections();
     const c: Container = {
-      connections: new MemoryConnections(),
+      connections,
       automations: new MemoryAutomations(),
       vault: new MemoryVault(),
       telegram: DEMO() ? demoTelegram : createTelegramGateway(),
       sessions,
+      sendNow: new MemorySendNow(connections),
+      finder: DEMO() ? demoFinder : offlineFinder,
+      links: DEMO() ? demoLinks : offlineLinks,
     };
     if (DEMO()) await seed(c);
     return c;
