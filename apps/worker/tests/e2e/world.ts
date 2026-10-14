@@ -63,6 +63,11 @@ export class MemoryClaimQueue {
     if (att.filter((a) => localDay(a.attemptedAt) === localDay(now)).length >= DAILY_CAP) return null;
     const queued = mine.filter((s) => s.status === "queued").sort((a, b) => a.scheduledFor.getTime() - b.scheduledFor.getTime());
     for (const s of queued) {
+      if (!this.store.group(s.automationId, s.groupId).active) {
+        s.status = "skipped";
+        s.reason = "grupo_inativo";
+        continue;
+      }
       const a = this.store.automation(s.automationId);
       const inside = isWithinWindow(now, { days: a.days, windowStart: a.windowStart, windowEnd: a.windowEnd, frequencyMin: a.frequencyMin, timezone: a.timezone });
       if (!inside) {
@@ -161,6 +166,7 @@ export async function createWorld(startIso: string, opts: { window?: [string, st
     scheduler: { runTick: () => runSchedulerTick({ store, now: clock.now, selectOffer, dedupeDays: 7 }) },
     queue: { listChannels: () => queue.listChannels(), claim: (ch) => queue.claim(ch, build) },
     executor,
+    groups: { deactivate: async (groupId, reason) => store.deactivateGroup(groupId, reason) },
     alerts: {
       shopeeCredentialFailed: (c) => alerts.shopeeCredentialFailed(c),
       telegramBotLostAccess: (c) => alerts.telegramBotLostAccess(c),

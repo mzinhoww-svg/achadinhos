@@ -114,6 +114,36 @@ describe("e2e (portas em memória + Shopee/Telegram simulados)", () => {
     ]);
   });
 
+  it("bot removido do grupo: 1 falha, grupo desativado, 1 alerta e nenhuma tentativa nos slots seguintes", async () => {
+    world = await createWorld("2026-10-13T12:00:00Z"); // 08:00 local
+    world.tg.setChatAccess(-100123, false);
+    for (let h = 0; h < 8; h++) {
+      await world.runtime.tickOnce();
+      await world.runtime.executorOnce();
+      world.clock.advance(3_600_000);
+    }
+    expect(world.store.sends.filter((s) => s.status === "failed")).toHaveLength(1);
+    expect(world.store.sends.filter((s) => s.status === "queued" || s.status === "sending")).toHaveLength(0);
+    expect(world.store.sends).toHaveLength(1); // o agendador parou de enfileirar
+    expect(world.queue.attempts).toHaveLength(1); // o teto não foi consumido de novo
+    expect(world.store.group("au1", "g1").active).toBe(false);
+    expect(world.alerts.getHistory().map((h) => h.cause)).toEqual(["telegram_bot_lost_access"]);
+  });
+
+  it("send já enfileirado de grupo desativado é pulado (grupo_inativo) e não conta no teto", async () => {
+    world = await createWorld("2026-10-13T16:00:00Z");
+    await world.enqueueDirect("k1", world.clock.now());
+    await world.enqueueDirect("k2", new Date(world.clock.now().getTime() + 1));
+    world.store.deactivateGroup("g1", "telegram_bot_removido");
+    await world.runtime.executorOnce();
+    expect(world.store.sends.map((s) => [s.status, s.reason])).toEqual([
+      ["skipped", "grupo_inativo"],
+      ["skipped", "grupo_inativo"],
+    ]);
+    expect(world.queue.attempts).toHaveLength(0);
+    expect(world.sentMessages()).toHaveLength(0);
+  });
+
   it("falha de Telegram sem acesso gera alerta e não reenvia", async () => {
     world = await createWorld("2026-10-13T16:00:00Z");
     world.tg.setChatAccess(-100123, false);

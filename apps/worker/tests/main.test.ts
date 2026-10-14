@@ -7,6 +7,7 @@ const okDeps: BuildDeps = async () => ({
   scheduler: { runTick: async () => ({ considered: 0, enqueued: 0, skipped: 0, advanced: 0, initialized: 0, contended: 0, errors: 0 }) },
   queue: { listChannels: async () => [], claim: async () => null },
   executor: { run: async () => ({ status: "sent", finishRecorded: true }) },
+  groups: { deactivate: async () => {} },
   alerts: { shopeeCredentialFailed: async () => {}, telegramBotLostAccess: async () => {}, workerNoHeartbeat: async () => {} },
 });
 

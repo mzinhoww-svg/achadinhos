@@ -37,6 +37,12 @@ export interface RuntimeDeps {
   };
   executor: { run(send: ClaimedSend): Promise<RunOutcome> };
   alerts: AlertSink;
+  /**
+   * Desativa o grupo (`groups.active=false`, `last_error` com o código fixo) e pula os
+   * `queued` dele (`skipped/grupo_inativo`). Sem isso um bot removido seria agendado e
+   * tentado a cada slot, consumindo o teto diário do canal.
+   */
+  groups: { deactivate(groupId: string, reason: string): Promise<void> };
   validation?: { runOnce(): Promise<ValidationSignal[]> };
   /** Batimento persistido (tabela), legível pelo monitor externo. */
   heartbeatStore?: { write(at: Date): Promise<void>; read(): Promise<Date | null> };
@@ -117,6 +123,8 @@ export function createWorkerRuntime(deps: RuntimeDeps): WorkerRuntime {
     const reason = outcome.reason;
     if (outcome.status !== "failed" || !reason) return;
     if (TELEGRAM_ACCESS_REASONS.has(reason)) {
+      // desativar primeiro: o grupo sai do agendador e da fila antes de qualquer outra coisa
+      await sendAlert("deactivate_group", () => deps.groups.deactivate(send.groupId, reason));
       await sendAlert("telegram", () => alerts.telegramBotLostAccess({ accountId: send.accountId, group: send.groupId, reason }));
     } else if (reason === "shopee_assinatura_invalida") {
       await sendAlert("shopee", () => alerts.shopeeCredentialFailed({ accountId: send.accountId, reason }));

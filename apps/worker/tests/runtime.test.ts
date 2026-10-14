@@ -13,6 +13,7 @@ const sent: RunOutcome = { status: "sent", finishRecorded: true };
 function setup(over: Partial<RuntimeDeps> = {}) {
   let nowMs = Date.parse("2026-10-14T15:00:00Z");
   const lines: string[] = [];
+  const deactivate = vi.fn(async (_groupId: string, _reason: string) => undefined);
   const alerts = {
     shopeeCredentialFailed: vi.fn(async () => undefined),
     telegramBotLostAccess: vi.fn(async () => undefined),
@@ -26,9 +27,10 @@ function setup(over: Partial<RuntimeDeps> = {}) {
     queue: { listChannels: async () => ["c1"], claim: async () => null },
     executor: { run: async () => sent },
     alerts,
+    groups: { deactivate: deactivate },
     ...over,
   };
-  return { deps, alerts, lines, advance: (ms: number) => { nowMs += ms; } };
+  return { deps, alerts, deactivate, lines, advance: (ms: number) => { nowMs += ms; } };
 }
 
 describe("tick do agendador", () => {
@@ -78,6 +80,33 @@ describe("laço do executor", () => {
       const s = setup({ queue: { listChannels: async () => ["c1"], claim: async () => claim("s1") }, executor: { run: async () => ({ status: "failed", reason, finishRecorded: true }) } });
       await createWorkerRuntime(s.deps).executorOnce();
       expect(s.alerts.telegramBotLostAccess).toHaveBeenCalledWith({ accountId: "acc", group: "g", reason });
+    }
+  });
+
+  it("erro de acesso do bot desativa o grupo (com motivo fixo) antes do alerta", async () => {
+    for (const reason of ["telegram_sem_acesso", "telegram_bot_removido", "telegram_bot_bloqueado", "telegram_chat_nao_encontrado"]) {
+      const order: string[] = [];
+      const s = setup({ queue: { listChannels: async () => ["c1"], claim: async () => claim("s1") }, executor: { run: async () => ({ status: "failed", reason, finishRecorded: true }) } });
+      s.deactivate.mockImplementation(async () => { order.push("deactivate"); });
+      s.alerts.telegramBotLostAccess.mockImplementation(async () => { order.push("alert"); });
+      await createWorkerRuntime(s.deps).executorOnce();
+      expect(s.deactivate).toHaveBeenCalledWith("g", reason);
+      expect(order).toEqual(["deactivate", "alert"]);
+    }
+  });
+
+  it("falha ao desativar o grupo não impede o alerta", async () => {
+    const s = setup({ queue: { listChannels: async () => ["c1"], claim: async () => claim("s1") }, executor: { run: async () => ({ status: "failed", reason: "telegram_bot_removido", finishRecorded: true }) } });
+    s.deactivate.mockRejectedValueOnce(new Error("db"));
+    await createWorkerRuntime(s.deps).executorOnce();
+    expect(s.alerts.telegramBotLostAccess).toHaveBeenCalledOnce();
+  });
+
+  it("falhas que não são de acesso (timeout, rate limit) não desativam o grupo", async () => {
+    for (const reason of ["timeout_shopee", "telegram_rate_limit", "telegram_timeout_resultado_desconhecido"]) {
+      const s = setup({ queue: { listChannels: async () => ["c1"], claim: async () => claim("s1") }, executor: { run: async () => ({ status: "failed", reason, finishRecorded: true }) } });
+      await createWorkerRuntime(s.deps).executorOnce();
+      expect(s.deactivate).not.toHaveBeenCalled();
     }
   });
 
