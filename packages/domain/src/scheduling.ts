@@ -1,4 +1,4 @@
-import { getZonedParts, resolveWindow, wallToUtc, DEFAULT_TIMEZONE, normalizeDays, getTimeZoneOffsetMs } from "./timezone";
+import { getZonedParts, resolveWindow, getTimeZoneOffsetMs } from "./timezone";
 
 export interface GroupLike {
   id?: string;
@@ -131,24 +131,6 @@ function extractNow(input: unknown, ...rest: unknown[]): Date | string | number 
   }
   if (typeof rest[0] === "function") return (rest[0] as () => Date)();
   return new Date();
-}
-
-function extractConfig(input: unknown, ...rest: unknown[]): AutomationConfig {
-  if (input && typeof input === "object" && !(input instanceof Date)) {
-    const o = input as Record<string, unknown>;
-    // if contains window/timezone/days directly, treat as config
-    if ("windowStart" in o || "window_start" in o || "start" in o || "days" in o || "frequencyMin" in o || "frequency_min" in o || "tz" in o || "timezone" in o || "timeZone" in o) {
-      return o as AutomationConfig;
-    }
-    // maybe nested automation
-    if (o.automation && typeof o.automation === "object") return o.automation as AutomationConfig;
-    if (o.config && typeof o.config === "object") return o.config as AutomationConfig;
-    if (o.params && typeof o.params === "object") return o.params as AutomationConfig;
-  }
-  // second argument?
-  const r0 = rest.find((r) => r && typeof r === "object" && !(r instanceof Date) && !Array.isArray(r));
-  if (r0) return r0 as AutomationConfig;
-  return {};
 }
 
 // flexible wrapper for calculateNextRunAt supporting (now, config) or (options)

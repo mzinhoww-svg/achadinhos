@@ -71,6 +71,15 @@ importers:
 
   apps/worker:
     dependencies:
+      '@achadinhos/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@achadinhos/shopee':
+        specifier: workspace:*
+        version: link:../../packages/shopee
+      '@achadinhos/telegram':
+        specifier: workspace:*
+        version: link:../../packages/telegram
       zod:
         specifier: ^3.23.8
         version: 3.25.76
