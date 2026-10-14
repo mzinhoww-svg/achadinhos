@@ -13,6 +13,8 @@ Legenda de severidade: **C** crítico (bloqueia), **A** alto, **M** médio. "Ite
 | ☐ | A | Mensagem de erro da Shopee/Telegram saneada antes de ir a `last_error`/UI (pode ecoar token, URL com token ou payload) | Teste com resposta simulada contendo o segredo | 2, 3 |
 | ☐ | A | Assinatura calculada sobre a mesma string enviada; segredo nunca na URL (Telegram usa token na URL: não logar a URL) | Teste de vetor; revisar cliente HTTP e logs de requisição | 1, 3 |
 | ☐ | A | Arquivo de ambiente do worker 0600, dono de serviço, fora do repo; rotação documentada | Inspeção do VPS | 6 |
+| ☐ | C | Cliente Shopee e Telegram: credencial não enumerável (`#campo` + `toJSON`/`inspect.custom` redigidos); `JSON.stringify`/`inspect` do cliente não contém o segredo (auditoria PR #1, R1) | Teste com canário | 1, 3 |
+| ☐ | A | Endpoint configurável só `https:` e host em allowlist (loopback só para mock) (R2) | Teste com `http://evil.example` | 1 |
 | ☐ | M | `.env.example` sem valores reais; allowlist do gitleaks restrita | Revisar `.gitleaks.toml` | — |
 
 ## B. RLS e banco
@@ -22,11 +24,17 @@ Legenda de severidade: **C** crítico (bloqueia), **A** alto, **M** médio. "Ite
 | ☐ | C | Teste cruzado: usuário da conta A não lê, insere, atualiza nem remove dados da conta B (cada tabela, cada operação) | Suíte de RLS com 2 contas | todos |
 | ☐ | C | Funções `SECURITY DEFINER` com `search_path` fixo, validação de `account_id` do chamador e `EXECUTE` revogado de `public`/anon quando interna (`claim_next_send`, reaper, leitura do Vault) | Revisar migrações; `has_function_privilege` | 8 |
 | ☐ | C | Schema `vault` e `decrypted_secrets` fora do alcance de anon/authenticated e fora do PostgREST | Query de privilégios; tentar acessar via API com JWT de usuário | 2 |
-| ☐ | A | `sends` e `commissions`: sem policy/GRANT de DELETE; UPDATE só nas transições permitidas (trigger de máquina de estados: queued→sending→sent\|failed\|skipped) | Teste que tenta voltar status e apagar | 8, 12 |
+| ☐ | A | `sends` e `commissions`: sem policy/GRANT de DELETE/UPDATE para `authenticated`; colunas de identidade imutáveis, de execução só por RPC `SECURITY DEFINER`; transições só para frente (decisão 001, M1) | Teste como `authenticated` e como dono: voltar status, alterar `priority`/`group_id`, apagar | 8, 12 |
+| ☐ | C | Sem INSERT direto de `authenticated` em `sends`; "Mandar agora" por `enqueue_send_now` que força `status='queued'`, `priority=100` e valida posse (decisão 001, M2) | Tentar inserir `status='sent'`, prioridade arbitrária e `group_id` de outra conta | 10 |
+| ☐ | C | Tenancy em referências: FK composta `(account_id, id)` (ou CHECK/trigger equivalente) em `sends`, `automation_groups`, `groups`, `channels.config_secret_id`, `shopee_credentials.secret_id` | Inserir como usuário A apontando para ids da conta B | todos |
+| ☐ | A | `ON DELETE` compatível com tabelas só de inserção: deletar grupo/oferta/conta com histórico funciona e respeita M1 | pgTAP com histórico | 8 |
+| ☐ | A | Limite de 5 automações serializado por conta (lock) e sem falso positivo ao editar a 5ª; arquivadas: regra explícita | 2 sessões concorrentes; `UPDATE` da 5ª | 4 |
+| ☐ | A | Eventos de status aplicáveis só pelo worker (função `SECURITY DEFINER` ou grant restrito); `changed_by` não forjável; CHECKs em `days`, `timezone` (IANA), `frequency_min` | Testes como `authenticated` | 6, 8 |
 | ☐ | A | Views com `security_invoker = true` (senão ignoram RLS do chamador) | Listar views | 11 |
 | ☐ | A | Realtime: tabelas publicadas só com RLS ativa; o canal de um usuário não recebe eventos de outra conta | Teste com 2 sessões | 11 |
 | ☐ | A | Limite de 5 automações imposto no banco, à prova de corrida | Teste concorrente | 4 |
-| ☐ | M | `sub_id` único e imutável por grupo; índice de dedupe e de fila presentes | Revisar migração | 3, 7, 8 |
+| ☐ | A | `groups.sub_id` NOT NULL e único **por conta**, imutável | Constraint + teste | 3, 12 |
+| ☐ | M | Índices de fila e de dedupe (incluindo `failed` com resultado desconhecido) presentes | Revisar migração | 7, 8 |
 | ☐ | M | Datas em `timestamptz`/UTC; nenhuma coluna `timestamp` sem zona | Query em `information_schema` | 6 |
 
 ## C. RSC / Next.js (vazamento e superfície de ataque)
@@ -62,6 +70,8 @@ Legenda de severidade: **C** crítico (bloqueia), **A** alto, **M** médio. "Ite
 | ☐ | C | Download de imagem: https, allowlist de host, bloqueio de IP privado/loopback, limite de bytes/pixels, timeout, sem redirect fora da allowlist | Testes de rejeição (decisão 002 C1) | 9 |
 | ☐ | A | Texto da oferta tratado como não confiável no criativo e na mensagem (sem HTML/Markdown injetável no Telegram: escapar `parse_mode`) | Teste com título malicioso | 9, 10 |
 | ☐ | A | Link curto e subIds gerados pelo servidor; subIds sem dados pessoais (só IDs internos) | Revisar | 1, 12 |
+| ☐ | A | `shortLink`/`offerLink`/`productLink`/`imageUrl` validados como URL `https:` não vazia antes de entrar em mensagem ou download (PR #1, R4) | Teste com `javascript:`, vazio e `http:` | 1, 9 |
+| ☐ | A | Erro HTTP 401/403 distingue credencial inválida de indisponibilidade (status exposto; PR #1, R3) | Teste com 401 + 10020 | 2 |
 | ☐ | M | Timeouts e limite de tamanho em todas as chamadas externas | Revisar clientes | todos |
 | ☐ | M | `conversionReport` idempotente por `checkout_id`; reexecução não duplica | Teste | 12 |
 

@@ -29,3 +29,23 @@ Lease expirado após crash (reaper marca failed com motivo; sem retry). Testar 2
 
 ### Riscos residuais aceitos
 Pode haver mensagem enviada com `failed` no histórico (A5 mitiga a repetição, não o registro). Falha sem retry perde a postagem daquele slot; é a regra do PRD.
+
+### Revisão após QA do PR #3 (2026-10-13): modelo de mutação de `sends` e enfileiramento
+**M1 — "Insert-only" de `sends` passa a ter definição operacional** (o texto literal do PRD é incompatível com claim/lease/`finish_send` e com `ON DELETE` das FKs; reproduzido pelo QA no PR #4):
+- **Colunas de identidade, imutáveis após o INSERT:** `id`, `account_id`, `idempotency_key`, `priority`, `scheduled_for`, `created_at`, e as referências `offer_id`, `group_id`, `channel_id` (estas só podem mudar para `NULL`, por ação de FK).
+- **Colunas de execução, mutáveis apenas por RPC `SECURITY DEFINER` do worker** (`claim_next_send`, `finish_send`, reaper): `status`, `reason`, `lease_expires_at`, `attempted_at`, `finished_at`, `sent_at`, `external_message_id`, `short_link`, `creative_url`, `message_text`.
+- **Histórico:** nenhum `DELETE` direto e transições só para frente (`queued→sending→sent|failed|skipped`; `queued→skipped`); cada transição gera linha em `send_status_events` (só inserção).
+- **Substituir `send_immutable_guard`** (PR #4) por um guard que compara `OLD` e `NEW` coluna a coluna e **não** usa GUC liberável pela sessão; `UPDATE`/`DELETE` revogados de `authenticated` (as RPCs rodam como dono). O guard deve **permitir** a anulação de `offer_id`/`group_id`/`channel_id` disparada por FK e o `DELETE` em cascata de `accounts` (exclusão de conta, LGPD), e **bloquear** qualquer outra mudança de identidade.
+- **Preferência de produto:** grupo/oferta com histórico é desativado (`active=false`), não apagado; a exclusão física fica para a conta inteira.
+- **Testes (pgTAP, como `authenticated` e como dono):** deletar grupo, oferta e conta com histórico não falha; alterar `priority`/`group_id` por cliente falha; transição `sent→queued` falha.
+
+**M2 — "Mandar agora" é RPC, não INSERT direto.** `authenticated` **não** tem policy de INSERT em `sends`. `enqueue_send_now(group_id, offer_id)` (`SECURITY DEFINER`, `search_path` fixo) valida posse do grupo e da oferta pela sessão, força `status='queued'`, `priority=100` e gera `idempotency_key` (anti duplo clique); ignora qualquer outro dado do cliente. A prioridade 100 que fura a janela (A8b) só é obtida por essa RPC.
+
+**M3 — Expressão do dia local (A6).** Para `tz = accounts.timezone`:
+`inicio = (date_trunc('day', now() AT TIME ZONE tz)) AT TIME ZONE tz` e `fim = (date_trunc('day', now() AT TIME ZONE tz) + interval '1 day') AT TIME ZONE tz`; contar `attempted_at >= inicio AND attempted_at < fim`. (`date_trunc` sobre `timestamp` sem zona devolve `timestamp` sem zona; a conversão de volta com `AT TIME ZONE tz` é obrigatória.) Testes com `attempted_at` em UTC em 23:59:30 e 00:00:30 de Cuiabá.
+
+**M4 — Dedupe e índices (A5).** O índice parcial `where status='sent'` do PRD/PR #4 não cobre o resultado desconhecido. Criar `(group_id, offer_id, attempted_at) where status='sent' or (status='failed' and reason='lease_expirado_resultado_desconhecido')` e, para corrida entre ordens, unique parcial `(group_id, offer_id) where status in ('queued','sending')`. A janela de `dedupe_days` fica na consulta do worker.
+
+**M5 — Risco residual (A8b).** Com 1 envio/60 s e backlog, `queued` pode passar da janela e virar `skipped/fora_da_janela`: perde-se a postagem, sem retry (regra do PRD). Aceito; o teste F2-10/T7-10 mede quantos viram `skipped`.
+
+**M6 — Comissão × insert-only (proposta; Aurimar decide).** `commissions` mantém PK `(account_id, checkout_id)`; o worker atualiza `status`/`estimated_commission` só por RPC de upsert idempotente, e cada mudança entra em `commission_events` (só inserção). Preserva o histórico exigido pelo PRD e resolve a atualização do `conversionReport`. Até Aurimar decidir, o schema do PR #4 **não** deve ser considerado final para `commissions`.
