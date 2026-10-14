@@ -1,9 +1,9 @@
-export * from "./estimate.js";
-export * from "./timezone.js";
-export * from "./scheduling.js";
-export * from "./offers.js";
-export * from "./dedupe.js";
-export * from "./automation.js";
+export * from "./estimate";
+export * from "./timezone";
+export * from "./scheduling";
+export * from "./offers";
+export * from "./dedupe";
+export * from "./automation";
 
 // clock helpers
 export const createClock = (initial: Date = new Date()) => {
