@@ -28,7 +28,7 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p id={`${htmlFor}-msg`} role="alert" className="text-sm text-err">
+        <p id={`${htmlFor}-msg`} role="alert" aria-live="assertive" className="text-sm text-err">
           {error}
         </p>
       ) : (
