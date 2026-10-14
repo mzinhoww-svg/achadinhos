@@ -42,8 +42,12 @@ describe("startWorker", () => {
     expect(lines.join("\n")).not.toContain("Sup3rS3nhaDB");
   });
 
-  it("sem adaptador de produção, o buildDeps padrão falha com mensagem clara", async () => {
-    const { defaultBuildDeps } = await import("../src/main.js");
-    await expect(defaultBuildDeps({} as never, {} as never)).rejects.toThrow(/adaptador/i);
+  it("sem buildDeps injetado, o padrão SQL falha fechado nomeando as variáveis que faltam (sem valores)", async () => {
+    const lines: string[] = [];
+    const r = await startWorker({ env, sink: (l) => lines.push(l) }); // sem SUPABASE_*, ALERT_EMAIL_TO...
+    expect(r.ok).toBe(false);
+    const out = lines.join("\n");
+    expect(out).toMatch(/worker\.falha_ao_iniciar/);
+    expect(out).not.toContain("Sup3rS3nhaDB");
   });
 });
