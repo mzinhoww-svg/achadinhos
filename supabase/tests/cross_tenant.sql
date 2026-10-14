@@ -13,16 +13,16 @@ INSERT INTO public.accounts (account_id,user_id) VALUES
 -- account B resources
 INSERT INTO public.channels (id,account_id,kind,config_secret_id)
   VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','telegram', vault.create_secret('cb'));
-INSERT INTO public.groups (id,account_id,channel_id,external_id)
-  VALUES ('dddddddd-dddd-dddd-dddd-dddddddddddd','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','cccccccc-cccc-cccc-cccc-cccccccccccc','ext-b');
+INSERT INTO public.groups (id,account_id,channel_id,external_id,sub_id)
+  VALUES ('dddddddd-dddd-dddd-dddd-dddddddddddd','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','cccccccc-cccc-cccc-cccc-cccccccccccc','ext-b','gb');
 INSERT INTO public.shopee_credentials (account_id,app_id,secret_id)
   VALUES ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','appb', vault.create_secret('sb'));
 
 -- account A channel/group
 INSERT INTO public.channels (id,account_id,kind,config_secret_id)
   VALUES ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','telegram', vault.create_secret('ca'));
-INSERT INTO public.groups (id,account_id,channel_id,external_id)
-  VALUES ('ffffffff-ffff-ffff-ffff-ffffffffffff','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','ext-a');
+INSERT INTO public.groups (id,account_id,channel_id,external_id,sub_id)
+  VALUES ('ffffffff-ffff-ffff-ffff-ffffffffffff','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','ext-a','ga');
 
 -- offers
 INSERT INTO public.offers (id,account_id,item_id) VALUES
@@ -30,17 +30,17 @@ INSERT INTO public.offers (id,account_id,item_id) VALUES
 
 -- cross-tenant send blocked
 SELECT throws_ok(
-  $$INSERT INTO public.sends (account_id, group_id, channel_id, offer_id)
+  $$INSERT INTO public.sends (account_id, group_id, channel_id, offer_id, idempotency_key)
      VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
              'dddddddd-dddd-dddd-dddd-dddddddddddd',
              'cccccccc-cccc-cccc-cccc-cccccccccccc',
-             '12121212-1212-1212-1212-121212121212')$$,
+             '12121212-1212-1212-1212-121212121212', 'k')$$,
   '23503', NULL, 'send cross-tenant blocked');
 
 -- cross-tenant group→channel blocked
 SELECT throws_ok(
-  $$INSERT INTO public.groups (account_id,channel_id,external_id)
-     VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','cccccccc-cccc-cccc-cccc-cccccccccccc','x')$$,
+  $$INSERT INTO public.groups (account_id,channel_id,external_id,sub_id)
+     VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','cccccccc-cccc-cccc-cccc-cccccccccccc','x','gx')$$,
   '23503', NULL, 'group cross-tenant channel blocked');
 
 -- cross-tenant automation_groups blocked
@@ -59,8 +59,8 @@ SELECT throws_ok(
   '23503', NULL, 'vault secret reuse across accounts blocked');
 
 -- duplicate same account ok (sanity)
-INSERT INTO public.sends (account_id, group_id, channel_id) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','ffffffff-ffff-ffff-ffff-ffffffffffff','eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee');
+INSERT INTO public.sends (account_id, group_id, channel_id, idempotency_key) VALUES
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','ffffffff-ffff-ffff-ffff-ffffffffffff','eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','k-same-tenant');
 SELECT pass('same-tenant send ok');
 
 SELECT * FROM finish();
