@@ -9,3 +9,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T3 | Design system + telas base | Prisma | em_revisao | PR #5; ciclo 1 corrigido (token na URL, criativo, vazio de /automacoes/nova) |
 | T4 | Bot Telegram (token, grupos, envio) | Vigia | devolvido (ciclo 1) | PR #2; QA: sem timeout, chat privado vira grupo |
 | T5 | Painel de progresso 127.0.0.1:3300 | Bússola | em_andamento | servidor no ar |
+| T9 | Comissão: conversionReport a cada 6 h idempotente (packages/commission) | Konoha? | em_revisao | PR pendente: pacote + testes |
