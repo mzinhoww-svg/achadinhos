@@ -16,7 +16,8 @@ type ExecutorFinishArgs =
 /**
  * Fila sobre as RPCs `claim_next_send`/`finish_send`/`reap_expired_sends` (T7-02/T7-03).
  * Toda regra (1 por canal, 60 s, teto, lease, reaper) mora no banco; o relógio é o do banco.
- * A conexão deve usar a role service_role (ou dedicada): EXECUTE é só dela.
+ * A conexão deve ser a role de login `achadinhos_worker` (herda service_role; `assertWorkerRole`
+ * recusa dono/superuser): service_role é NOLOGIN no Supabase.
  */
 export class PgQueue implements QueuePort {
   constructor(private readonly db: SqlClient) {}

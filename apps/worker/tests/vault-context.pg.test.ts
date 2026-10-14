@@ -61,8 +61,15 @@ describe("PgSendContext", () => {
   it("telegramToken: lê o token do canal; canal inexistente => null", async () => {
     const s = await fresh();
     const ctx = new PgSendContext(client(), { affiliateHandle: () => "x" });
-    expect((await ctx.telegramToken(s.channelId))!.reveal()).toBe(BOT_TOKEN);
-    expect(await ctx.telegramToken("00000000-0000-4000-8000-000000000000")).toBeNull();
+    expect((await ctx.telegramToken(s.channelId, s.accountId))!.reveal()).toBe(BOT_TOKEN);
+    expect(await ctx.telegramToken("00000000-0000-4000-8000-000000000000", s.accountId)).toBeNull();
+  });
+
+  it("telegramToken: canal de outra conta nunca entrega o segredo", async () => {
+    const a = await fresh();
+    const b = await fresh();
+    const ctx = new PgSendContext(client(), { affiliateHandle: () => "x" });
+    expect(await ctx.telegramToken(b.channelId, a.accountId)).toBeNull();
   });
 
   async function claimed(s: Seed, key: string, withOffer = true) {
@@ -112,11 +119,17 @@ describe("PgSendContext", () => {
     });
   });
 
-  it("'Mandar agora' (chave now:) cai na automação ligada ao grupo", async () => {
-    const s = await fresh();
-    const { id } = await claimed(s, `now:${s.groupId}:x:1`);
+  it("'Mandar agora' (chave now:) é manual: nunca vira a automação do grupo (comissão)", async () => {
+    const s = await fresh(); // o grupo TEM uma automação ligada
+    const { id } = await claimed(s, `now:${s.groupId}:oferta:29000000`);
     const got = await new PgSendContext(client(), { affiliateHandle: () => "h" }).loadClaimedSend(id);
-    expect(got?.automationId).toBe(s.automationId);
+    expect(got?.automationId).toBe("manual");
+  });
+
+  it("chave sem UUID de automação => manual", async () => {
+    const s = await fresh();
+    const { id } = await claimed(s, "qualquer-coisa");
+    expect((await new PgSendContext(client(), { affiliateHandle: () => "h" }).loadClaimedSend(id))?.automationId).toBe("manual");
   });
 
   it("chat @canal permanece string", async () => {

@@ -51,12 +51,10 @@ export class PgSendContext {
   async loadClaimedSend(sendId: string): Promise<ClaimedSend | null> {
     const r = await this.db.query<SendRow>(
       `select s.id as send_id, s.account_id, s.group_id, s.channel_id, s.offer_id,
-              coalesce(
-                case when s.idempotency_key ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:'
-                     then split_part(s.idempotency_key, ':', 1) end,
-                (select ag.automation_id::text from public.automation_groups ag
-                  where ag.group_id = s.group_id order by ag.created_at, ag.automation_id limit 1)
-              ) as automation_id,
+              -- só a chave de slot (uuid-da-automacao:grupo:slot) identifica a automação; "Mandar agora"
+              -- (prefixo now:) e qualquer outra chave são manuais: a comissão não vai para uma automação alheia
+              case when s.idempotency_key ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:'
+                   then split_part(s.idempotency_key, ':', 1) end as automation_id,
               g.sub_id, g.external_id,
               o.title, o.image_url, o.product_url,
               o.price::float8 as price, o.original_price::float8 as original_price, o.discount_pct::float8 as discount_pct
@@ -101,11 +99,11 @@ export class PgSendContext {
     return secret ? { appId: row.app_id, secret: new Secret(secret) } : null;
   }
 
-  /** Token do bot do canal (`channels.config_secret_id`). */
-  async telegramToken(channelId: string): Promise<Secret | null> {
+  /** Token do bot do canal (`channels.config_secret_id`); só se o canal é da conta informada. */
+  async telegramToken(channelId: string, accountId: string): Promise<Secret | null> {
     const r = await this.db.query<{ config_secret_id: string }>(
-      "select config_secret_id from public.channels where id = $1::uuid",
-      [channelId],
+      "select config_secret_id from public.channels where id = $1::uuid and account_id = $2::uuid",
+      [channelId, accountId],
     );
     const row = r.rows[0];
     if (!row) return null;
