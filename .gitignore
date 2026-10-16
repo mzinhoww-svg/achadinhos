@@ -13,3 +13,4 @@ supabase/.temp/
 STOP
 next-env.d.ts
 *.tsbuildinfo
+outbox/

@@ -14,20 +14,26 @@ Decisões anteriores que este escopo **suspende** (não revoga o raciocínio, s�
 Pacote novo `packages/channel` (sem dependência de Shopee, Telegram ou banco).
 
 ```ts
+/** Identidade do envio. É a MESMA coisa que o nome do arquivo (B1): nada mais entra no caminho. */
+export interface Slot {
+  day: string;        // AAAAMMDD, fuso America/Cuiaba, calculado UMA vez por execução
+  hhmm: string;       // HHMM, mesmo relógio e mesmo instante (início da execução)
+  groupIndex: number; // 1..99, posição do grupo na configuração; nunca o rótulo externo
+}
 export interface OutboundOffer {
-  slotKey: string;          // determinístico: AAAAMMDD-HHMM-<itemId>-<grupo>; chave de idempotência
-  itemId: string;           // só dígitos (validado)
+  slot: Slot;
+  itemId: string;           // só dígitos (^[0-9]{1,20}$)
   title: string;            // dado externo: nunca vira nome de arquivo
-  text: string;             // mensagem pronta (cabeçalho + título + preço + link + rodapé)
-  affiliateLink: string;    // https, host em allowlist da Shopee
-  priceCurrent: number; priceOld: number; discountPct: number;
-  creativePng: Uint8Array;  // 1080x1080
-  generatedAtUtc: string;   // ISO 8601 UTC
-  groupLabel: string;       // rótulo de exibição; vira sub_id só no link, nunca no caminho
+  text: string;             // mensagem pronta; também dado externo (ver regra 4)
+  affiliateLink: string;    // https, host em AFFILIATE_LINK_HOSTS
+  priceCurrent: number; priceOld: number; discountPct: number; // finitos, >= 0; discountPct <= 100
+  creativePng: Uint8Array;  // 1080x1080, <= MAX_CREATIVE_PNG_BYTES
+  generatedAtUtc: string;   // ISO 8601 UTC; só dentro do front matter
+  groupLabel: string;       // rótulo de exibição; nunca em caminho
 }
 export type DeliveryResult =
   | { status: "delivered"; ref: string }      // ref: caminho relativo (FileOutbox) ou id da mensagem (WhatsApp)
-  | { status: "failed"; code: string }        // nada entregue; código fixo, nunca mensagem de erro
+  | { status: "failed"; code: string }        // nada confirmado; código fixo, nunca mensagem de erro
   | { status: "unknown"; code: string };      // pode ter entregue (timeout); NUNCA reenviar sozinho
 export interface Channel {
   readonly kind: "file-outbox" | "whatsapp";
@@ -35,26 +41,34 @@ export interface Channel {
 }
 ```
 
+**Fonte única de tempo (B1).** O gerador (T7-B) calcula `day` e `hhmm` **uma vez**, no início da execução, com `getZonedParts(runStartedAt, DEFAULT_TIMEZONE)` de `packages/domain/src/timezone.ts`, e usa o mesmo `Slot` em todas as ofertas da execução. Assim uma execução que cruza a meia-noite grava tudo na pasta do dia em que começou. O `channel` **não calcula tempo**: só valida o formato (`^[0-9]{8}$`, `^[0-9]{4}$`, inteiro 1–99). UTC aparece apenas em `generatedAtUtc` (dentro do arquivo).
+
+**Constantes compartilhadas (B3).** `packages/channel/src/limits.ts` exporta `AFFILIATE_LINK_HOSTS = ["shopee.com.br", "shp.ee", "shope.ee", "s.shopee.com.br"]`, `MAX_LINK_LENGTH = 300` e `MAX_CREATIVE_PNG_BYTES = 5_000_000`, e a função `isAllowedLink` (https, sem credenciais, host exato ou subdomínio). Os valores são cópia de `apps/worker/src/links.ts` e `sql/build-deps.ts`; o `channel` **não importa de `apps/worker`**. Um teste de paridade em `apps/worker/tests/` (que importa os dois lados) falha se os valores divergirem.
+
 `unknown` reaproveita a regra de `packages/domain/src/unknown-result.ts`: resultado incerto não é reenviado. O FileOutbox quase nunca o produz; existe para o WhatsApp.
 
 **FileOutbox** (agora):
 
 ```
-outbox/                       raiz: OUTBOX_DIR (padrão ./outbox); caminho resolvido e checado
-  2026-10-16/                 dia no fuso America/Cuiaba; horários dentro dos arquivos em UTC
-    index.md                  tabela do dia, reconstruída listando a pasta (derivado, não é estado)
-    1432-123456789.md         texto pronto para copiar + front matter
-    1432-123456789.png        criativo ao lado
+outbox/                                  raiz: OUTBOX_DIR (padrão ./outbox); `outbox/` entra no .gitignore já neste PR
+  20261016/                              slot.day
+    index.md                             tabela do dia, reconstruída listando a pasta (derivado, não é estado)
+    1432-123456789-g1.md                 <hhmm>-<itemId>-g<groupIndex>; marcador de "entregue"
+    1432-123456789-g1.png                criativo ao lado
 ```
 
+`slotKey` = `<day>/<hhmm>-<itemId>-g<groupIndex>`: é, ao mesmo tempo, a chave de idempotência e o caminho (sem extensão). Dois grupos com o mesmo item no mesmo minuto geram **dois** arquivos (`-g1`, `-g2`).
+
 Regras do adaptador (viram testes hostis):
-1. **Nome de arquivo só de campos controlados**: `HHMM` + `itemId` numérico. Título, grupo e qualquer texto da Shopee nunca entram em caminho (sem `../`, sem separador, sem Unicode estranho).
-2. **Escrita atômica** (`tmp` + `rename`), diretório `0700`, arquivos `0600`. A raiz resolvida tem de ficar dentro de `OUTBOX_DIR`; symlink na pasta do dia é recusado.
-3. **Idempotência**: se o `.md` do `slotKey` já existe, devolve `delivered` com o mesmo `ref` e não reescreve. Isso evita duplicata por reexecução do mesmo slot, sem guardar nada além dos arquivos. (Não substitui antirrepetição de 7 dias, que está adiada.)
-4. **Front matter por `JSON.stringify`** (YAML válido); título é texto externo: remove controles/quebras, teto de 500 caracteres, `[ ] < >` e `---` escapados. Um título hostil não pode fechar o front matter nem forjar linha da tabela do `index.md`.
-5. **Link**: `https` e host na allowlist da Shopee (mesma de `links.ts`) antes de escrever; resposta da API é dado, não instrução.
-6. **Sem segredo na outbox**: App ID, Secret, header de assinatura e corpo bruto da API nunca são gravados. O `.md` leva só o que o grupo veria.
-7. PNG limitado a `maxImageBytes` já existente; extensão e assinatura PNG conferidas.
+1. **Nome de arquivo só de campos controlados** (`day`, `hhmm`, `itemId`, `groupIndex` validados por regex). Título, rótulo do grupo e qualquer texto da Shopee nunca entram em caminho.
+2. **Raiz e permissões**: a raiz resolvida tem de estar dentro de `OUTBOX_DIR`; pasta `0700`, arquivos `0600`; symlink na pasta do dia (ou em qualquer arquivo do slot) é recusado.
+3. **Ordem de escrita e marcador de commit (B2)**: (a) grava o PNG em `.<nome>.<pid>.png.tmp` e faz `rename` para o nome final (sobrescrever PNG órfão é permitido: o criativo é função determinística da oferta); (b) **por último**, grava o `.md` em `.<nome>.<pid>.md.tmp` e publica com `link(tmp, final)` + `unlink(tmp)`, que **falha com `EEXIST` se o `.md` já existir** (sem sobrescrita silenciosa). O `.md` é o único marcador de "entregue".
+4. **Idempotência e corrida**: antes de qualquer escrita, se o `.md` do slot existe, devolve `delivered` com o mesmo `ref` sem tocar em nada. Se duas execuções passam na checagem ao mesmo tempo, `link` deixa **um** vencedor; o perdedor recebe `EEXIST` e devolve `delivered` com o `ref` do vencedor. PNG sem `.md` (falha entre os passos) **não** é "entregue": a reexecução regrava o PNG e o `.md`. Falha no PNG → `failed` `escrita_png`; falha no `.md` → `failed` `escrita_md`; o PNG órfão é inofensivo e o `index.md` lista só slots com `.md`. A idempotência vale **dentro do mesmo minuto** (o `hhmm` faz parte da chave); reexecução um minuto depois grava outro slot — não é proteção de antirrepetição.
+5. **Texto externo neutralizado (título e `text`)**: remove controles C0/C1, `\r`, `\n` (vira espaço), U+2028 e U+2029, U+202A–U+202E e U+2066–U+2069; teto de 500 caracteres para o título; escapa `\`, `` ` ``, `|`, `[`, `]`, `<`, `>`, `*`, `_` e linhas que comecem com `---`, `#` ou `>`. O mesmo vale para o trecho do título dentro do corpo do `.md` e para a célula do `index.md` (a tabela só tem `|` nossos). Front matter por `JSON.stringify` **após** remover U+2028/U+2029 (alguns parsers YAML os tratam como quebra de linha).
+6. **Link**: `isAllowedLink(affiliateLink, AFFILIATE_LINK_HOSTS)` antes de qualquer escrita; falha → `failed` `link_invalido`.
+7. **Números**: `priceCurrent`, `priceOld`, `discountPct` precisam ser finitos e ≥ 0, `discountPct ≤ 100`; senão `failed` `oferta_invalida` (NaN/Infinity/negativo nunca viram texto copiável).
+8. **PNG**: ≤ `MAX_CREATIVE_PNG_BYTES` e assinatura PNG (`89 50 4E 47 0D 0A 1A 0A`); senão `failed` `png_invalido`.
+9. **Sem segredo na outbox**: App ID, Secret, header de assinatura e corpo bruto da API nunca são gravados. Temporários (`.`-prefixados) são ignorados pelo `index.md`.
 
 **Adaptador WhatsApp (depois, não agora)**: implementa o mesmo `Channel`; o resto do pipeline não muda. Antes de ligar, condições de entrada: (a) Aurimar autoriza o primeiro envio real (regra já declarada); (b) antirrepetição e limite de ritmo existem de alguma forma, porque sem eles um erro repete mensagens num grupo real; (c) escolha do transporte registrada em decisão: automação não oficial de WhatsApp costuma violar termos e arrisca banir o número, e a API oficial pode não cobrir envio a grupo (confirmar na documentação antes de decidir).
 
@@ -68,12 +82,20 @@ Princípio: **isolar, não apagar** (histórico fica no git e no repo). "Dorment
 | `apps/worker/src/{offer-selection,links,image}.ts` (seleção, host de link, downloader seguro de imagem) | **Mantém e reaproveita** | base do gerador novo |
 | `apps/worker/src/executor.ts`, `ports.ts`, `runtime.ts`, `main.ts`, `heartbeat*`, `scheduler*` | **Dormente** | acoplados a `ClaimedSend`, lease, `finish_send`, Telegram |
 | `apps/worker/src/sql/*`, `validation/*`, `commission-job.ts` | **Dormente** | Postgres, Vault, validação de token |
-| `packages/telegram` | **Dormente** | sai das dependências de `apps/worker` e `apps/web` |
-| `packages/alerts` (e-mail) | **Dormente** | substituído por resumo no terminal e código de saída |
+| `packages/telegram` | **Dormente** | fora do `typecheck`/`test` padrão (filtro do pnpm); dependências **permanecem** em `package.json` para a suíte dormente continuar rodando |
+| `packages/alerts` (e-mail) | **Dormente** | idem; substituído por resumo no terminal e código de saída |
 | `packages/commission` | **Núcleo puro mantém; `sql/` dormente** | coleta adiada (§4) |
-| `supabase/` (migrações, testes de banco) | **Dormente, intacto** | jobs de banco da CI viram `workflow_dispatch` ou saem do caminho padrão |
+| `supabase/` (migrações, testes de banco) | **Dormente, intacto** | job de banco sai da CI padrão e roda no workflow dormente (abaixo) |
 | `apps/web/src/server/supabase/*`, `realtime*`, `telegram-gateway.ts`, `/conexoes` | **Dormente** | o web já tem container em memória (`server/memory.ts`); passa a ser o único usado |
 | Vault, RLS, Realtime | **Dormente** | credencial Shopee passa a vir de variável de ambiente |
+
+**Como o dormente é isolado sem apagar e sem apodrecer (B3).** Mecanismo único, executado na T7-C:
+- **Dependências não são removidas** de nenhum `package.json`: o código dormente continua compilando e testável.
+- `apps/worker/tsconfig.json` ganha `exclude` com: `src/executor.ts`, `src/ports.ts`, `src/runtime.ts`, `src/main.ts`, `src/bin.ts`, `src/index.ts`, `src/heartbeat*.ts`, `src/scheduler*.ts`, `src/memory-store.ts`, `src/commission-job.ts`, `src/deadline.ts`, `src/timeouts.ts`, `src/config.ts`, `src/sql/**`, `src/validation/**`. Ficam no caminho ativo: `offer-selection.ts`, `links.ts`, `image.ts`, `logger.ts` e a pasta nova `gerar/`.
+- `apps/worker/vitest.config.ts` ganha `exclude` para os testes correspondentes (hoje 339 testes no worker, a maioria dormente). Os testes ativos continuam: `offer-selection`, `links`, `image`, `logger`, `gerar/**` e a paridade de constantes.
+- **Se um arquivo ativo importar um excluído, a T7-C para e avisa o Planejador** (não improvisa, não move código).
+- Raiz: `typecheck` e `test` passam a usar `pnpm -r --filter '!@achadinhos/telegram' --filter '!@achadinhos/alerts'`; `packages/commission/src/sql/**` sai por `exclude`; `apps/web` segue na CI padrão até a T8-A.
+- **Revalidação do dormente**: configs `tsconfig.dormente.json`/`vitest.dormente.config.ts` (sem os `exclude`) e o workflow `.github/workflows/dormente.yml` com `workflow_dispatch` **e** `schedule` semanal, rodando typecheck e a suíte dormente (o job de banco `supabase test db` entra aqui). Falha do workflow dormente não bloqueia PR, mas aparece no painel. Assim o dormente apodrece com alarme, e o README deixa de ser a única defesa (R5).
 
 **Segredos sem Vault**: `SHOPEE_APP_ID` e `SHOPEE_SECRET` só em `.env` (gitignored, modo 0600) ou no ambiente do shell. O logger com redação continua obrigatório; a sonda e o gerador seguem o allowlist de saída do PR #41/#42. Perde-se a separação "só o worker lê o segredo": como é uso próprio e local, o risco aceito é "quem lê a máquina lê o `.env`". Registrar isso em `docs/security-checklist.md` quando o item 2 fechar.
 
@@ -108,7 +130,7 @@ Itens 1, 5 e 9 não mudam.
 | 6 | Agendador por minuto | **Adiado** | — | adiado |
 | 7 | Antirrepetição 7 dias | **Adiado**; dedupe só dentro do lote | Lote nunca repete `item_id` | adiado (parte em memória em T7-B) |
 | 8 | Fila/ritmo/teto 200 | **Adiado**; teto por execução | `--limite` máx. 50 respeitado | adiado |
-| 10 | Mandar agora (e2e simulada) | **Gerar agora** (CLI → outbox) | E2E com Shopee simulada: N ofertas → N pares `.md`/`.png` + índice; reexecução do mesmo slot não duplica | pendente (T7-B); é o item central |
+| 10 | Mandar agora (e2e simulada) | **Gerar agora** (CLI → outbox) | E2E com Shopee simulada: N ofertas → N pares `.md`/`.png` + índice; reexecução **no mesmo minuto** não duplica (um minuto depois grava outro slot: isto não é antirrepetição) | pendente (T7-B); é o item central |
 | 11 | Envios: cards, 30 dias, Realtime | `index.md` do dia | Índice lista as entregas do dia e resiste a título hostil | coberto por T7-A |
 | 12 | Comissão a cada 6 h | **Adiado** | — | adiado |
 | 13 | Alertas por e-mail | **Adiado**; resumo no terminal e exit code | Execução com falha sai ≠ 0 | coberto por T7-B |
@@ -118,11 +140,11 @@ Itens 1, 5 e 9 não mudam.
 
 Cada tarefa: worktree e branch próprios, PR pequeno, `TASKS.md` → `em_revisao` com PR e evidência, **sem chamada real à Shopee** (só servidor simulado), segredos nunca em log/PR. Instruções explícitas para modelo menor: não mexer em arquivos fora da lista, não apagar nada dormente, rodar `pnpm typecheck && pnpm test` antes do PR.
 
-**T7-A — `packages/channel` (interface + FileOutbox)**. Cria o pacote com os tipos do §1 e o adaptador. Arquivos: só `packages/channel/**` e uma linha em `pnpm-workspace`/`.gitignore` (`outbox/`). Aceite: testes para (1) título com `../`, `\n`, `---`, `|`, `[x](http://...)`, 10 000 caracteres e emoji; (2) `itemId` não numérico recusado; (3) link fora da allowlist recusado; (4) mesmo `slotKey` duas vezes → um arquivo só; (5) arquivo `0600`, pasta `0700`; (6) symlink na pasta do dia recusado; (7) `index.md` correto após 3 entregas, com título hostil.
+**T7-A — `packages/channel` (interface + FileOutbox)**. Cria o pacote com os tipos do §1 e o adaptador. Arquivos: só `packages/channel/**` (a linha `outbox/` do `.gitignore` já vem deste PR de plano). Entrega `limits.ts` (§1) e o adaptador. Aceite: testes para (1) título com `../`, `\n`, `---`, `|`, `[x](http://...)`, 10 000 caracteres e emoji; (2) `itemId` não numérico recusado; (3) link fora da allowlist recusado; (4) mesmo `slotKey` duas vezes → um arquivo só; (5) arquivo `0600`, pasta `0700`; (6) symlink na pasta do dia recusado; (7) `index.md` correto após 3 entregas, com título hostil (`|`, crase, U+2028/U+2029, `---`); (8) **dois grupos, mesmo item e mesmo minuto → 2 arquivos** (`-g1`, `-g2`); (9) `Slot` cruzando a virada de dia: duas ofertas da mesma execução ficam na mesma pasta; (10) **falha forçada após o PNG e antes do `.md`** → `failed`, reexecução conclui e só então há `.md`; (11) **duas gravações concorrentes do mesmo slot** → um `.md`, um vencedor, ambas respondem `delivered` com o mesmo `ref`; (12) `NaN`, `Infinity`, negativo e `discountPct` > 100 recusados; (13) PNG sem assinatura ou acima do limite recusado; (14) `.md` já existente nunca é sobrescrito.
 
-**T7-B — gerador e CLI `pnpm outbox:gerar`**. Em `apps/worker/src/gerar/`: função pura com portas (`OfferSource`, `ShortLinker`, `ImageFetcher`, `RenderCreative`, `Channel`), reaproveitando `offer-selection.ts`, `links.ts`, `image.ts` e `@achadinhos/creative`. Dedupe só do lote; `--limite`; sem laço/retry; saída conforme §3. Aceite: e2e com o servidor Shopee simulado (N ofertas → N pares + índice; uma falha de imagem não derruba as outras; exit code); teste de que nenhum arquivo nem linha de log contém o Secret.
+**T7-B — gerador e CLI `pnpm outbox:gerar`**. Em `apps/worker/src/gerar/`: função pura com portas (`OfferSource`, `ShortLinker`, `ImageFetcher`, `RenderCreative`, `Channel`), reaproveitando `offer-selection.ts`, `links.ts`, `image.ts` e `@achadinhos/creative`. Calcula o `Slot` **uma vez** por execução (§1) e importa `AFFILIATE_LINK_HOSTS`/`MAX_CREATIVE_PNG_BYTES` de `@achadinhos/channel`. Dedupe só do lote; `--limite`; sem laço/retry; saída conforme §3. Inclui o teste de paridade de constantes com `apps/worker/src/links.ts` e `sql/build-deps.ts`. Aceite: e2e com o servidor Shopee simulado (N ofertas → N pares + índice; uma falha de imagem não derruba as outras; exit code); teste de que nenhum arquivo nem linha de log contém o Secret.
 
-**T7-C — isolar o dormente**. Remove dependências de `packages/telegram`/`alerts` de `apps/worker` e `apps/web` (`package.json`), tira jobs de banco da CI padrão, adiciona `README.md` "DORMENTE: ver docs/plans/escopo-sem-supabase-telegram.md" em cada pasta do §2. **Não apaga arquivo nenhum.** Aceite: `pnpm install && pnpm typecheck && pnpm test` verdes sem Docker e sem Supabase CLI; `git diff --stat` sem deleções de código.
+**T7-C — isolar o dormente**. Segue **exatamente** o mecanismo do §2 ("Como o dormente é isolado"): `exclude` no `tsconfig` e no `vitest` do worker, filtros do `pnpm` na raiz, configs e workflow dormentes, README "DORMENTE: ver docs/plans/escopo-sem-supabase-telegram.md" em cada pasta listada, e aviso de "suspenso/desatualizado" no topo de `prd.md`, `deploy.md` e das decisões 001 e 003 (sem apagar o texto). **Não remove dependência nenhuma nem apaga arquivo.** Aceite: `pnpm install && pnpm typecheck && pnpm test` verdes sem Docker e sem Supabase CLI; o workflow dormente roda verde (`workflow_dispatch`) com a suíte completa; `git diff --stat` sem deleções de código; a contagem de testes do worker antes/depois está no PR (ativos + dormentes = total anterior).
 
 **T7-D — automações por arquivo (só depois da resposta 1 do §7)**. `config/automacoes.json` (sem segredo, versionado ou não conforme a resposta), carregado e validado por `packages/domain/src/automation.ts` (limite 5, filtros). Aceite: arquivo inválido falha fechado com código fixo; 6ª automação recusada.
 
