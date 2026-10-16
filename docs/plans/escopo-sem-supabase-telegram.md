@@ -80,7 +80,7 @@ Princípio: **isolar, não apagar** (histórico fica no git e no repo). "Dorment
 |---|---|---|
 | `packages/shopee`, `packages/creative`, `packages/domain` (estimativa, fuso, filtros, `unknown-result`) | **Mantém, é o núcleo** | `shopee` testado só contra o servidor simulado até o diagnóstico do 10010 (PR #42) |
 | `apps/worker/src/{offer-selection,links,image}.ts` (seleção, host de link, downloader seguro de imagem) | **Mantém e reaproveita** | base do gerador novo |
-| `apps/worker/src/executor.ts`, `ports.ts`, `runtime.ts`, `main.ts`, `heartbeat*`, `scheduler*` | **Dormente** | acoplados a `ClaimedSend`, lease, `finish_send`, Telegram |
+| `apps/worker/src/executor.ts`, `ports.ts`, `runtime.ts`, `main.ts`, `heartbeat*`, `scheduler.ts` (não `scheduler-ports.ts`) | **Dormente** | acoplados a `ClaimedSend`, lease, `finish_send`, Telegram |
 | `apps/worker/src/sql/*`, `validation/*`, `commission-job.ts` | **Dormente** | Postgres, Vault, validação de token |
 | `packages/telegram` | **Dormente** | fora do `typecheck`/`test` padrão (filtro do pnpm); dependências **permanecem** em `package.json` para a suíte dormente continuar rodando |
 | `packages/alerts` (e-mail) | **Dormente** | idem; substituído por resumo no terminal e código de saída |
