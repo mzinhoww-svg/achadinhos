@@ -22,7 +22,7 @@ import {
 import type { DiagResponseInput } from "./diag-allowlist.js";
 
 const APP_ID = "12345678901";
-const SECRET = "abcdef0123456789abcdef0123456789";
+const SECRET = "test-secret";
 const SECRETS = [APP_ID, SECRET];
 
 const BASE: DiagResponseInput = {
