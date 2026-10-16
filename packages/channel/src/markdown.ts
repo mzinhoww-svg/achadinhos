@@ -1,4 +1,10 @@
-import { MAX_TITLE_LENGTH, sanitizeText, sanitizeTitle, stripLineSeparators, truncateCodepoints } from "./sanitize";
+import {
+  MAX_TITLE_LENGTH,
+  neutralizeExternal,
+  sanitizeTitle,
+  stripLineSeparators,
+  truncateCodepoints,
+} from "./sanitize";
 import type { OutboundOffer } from "./types";
 
 /** Controles, separadores Unicode e bidi que não podem sobreviver dentro do artefato. */
@@ -16,18 +22,42 @@ function formatPrice(value: number): string {
   return `R$ ${value.toFixed(2)}`;
 }
 
+/** Maior sequência contígua de crases no valor. */
+function longestBacktickRun(value: string): number {
+  let longest = 0;
+  let current = 0;
+  for (const char of value) {
+    current = char === "`" ? current + 1 : 0;
+    if (current > longest) longest = current;
+  }
+  return longest;
+}
+
+/**
+ * Mensagem pronta para copiar: neutralizada (controles, separadores, bidi) mas **sem escape** de
+ * markdown, dentro de um bloco cercado por crases. O fence tem `maior sequência de crases do texto + 1`
+ * (mínimo 3), então `*negrito*`, `_itálico_` e crases saem literais sem fechar o bloco.
+ */
+export function renderTextBlock(rawText: string): string {
+  const text = neutralizeExternal(rawText);
+  const fence = "`".repeat(Math.max(3, longestBacktickRun(text) + 1));
+  return [fence, text, fence].join("\n");
+}
+
 /**
  * Artefato `.md` de um slot: front matter JSON (uma linha, U+2028/U+2029 removidos) como dado
  * legível por máquina, e corpo markdown com o texto externo já neutralizado.
  */
 export function renderOfferMarkdown(offer: OutboundOffer, slotKey: string): string {
+  // Regra 6: o link gravado em qualquer lugar do `.md` é o normalizado, nunca o texto cru recebido.
+  const affiliateLink = normalizeAffiliateLink(offer.affiliateLink);
   const frontMatter = stripLineSeparators(
     JSON.stringify({
       slot: { day: offer.slot.day, hhmm: offer.slot.hhmm, groupIndex: offer.slot.groupIndex },
       itemId: offer.itemId,
       // título cru (o JSON cuida da citação); limitado para não inflar o arquivo. Quem exibe, sanitiza.
       title: truncateCodepoints(offer.title, MAX_TITLE_LENGTH),
-      affiliateLink: offer.affiliateLink,
+      affiliateLink,
       priceCurrent: offer.priceCurrent,
       priceOld: offer.priceOld,
       discountPct: offer.discountPct,
@@ -39,11 +69,11 @@ export function renderOfferMarkdown(offer: OutboundOffer, slotKey: string): stri
   const body = [
     `# ${sanitizeTitle(offer.title)}`,
     "",
-    normalizeAffiliateLink(offer.affiliateLink),
+    affiliateLink,
     "",
     `${formatPrice(offer.priceCurrent)} (era ${formatPrice(offer.priceOld)}) — ${offer.discountPct}% de desconto`,
     "",
-    sanitizeText(offer.text),
+    renderTextBlock(offer.text),
     "",
     `- slot: ${slotKey}`,
     `- grupo: ${sanitizeTitle(offer.groupLabel)}`,

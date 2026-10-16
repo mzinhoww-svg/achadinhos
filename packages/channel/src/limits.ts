@@ -1,8 +1,10 @@
 /**
- * Constantes compartilhadas (B3). Os valores são cópia de `apps/worker/src/links.ts`
- * (`DEFAULT_SHOPEE_LINK_HOSTS`, `MAX_LINK_LENGTH`) e de `apps/worker/src/sql/build-deps.ts`
- * (`MAX_IMAGE_BYTES`). O `channel` NÃO importa de `apps/worker`; a paridade é garantida por um
- * teste em `apps/worker/tests/` (T7-B) que importa os dois lados.
+ * Constantes compartilhadas (B3). `AFFILIATE_LINK_HOSTS` e `MAX_LINK_LENGTH` são cópia de
+ * `apps/worker/src/links.ts` (ativo); a paridade é garantida por `apps/worker/tests/paridade.test.ts`
+ * (T7-B), que importa os dois lados e compara hosts, `MAX_LINK_LENGTH` e o resultado de `isAllowedLink`.
+ * `MAX_CREATIVE_PNG_BYTES = 5_000_000` é o valor de `MAX_IMAGE_BYTES` em `apps/worker/src/sql/build-deps.ts`,
+ * que é dormente e não exportado — **não há paridade para ele**: o `channel` passa a ser a fonte.
+ * O `channel` NÃO importa de `apps/worker`.
  */
 
 /** Hosts de afiliado/produto da Shopee (decisão 004). */

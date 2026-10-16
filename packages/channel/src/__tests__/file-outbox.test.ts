@@ -95,6 +95,37 @@ describe("§1 T7-A FileOutbox", () => {
     expect(md).not.toContain("a".repeat(600));
   });
 
+  it("(texto) mensagem vai em bloco cercado, sai literal e não fecha o bloco", async () => {
+    const root = await tmpRoot();
+    const channel = createFileOutbox({ dir: root });
+    const text = "Oferta *x* e _y_ ``` fim";
+    await channel.deliver(makeOffer({ text }), { signal: SIGNAL });
+
+    const md = await readFile(join(root, "20261016", "1432-123456789-g1.md"), "utf8");
+    expect(md).toContain("*x*");
+    expect(md).toContain("_y_");
+    expect(md).not.toContain("\\*x\\*"); // sem escape de markdown no text
+    expect(md).not.toContain("\\_y\\_");
+    // fence = maior sequência de crases do texto (3) + 1 = 4
+    expect(md).toContain("````\nOferta *x* e _y_ ``` fim\n````");
+  });
+
+  it("(link) URL com quebra interna é normalizada no front matter e no corpo", async () => {
+    const root = await tmpRoot();
+    const channel = createFileOutbox({ dir: root });
+    const result = await channel.deliver(makeOffer({ affiliateLink: "https://shopee.com.br/a\nb" }), {
+      signal: SIGNAL,
+    });
+    expect(result.status).toBe("delivered");
+
+    const md = await readFile(join(root, "20261016", "1432-123456789-g1.md"), "utf8");
+    const lines = md.split("\n");
+    const frontMatter = lines.slice(1, lines.indexOf("---", 1)).join("\n");
+    expect(frontMatter).toContain('"affiliateLink":"https://shopee.com.br/ab"');
+    expect(md).toContain("\nhttps://shopee.com.br/ab\n");
+    expect(md).not.toContain("a\\nb");
+  });
+
   it("(1) URL hostil não forja estrutura no .md", async () => {
     const root = await tmpRoot();
     const channel = createFileOutbox({ dir: root });

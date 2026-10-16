@@ -9,6 +9,7 @@ export {
 export {
   renderDayIndex,
   renderOfferMarkdown,
+  renderTextBlock,
   normalizeAffiliateLink,
   type DayIndexRow,
 } from "./markdown";

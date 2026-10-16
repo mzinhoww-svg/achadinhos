@@ -6,6 +6,9 @@ Interface `Channel` + adaptador `FileOutbox` (plano `docs/plans/escopo-sem-supab
 - O canal **não calcula tempo**: recebe o `Slot` (`day`/`hhmm`/`groupIndex`) pronto do gerador (T7-B).
 - `FileOutbox` grava `outbox/<day>/<hhmm>-<itemId>-g<groupIndex>.{png,md}` e um `index.md` derivado.
   O `.md` é o único marcador de "entregue"; o `.png` vem antes e pode ficar órfão.
+- `text` (mensagem pronta para copiar) vai num bloco de código cercado (fence = maior sequência de
+  crases + 1, mínimo 3), sem escape de `*`/`_`; o título e a célula do `index.md` são escapados.
+  O link gravado no front matter e no corpo é sempre o normalizado (`new URL(...).href`).
 
 ```ts
 import { createFileOutbox } from "@achadinhos/channel";
