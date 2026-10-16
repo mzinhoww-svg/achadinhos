@@ -11,6 +11,7 @@ import {
 } from "../errors.js";
 import {
   ERROR_WITHOUT_CODE,
+  INVALID_CODE,
   UNKNOWN_ERROR_CODE,
   formatLiveCheck,
   runOfferLiveCheck,
@@ -120,5 +121,46 @@ describe("runOfferLiveCheck", () => {
     expect(formatLiveCheck({ resultado: "sucesso", codigo: "OK", contagem: 1 })).toBe(
       "resultado=sucesso\ncodigo=OK\ncontagem=1",
     );
+  });
+
+  it("descarta código hostil vindo da resposta da Shopee (B1 do QA)", async () => {
+    const hostis = [
+      "10010\nresultado=sucesso\ncodigo=OK\ncontagem=1",
+      "A".repeat(5000),
+      "SHA256 Credential=abc, Signature=def",
+      "10020 com espaço",
+      "10010\t10020",
+    ];
+
+    for (const codigo of hostis) {
+      const result = await runOfferLiveCheck(
+        failingClient(new ShopeeGraphQLError("graphql", codigo)),
+      );
+
+      expect(result.codigo).toBe(INVALID_CODE);
+      const impresso = formatLiveCheck(result);
+      expect(impresso.split("\n")).toHaveLength(3);
+      expect(impresso).toBe(`resultado=falha\ncodigo=${INVALID_CODE}\ncontagem=0`);
+    }
+  });
+
+  it("exige formato seguro no código: até 32 caracteres de [A-Za-z0-9_-]", async () => {
+    const casos: { codigo: string | undefined; esperado: string }[] = [
+      { codigo: "10020", esperado: "10020" },
+      { codigo: "HTTP_403", esperado: "HTTP_403" },
+      { codigo: "A".repeat(32), esperado: "A".repeat(32) },
+      { codigo: "A".repeat(33), esperado: INVALID_CODE },
+      { codigo: "", esperado: ERROR_WITHOUT_CODE },
+      { codigo: undefined, esperado: ERROR_WITHOUT_CODE },
+      { codigo: "erro de assinatura", esperado: INVALID_CODE },
+      { codigo: "10020;rm -rf", esperado: INVALID_CODE },
+    ];
+
+    for (const { codigo, esperado } of casos) {
+      const result = await runOfferLiveCheck(
+        failingClient(new ShopeeGraphQLError("graphql", codigo)),
+      );
+      expect(result.codigo).toBe(esperado);
+    }
   });
 });

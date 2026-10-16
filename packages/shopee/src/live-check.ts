@@ -14,7 +14,7 @@ export type LiveCheckResult = {
   resultado: "sucesso" | "falha";
   /** Código do erro (`10020`, `HTTP_403`, `TIMEOUT`, …) ou `OK` no sucesso. */
   codigo: string;
-  /** Ofertas recebidas na página: 1 no sucesso, 0 na falha. */
+  /** Ofertas recebidas na página: 0 quando a falha, ou quando a página veio vazia. */
   contagem: number;
 };
 
@@ -24,6 +24,11 @@ export type OfferLiveCheckClient = Pick<ShopeeClient, "productOfferV2">;
 export const LIVE_CHECK_OK_CODE = "OK";
 export const UNKNOWN_ERROR_CODE = "ERRO_DESCONHECIDO";
 export const ERROR_WITHOUT_CODE = "ERRO";
+/** Código presente mas fora de formato seguro: nunca vai ao terminal como veio. */
+export const INVALID_CODE = "CODIGO_INVALIDO";
+
+/** Só isto pode ser impresso: nada de quebra de linha, espaço, vírgula ou tamanho livre. */
+const SAFE_CODE = /^[A-Za-z0-9_-]{1,32}$/;
 
 export async function runOfferLiveCheck(
   client: OfferLiveCheckClient,
@@ -38,13 +43,21 @@ export async function runOfferLiveCheck(
 
 /**
  * Status HTTP prevalece (429/5xx não são credencial ruim); senão o código que o
- * cliente já derivou. Erro fora da taxonomia vira `ERRO_DESCONHECIDO` — a
- * mensagem original fica de fora de propósito.
+ * cliente já derivou — **validado antes de sair**: `extensions.code` é resposta
+ * da Shopee, e resposta é dado, não texto de terminal (`live-check.test.ts`
+ * injeta `\n`, texto de assinatura e 5000 caracteres). Sem código, `ERRO`; com
+ * código fora de `^[A-Za-z0-9_-]{1,32}$`, `CODIGO_INVALIDO`. A mensagem do erro
+ * nunca entra no resultado.
  */
 export function liveCheckErrorCode(error: unknown): string {
   if (error instanceof ShopeeHttpError) return `HTTP_${error.status}`;
-  if (error instanceof ShopeeError) return error.code ?? ERROR_WITHOUT_CODE;
+  if (error instanceof ShopeeError) return safeCode(error.code);
   return UNKNOWN_ERROR_CODE;
+}
+
+function safeCode(code: string | undefined): string {
+  if (code === undefined || code === "") return ERROR_WITHOUT_CODE;
+  return SAFE_CODE.test(code) ? code : INVALID_CODE;
 }
 
 /** Três linhas, nessa ordem, e nada mais. */
