@@ -1,0 +1,43 @@
+name: dormente
+
+# Revalidação do código dormente (ver docs/plans/escopo-sem-supabase-telegram.md §2).
+# Não roda em pull_request de propósito: falha aqui NÃO bloqueia PR (ela aparece no painel).
+# Roda sob demanda e semanalmente.
+on:
+  workflow_dispatch:
+  schedule:
+    # Semanal: toda segunda-feira às 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+jobs:
+  revalidar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm install --frozen-lockfile=false
+
+      # Typecheck do caminho padrão dos pacotes (menos o web, que segue na CI padrão até a T8-A)
+      # somado aos configs dormentes do worker e da commission (sem os `exclude`).
+      - run: pnpm -r --if-present --filter '!@achadinhos/web' typecheck
+      - run: pnpm --filter @achadinhos/worker exec tsc --noEmit -p tsconfig.dormente.json
+      - run: pnpm --filter @achadinhos/commission exec tsc --noEmit -p tsconfig.dormente.json
+
+      # Suíte dormente: telegram, alerts e as suítes completas do worker e da commission.
+      - run: pnpm -r --if-present --filter '!@achadinhos/web' test
+      - run: pnpm --filter @achadinhos/worker exec vitest run --config vitest.dormente.config.ts
+      - run: pnpm --filter @achadinhos/commission exec vitest run --config vitest.dormente.config.ts
+
+  banco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - run: supabase test db --local
+      - if: always()
+        run: supabase stop --no-backup

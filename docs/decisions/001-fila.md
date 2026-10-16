@@ -1,3 +1,7 @@
+> **SUSPENSO / DESATUALIZADO (2026-10-16).** A fila SQL (tabela `sends` + `SKIP LOCKED`) está
+> suspensa pelo escopo sem persistência (`docs/plans/escopo-sem-supabase-telegram.md`, §2 e §4).
+> O texto e o parecer abaixo ficam preservados como histórico; nada foi apagado.
+
 # 001 — Fila de envios
 Status: aceita com ajustes (parecer do Planejador em 2026-10-13: ver final do arquivo; ajustes A1–A9 viram requisitos de T2/F2)
 ## Opções

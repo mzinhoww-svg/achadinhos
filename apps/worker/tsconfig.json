@@ -18,5 +18,23 @@
     "declaration": true
   },
   "include": ["src"],
-  "exclude": ["tests", "node_modules", "dist"]
+  "exclude": [
+    "tests",
+    "node_modules",
+    "dist",
+    "src/executor.ts",
+    "src/ports.ts",
+    "src/runtime.ts",
+    "src/main.ts",
+    "src/bin.ts",
+    "src/index.ts",
+    "src/heartbeat*.ts",
+    "src/scheduler.ts",
+    "src/memory-store.ts",
+    "src/commission-job.ts",
+    "src/timeouts.ts",
+    "src/config.ts",
+    "src/sql/**",
+    "src/validation/**"
+  ]
 }
