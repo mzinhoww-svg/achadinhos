@@ -25,11 +25,13 @@ import { sign } from "../packages/shopee/src/index.js";
 import {
   D0_QUERY,
   DEGRAU_D0,
+  DEGRAU_NENHUM,
   MAX_BODY_BYTES,
   buildDiagBody,
   assertAllowedEndpoint,
   diagClock,
   formatDiagReport,
+  readBodyLimited,
   summarizeDiag,
 } from "./diag-allowlist.js";
 import type { DiagReport } from "./diag-allowlist.js";
@@ -39,10 +41,11 @@ const ENV_FILE = join(ROOT, ".env");
 const DEFAULT_ENDPOINT = "https://open-api.affiliate.shopee.com.br/graphql";
 const TIMEOUT_MS = 20_000;
 
+/** Recusa local: nenhum degrau rodou, por isso `degrau=-`. */
 function refusal(codigo: string, startedAtMs: number): DiagReport {
   const localMs = Date.now();
   return {
-    degrau: DEGRAU_D0,
+    degrau: DEGRAU_NENHUM,
     codigo,
     contagem: 0,
     duracao_ms: Math.max(0, Math.round(localMs - startedAtMs)),
@@ -57,18 +60,26 @@ function loadEnvFile(): void {
   process.loadEnvFile(ENV_FILE);
 }
 
-function readDegrau(argv: string[]): string | null {
+/**
+ * `--degrau D0`, exatamente uma vez. Ausente, repetido ou diferente de D0 é
+ * recusa local (sem envio) e o valor recebido nunca é ecoado.
+ */
+function readDegrau(argv: string[]): { ok: boolean; codigo: string } {
+  const marcadores = argv.filter((arg) => arg === "--degrau");
+  if (marcadores.length > 1) return { ok: false, codigo: "ARGUMENTO_REPETIDO" };
   const index = argv.indexOf("--degrau");
-  if (index === -1) return null;
-  return argv[index + 1] ?? null;
+  if (index === -1) return { ok: false, codigo: "DEGRAU_NAO_AUTORIZADO" };
+  if (argv[index + 1] !== DEGRAU_D0) return { ok: false, codigo: "DEGRAU_NAO_AUTORIZADO" };
+  return { ok: true, codigo: DEGRAU_D0 };
 }
 
 async function main(): Promise<{ report: DiagReport; exit: number }> {
   const startedAtMs = Date.now();
 
-  if (readDegrau(process.argv.slice(2)) !== DEGRAU_D0) {
+  const degrau = readDegrau(process.argv.slice(2));
+  if (!degrau.ok) {
     // Fail closed: nenhum outro degrau foi autorizado (sem D1–D4).
-    return { report: refusal("DEGRAU_NAO_AUTORIZADO", startedAtMs), exit: 2 };
+    return { report: refusal(degrau.codigo, startedAtMs), exit: 2 };
   }
 
   loadEnvFile();
@@ -109,6 +120,8 @@ async function main(): Promise<{ report: DiagReport; exit: number }> {
           Authorization: `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`,
         },
         body,
+        // Sem seguir redirect: a allowlist de host vale só para o primeiro alvo.
+        redirect: "manual",
         signal: controller.signal,
       });
     } catch {
@@ -122,9 +135,13 @@ async function main(): Promise<{ report: DiagReport; exit: number }> {
     const localMs = Date.now();
     const dateHeader = response.headers.get("date");
 
-    let bodyText: string;
+    let bodyText = "";
+    let bodyTooLarge = false;
     try {
-      bodyText = await response.text();
+      // Leitura em stream com teto: corta e cancela ao estourar.
+      const read = await readBodyLimited(response, MAX_BODY_BYTES);
+      if ("tooLarge" in read) bodyTooLarge = true;
+      else bodyText = read.text;
     } catch {
       return { report: refusal(timedOut ? "TIMEOUT" : "NETWORK", startedAtMs), exit: 1 };
     }
@@ -135,7 +152,7 @@ async function main(): Promise<{ report: DiagReport; exit: number }> {
         status: response.status,
         ok: response.ok,
         bodyText,
-        bodyTooLarge: Buffer.byteLength(bodyText) > MAX_BODY_BYTES,
+        bodyTooLarge,
         dateHeader,
         localMs,
         startedAtMs,

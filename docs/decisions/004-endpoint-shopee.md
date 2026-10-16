@@ -59,20 +59,26 @@ Saída allowlisted do §4 (oito linhas, nada além disso):
 | date_resposta | `2026-10-16T20:48:28.000Z` |
 | delta_date_s | `0` |
 
-### O que fica confirmado
-- **Envelope, assinatura e credencial passam.** A API devolveu `data` (2xx, um campo na raiz) para um corpo
-  assinado com o App ID/Secret do `.env`: o header que o cliente monta
-  (`SHA256 Credential=…, Timestamp=…, Signature=…`), a ordem dos campos e o
-  `SHA256(AppID + Timestamp + Payload + Secret)` sobre a mesma string do corpo são aceitos. Não houve `10020`.
+### O que o D0 mostra — e o que ele não prova
+
+- **Transporte, envelope e assinatura sem `variables` foram aceitos.** A API devolveu `data` (2xx, um campo
+  na raiz) para o corpo `{"query":"{ __typename }"}` assinado com o App ID/Secret do `.env`: o header que o
+  cliente monta (`SHA256 Credential=…, Timestamp=…, Signature=…`), a ordem dos campos e o
+  `SHA256(AppID + Timestamp + Payload + Secret)` sobre a mesma string do corpo passam nesse caminho. Não houve
+  `10020`. **Isso não prova a credencial**: um gateway pode responder meta-campo (`__typename`) antes de
+  autenticar, e o D0 não tem nó de produto para provar acesso. Credencial só se prova com `productOfferV2`
+  devolvendo nós (§5 do plano); o degrau D4 (Secret propositalmente inválido) é que separa "credencial aceita"
+  de "gateway aceitou o envelope".
 - **Relógio**: `delta_date_s = 0` — horário local e `Date` da resposta batem no segundo. A tolerância da
   Shopee segue não delimitada (só se sabe que 0 s de defasagem passa).
 - **A URL** segue confirmada por resposta real (2xx com envelope GraphQL).
-- **O `10010` vem do documento, não do transporte.** Com `{ __typename }` a API respondeu dados; a causa
-  provável passa a ser o documento `productOfferV2` do cliente (9 variáveis tipadas + `variables` + 19 campos)
-  — hipótese 1 do parecer de 2026-10-16.
+- **Causa do `10010` ainda indeterminada.** O D0 só mostrou que o transporte, com um corpo sem `variables`,
+  funciona. Há uma diferença de corpo que ele não separa: a chamada que devolveu `10010` enviava `variables`
+  (com `limit`) e um documento de 9 variáveis tipadas + 19 campos. Seguem em pé: (a) o documento
+  `productOfferV2` (nome de operação, argumentos, campos) e (b) o uso de `variables` no corpo. O D1
+  (`productOfferV2(limit: 1)` inline, 2 campos) e o D2 (`variables` como no cliente) é que decidem.
 - **Item 2 do checklist**: o critério do §5 (uma chamada `productOfferV2` do cliente de produção devolvendo
-  ≥ 1 oferta) **não** foi cumprido, então o item segue aberto — agora com a evidência de que
-  credencial, assinatura e relógio estão aceitos.
+  ≥ 1 oferta) **não** foi cumprido, então o item segue aberto.
 
 ### O que continua desconhecido
 Tipos reais de `priceMin`/comissões (o D0 não pediu nó de produto; §4.6 fica para D1+), formato real do erro

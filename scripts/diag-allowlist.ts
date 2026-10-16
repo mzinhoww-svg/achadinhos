@@ -6,9 +6,15 @@
  * terminal.
  * - `codigo` só sai se casar com `^[A-Za-z0-9_-]{1,32}$`, senão `CODIGO_INVALIDO`
  *   (mesma regra da sonda em `packages/shopee/src/live-check.ts`).
- * - `mensagem` é opcional, vira ASCII imprimível (sem `\n`, `\r`, controle ou
- *   ANSI), tem teto de tamanho e passa por máscara de App ID, Secret, valor de
- *   cabeçalho e token longo.
+ * - `mensagem` **não é redação**: só passa um modelo fixo de erro GraphQL
+ *   (Syntax Error / Unknown argument / Unknown field / Unknown type /
+ *   Variable … of type) e, dentro dele, apenas identificadores que existem no
+ *   nosso próprio documento. Qualquer outra coisa vira
+ *   `MENSAGEM_OMITIDA (tamanho=N)`. App ID, Secret e valor de cabeçalho nunca
+ *   podem aparecer, porque nada além do modelo e desses identificadores é
+ *   impresso (há um cinto extra caso um identificador coincida com um segredo).
+ * - Estado do corpo é lido em stream com teto (`readBodyLimited`), como no
+ *   `ShopeeClient`; passou do teto, vira `BODY_TOO_LARGE`.
  * - Relógio: horário local e cabeçalho `Date` viram UTC + diferença em segundos
  *   (§4.5); `Date` fora do formato RFC 1123 vira `ausente`.
  * - O endpoint passa por allowlist antes de qualquer envio (o Secret nunca vai
@@ -16,6 +22,8 @@
  */
 
 export const DEGRAU_D0 = "D0";
+/** Rótulo de recusa local: nenhum degrau foi executado. */
+export const DEGRAU_NENHUM = "-";
 /** D0: só o tipo da raiz, corpo apenas com `query` (§3). */
 export const D0_QUERY = "{ __typename }";
 
@@ -25,6 +33,7 @@ export const INVALID_CODE = "CODIGO_INVALIDO";
 export const INVALID_JSON_CODE = "INVALID_JSON";
 export const BODY_TOO_LARGE_CODE = "BODY_TOO_LARGE";
 export const NO_DATA_CODE = "SEM_DADOS";
+export const MESSAGE_OMITTED = "MENSAGEM_OMITIDA";
 export const ABSENT = "ausente";
 export const UNAVAILABLE = "indisponivel";
 
@@ -35,10 +44,48 @@ export const MAX_BODY_BYTES = 64 * 1024;
 const SAFE_CODE = /^[A-Za-z0-9_-]{1,32}$/;
 /** `Date` de resposta HTTP: RFC 1123 estrito, sem texto extra. */
 const HTTP_DATE = /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
-/** Valor de campo que carrega segredo no cabeçalho de assinatura. */
-const HEADER_VALUE = /\b(Credential|Signature|Timestamp|Authorization)\s*=\s*\S+/gi;
-/** Corrida longa de caracteres "de token" (hash de assinatura, App ID colado). */
-const LONG_TOKEN = /[A-Za-z0-9+/=_-]{20,}/g;
+const IDENTIFIER = /[A-Za-z_][A-Za-z0-9_]*/g;
+
+/**
+ * Modelos de erro GraphQL que podem ser impressos, com o texto que os rotula.
+ * O que não casa com nenhum deles não é impresso (`MENSAGEM_OMITIDA`).
+ */
+const MESSAGE_MODELS: { label: string; match: RegExp }[] = [
+  { label: "Syntax Error", match: /^Syntax Error\b/ },
+  { label: "Unknown argument", match: /^Unknown argument\b/ },
+  { label: "Unknown field", match: /^Unknown field\b/ },
+  { label: "Unknown type", match: /^Unknown type\b/ },
+  { label: "Variable of type", match: /^Variable\b.*\bof type\b/ },
+];
+
+/**
+ * Identificadores do **nosso** documento (operações, argumentos, campos e tipos
+ * escalares usados em `packages/shopee/src/client.ts` + a sonda D0). Só eles
+ * podem sair junto do modelo; se o cliente mudar, o que sobrar é omitido (falha
+ * fechada). `type`, `field`, `on` e palavras do inglês ficam de fora de propósito.
+ */
+const DOCUMENT_IDENTIFIERS = new Set([
+  // meta e operações
+  "__typename", "query", "mutation", "ProductOfferV2", "productOfferV2",
+  "GenerateShortLink", "generateShortLink", "ConversionReport", "conversionReport",
+  // productOfferV2: argumentos e paginação
+  "keyword", "shopId", "itemId", "listType", "sortType", "page", "limit",
+  "isAMSOffer", "isKeySeller", "nodes", "pageInfo", "hasNextPage",
+  // productOfferV2: campos do nó
+  "productName", "productLink", "offerLink", "imageUrl", "priceMin", "priceMax",
+  "priceDiscountRate", "sales", "ratingStar", "commissionRate", "sellerCommissionRate",
+  "shopeeCommissionRate", "commission", "shopName", "shopType", "periodStartTime",
+  "periodEndTime",
+  // generateShortLink
+  "input", "originUrl", "subIds", "shortLink",
+  // conversionReport
+  "purchaseTimeStart", "purchaseTimeEnd", "orderStatus", "buyerType", "device",
+  "scrollId", "purchaseTime", "clickTime", "conversionId", "totalCommission",
+  "sellerCommission", "shopeeCommissionCapped", "utmContent", "orders", "orderId",
+  "items", "itemName", "itemPrice", "qty", "itemTotalCommission", "attributionType",
+  // tipos escalares citados nas mensagens da API
+  "Int", "String", "Boolean", "Float", "ID",
+]);
 
 const ALLOWED_HOST_SUFFIX = ".shopee.com.br";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -93,31 +140,84 @@ export function sanitizeDiagCode(code: unknown): string {
   return SAFE_CODE.test(code) ? code : INVALID_CODE;
 }
 
-/**
- * Mensagem: máscara primeiro (sobre o texto inteiro, para não deixar metade de
- * token na borda), teto depois. Devolve `null` quando não sobra texto útil.
- */
-export function sanitizeDiagMessage(message: unknown, secrets: readonly string[]): string | null {
-  if (typeof message !== "string" || message.length === 0) return null;
-
+function toPrintableAscii(value: string): string {
   let text = "";
-  for (const char of message) {
+  for (const char of value) {
     const point = char.codePointAt(0) ?? 0;
     text += point >= 0x20 && point <= 0x7e ? char : " ";
   }
-  text = text.replace(/\s+/g, " ").trim();
+  return text.replace(/\s+/g, " ").trim();
+}
 
-  text = text.replace(HEADER_VALUE, (_match, key: string) => `${key}=[REDACTED]`);
-  for (const secret of secrets) {
-    if (secret.length >= 4) text = text.split(secret).join("[REDACTED]");
+function omitted(message: string): string {
+  return `${MESSAGE_OMITTED} (tamanho=${[...message].length})`;
+}
+
+/**
+ * §4.4: a mensagem é opcional e passa por allowlist. Só o modelo fixo e
+ * identificadores do nosso documento saem; o resto é `MENSAGEM_OMITIDA` com o
+ * tamanho original. `null` quando não há mensagem (o relatório imprime
+ * `ausente`).
+ */
+export function sanitizeDiagMessage(message: unknown, secrets: readonly string[] = []): string | null {
+  if (typeof message !== "string" || message.length === 0) return null;
+
+  const flat = toPrintableAscii(message);
+  const model = MESSAGE_MODELS.find((candidate) => candidate.match.test(flat));
+  if (!model) return omitted(message);
+
+  const identifiers = [
+    ...new Set(Array.from(flat.matchAll(IDENTIFIER), (match) => match[0])),
+  ].filter((token) => DOCUMENT_IDENTIFIERS.has(token));
+  let text = identifiers.length > 0 ? `${model.label}: ${identifiers.join(",")}` : model.label;
+
+  // Cinto extra: um identificador nosso jamais deve coincidir com um segredo.
+  if (secrets.some((secret) => secret.length >= 4 && text.includes(secret))) {
+    return omitted(message);
   }
-  text = text.replace(LONG_TOKEN, "[REDACTED]").trim();
 
-  if (text.length === 0) return null;
   if (text.length > MAX_MESSAGE_CHARS) {
-    return `${text.slice(0, MAX_MESSAGE_CHARS).trimEnd()}...`;
+    text = `${text.slice(0, MAX_MESSAGE_CHARS).trimEnd()}...`;
   }
   return text;
+}
+
+export type DiagBodyRead = { text: string } | { tooLarge: true };
+
+/**
+ * Leitura em stream com teto: cancela o stream ao estourar (mesma técnica do
+ * `ShopeeClient.readBodyLimited`), então um servidor que envia lixo sem parar
+ * não enche a memória.
+ */
+export async function readBodyLimited(
+  response: Response,
+  maxBytes: number = MAX_BODY_BYTES,
+): Promise<DiagBodyRead> {
+  const body = response.body;
+  if (!body) {
+    const text = await response.text();
+    return Buffer.byteLength(text) > maxBytes ? { tooLarge: true } : { text };
+  }
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const step = await reader.read();
+      if (step.done) break;
+      total += step.value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        return { tooLarge: true };
+      }
+      chunks.push(step.value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+  return { text: Buffer.concat(chunks).toString("utf8") };
 }
 
 export type DiagClock = {
@@ -159,7 +259,7 @@ export type DiagResponseInput = {
   status: number;
   ok: boolean;
   bodyText: string;
-  /** O chamador já sabe que o corpo passou do teto (evita guardar o corpo inteiro). */
+  /** O chamador já sabe que o corpo passou do teto (o stream foi cortado). */
   bodyTooLarge?: boolean;
   dateHeader: string | null;
   localMs: number;
@@ -180,6 +280,11 @@ export function summarizeDiag(input: DiagResponseInput): DiagReport {
 
   if (input.bodyTooLarge === true || Buffer.byteLength(input.bodyText) > MAX_BODY_BYTES) {
     return { ...base, codigo: BODY_TOO_LARGE_CODE, mensagem: null };
+  }
+
+  // Redirect não seguido (`redirect: "manual"`): nada de segunda requisição.
+  if (input.status >= 300 && input.status < 400) {
+    return { ...base, codigo: `HTTP_${input.status}`, mensagem: null };
   }
 
   let json: unknown;

@@ -9,19 +9,21 @@ import {
   INVALID_CODE,
   INVALID_JSON_CODE,
   MAX_MESSAGE_CHARS,
+  MESSAGE_OMITTED,
   NO_DATA_CODE,
   UNAVAILABLE,
   assertAllowedEndpoint,
   buildDiagBody,
   diagClock,
   formatDiagReport,
+  readBodyLimited,
   sanitizeDiagCode,
   sanitizeDiagMessage,
   summarizeDiag,
 } from "./diag-allowlist.js";
 import type { DiagResponseInput } from "./diag-allowlist.js";
 
-const APP_ID = "12345678901";
+const APP_ID = "APPID123456";
 const SECRET = "test-secret";
 const SECRETS = [APP_ID, SECRET];
 
@@ -82,7 +84,8 @@ describe("sanitizeDiagCode (allowlist do §4.4)", () => {
       "10020;rm -rf",
       { code: 10010 },
       ["10010"],
-    ]) {      expect(sanitizeDiagCode(code)).toBe(INVALID_CODE);
+    ]) {
+      expect(sanitizeDiagCode(code)).toBe(INVALID_CODE);
     }
   });
 
@@ -93,39 +96,87 @@ describe("sanitizeDiagCode (allowlist do §4.4)", () => {
   });
 });
 
-describe("sanitizeDiagMessage (§4.4: ASCII imprimível, sem controle, com teto)", () => {
-  it("preserva a mensagem útil", () => {
-    expect(sanitizeDiagMessage("Parse Error", SECRETS)).toBe("Parse Error");
-    expect(sanitizeDiagMessage("Invalid Signature", SECRETS)).toBe("Invalid Signature");
+describe("sanitizeDiagMessage: modelo fixo + identificadores do nosso documento (B1 do QA)", () => {
+  it("imprime só o modelo e os identificadores conhecidos", () => {
+    expect(sanitizeDiagMessage("Syntax Error: Expected Name, found }", SECRETS)).toBe("Syntax Error");
+    expect(
+      sanitizeDiagMessage('Unknown argument "isKeySeller" on field "productOfferV2"', SECRETS),
+    ).toBe("Unknown argument: isKeySeller,productOfferV2");
+    expect(sanitizeDiagMessage("Unknown field shopType on type ProductOfferV2", SECRETS)).toBe(
+      "Unknown field: shopType,ProductOfferV2",
+    );
+    expect(sanitizeDiagMessage("Unknown type Limit. Did you mean Int?", SECRETS)).toBe(
+      "Unknown type: Int",
+    );
+    expect(sanitizeDiagMessage("Variable $limit of type Int used in position expecting String", SECRETS)).toBe(
+      "Variable of type: limit,Int,String",
+    );
   });
 
-  it("mata quebra de linha, controle e ANSI (nunca duas linhas)", () => {
-    expect(sanitizeDiagMessage("10010\nresultado=sucesso", SECRETS)).toBe("10010 resultado=sucesso");
-    expect(sanitizeDiagMessage("\u001b[31mParse\u001b[0m", SECRETS)).toBe("[31mParse [0m");
-    expect(sanitizeDiagMessage("a\rb\u0000c", SECRETS)).toBe("a b c");
-    expect(sanitizeDiagMessage("\n\t \u0007", SECRETS)).toBeNull();
+  it("fora dos modelos: MENSAGEM_OMITIDA com o tamanho, sem o texto", () => {
+    const variacoes = [
+      "Parse Error",
+      "Invalid Signature",
+      "SECRET S3CRETVALUE99 app appid123456",
+      "%73%33cretVALUE99",
+      "s3cret VALUE99",
+      "A.P.P.I.D.1.2.3.4.5.6",
+      "Signature abc123 rejected for Timestamp 1760000000",
+      "10010\nresultado=sucesso\ncodigo=OK\ncontagem=1",
+      "\u001b[31mParse\u001b[0m",
+      `daqui ${SECRET}`,
+    ];
+    for (const variacao of variacoes) {
+      const saida = sanitizeDiagMessage(variacao, SECRETS);
+      expect(saida, variacao).toBe(`${MESSAGE_OMITTED} (tamanho=${[...variacao].length})`);
+      expect(saida!.split("\n")).toHaveLength(1);
+      for (const sensivel of [APP_ID, SECRET]) expect(saida!, variacao).not.toContain(sensivel);
+    }
   });
 
-  it("mascara valor de cabeçalho, App ID, Secret e token longo", () => {
-    const message = `SHA256 Credential=${APP_ID}, Signature=${SECRET}, Timestamp=1700000000`;
-    const sanitized = sanitizeDiagMessage(message, SECRETS);
-    expect(sanitized).not.toContain(APP_ID);
-    expect(sanitized).not.toContain(SECRET);
-    expect(sanitized).toContain("Credential=[REDACTED]");
-    expect(sanitized).toContain("Signature=[REDACTED]");
-    expect(sanitized).not.toContain("1700000000");
-    expect(sanitizeDiagMessage(`hash ${"a".repeat(64)} fim`, SECRETS)).toBe("hash [REDACTED] fim");
+  it("não deixa passar identificador que coincida com segredo real", () => {
+    expect(sanitizeDiagMessage("Unknown argument limit", ["limit"])).toBe(
+      `${MESSAGE_OMITTED} (tamanho=22)`,
+    );
   });
 
-  it("aplica teto de tamanho e devolve null quando não sobra texto", () => {
-    const longo = sanitizeDiagMessage("palavra ".repeat(200), SECRETS);
-    expect(longo).not.toBeNull();
-    expect(longo!.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS + 3);
-    expect(longo!.endsWith("...")).toBe(true);
-    // Máscara antes do teto: corrida longa não deixa metade de token na borda.
-    expect(sanitizeDiagMessage("m".repeat(5000), SECRETS)).toBe("[REDACTED]");
+  it("respeita o teto de tamanho mesmo com muitos identificadores", () => {
+    const saida = sanitizeDiagMessage(
+      `Unknown field ${"limit ".repeat(200)}on type ProductOfferV2`,
+      SECRETS,
+    );
+    expect(saida!.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS + 3);
+  });
+
+  it("devolve null quando a mensagem está ausente ou não é texto", () => {
     expect(sanitizeDiagMessage(undefined, SECRETS)).toBeNull();
-    expect(sanitizeDiagMessage(42 as unknown, SECRETS)).toBeNull();
+    expect(sanitizeDiagMessage(null, SECRETS)).toBeNull();
+    expect(sanitizeDiagMessage("", SECRETS)).toBeNull();
+    expect(sanitizeDiagMessage(42, SECRETS)).toBeNull();
+  });
+});
+
+describe("readBodyLimited (B2: teto de corpo em stream)", () => {
+  it("lê até o teto", async () => {
+    const body = new Response('{"query":"{ __typename }"}').body!;
+    const read = await readBodyLimited(new Response(body), 1024);
+    expect(read).toEqual({ text: '{"query":"{ __typename }"}' });
+  });
+
+  it("aborta ao passar do teto sem juntar o resto", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < 1000; i += 1) controller.enqueue(new Uint8Array(1024));
+        controller.close();
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const read = await readBodyLimited(new Response(stream), 64 * 1024);
+    expect(read).toEqual({ tooLarge: true });
+    expect(cancelled).toBe(true);
   });
 });
 
@@ -160,17 +211,17 @@ describe("summarizeDiag", () => {
     });
   });
 
-  it("erro GraphQL: código allowlisted, contagem 0 e mensagem saneada", () => {
+  it("erro GraphQL: código allowlisted, contagem 0 e mensagem pelo modelo", () => {
     const report = summarizeDiag({
       ...BASE,
       bodyText: JSON.stringify({ errors: [{ message: "Parse Error", extensions: { code: 10010 } }] }),
     });
     expect(report.codigo).toBe("10010");
     expect(report.contagem).toBe(0);
-    expect(report.mensagem).toBe("Parse Error");
+    expect(report.mensagem).toBe(`${MESSAGE_OMITTED} (tamanho=11)`);
   });
 
-  it("código hostil e mensagem hostil não furassem a saída", () => {
+  it("código hostil e mensagem hostil não furam a saída", () => {
     const report = summarizeDiag({
       ...BASE,
       bodyText: JSON.stringify({
@@ -183,7 +234,7 @@ describe("summarizeDiag", () => {
       }),
     });
     expect(report.codigo).toBe(INVALID_CODE);
-    expect(report.mensagem).not.toContain(SECRET);
+    expect(report.mensagem).toBe(`${MESSAGE_OMITTED} (tamanho=29)`);
     const printed = formatDiagReport(report);
     expect(printed.split("\n")).toHaveLength(8);
     expect(printed).not.toContain(SECRET);
@@ -197,12 +248,20 @@ describe("summarizeDiag", () => {
     expect(summarizeDiag({ ...BASE, bodyText: semCodigo }).codigo).toBe(DIAG_CODE_WITHOUT);
   });
 
+  it("redirect não seguido vira HTTP_3xx, sem ler corpo adiante", () => {
+    for (const status of [301, 302, 307]) {
+      const report = summarizeDiag({ ...BASE, status, ok: false, bodyText: "" });
+      expect(report.codigo).toBe(`HTTP_${status}`);
+      expect(report.mensagem).toBeNull();
+    }
+  });
+
   it("404/500 sem corpo e corpo inválido viram código fixo", () => {
-    expect(summarizeDiag({ ...BASE, status: 404, ok: false, bodyText: "" }).codigo).toBe("INVALID_JSON");
+    expect(summarizeDiag({ ...BASE, status: 404, ok: false, bodyText: "" }).codigo).toBe(INVALID_JSON_CODE);
     expect(summarizeDiag({ ...BASE, status: 500, ok: false, bodyText: "<html>erro</html>" }).codigo).toBe(
       INVALID_JSON_CODE,
     );
-    expect(summarizeDiag({ ...BASE, status: 502, ok: false, bodyText: "x".repeat(70 * 1024) }).codigo).toBe(
+    expect(summarizeDiag({ ...BASE, status: 502, ok: false, bodyText: "", bodyTooLarge: true }).codigo).toBe(
       BODY_TOO_LARGE_CODE,
     );
   });
@@ -221,7 +280,7 @@ describe("formatDiagReport", () => {
         codigo: "10010",
         contagem: 0,
         duracao_ms: 1012,
-        mensagem: "Parse Error",
+        mensagem: "Syntax Error",
         hora_local_utc: "2026-10-16T20:41:12.000Z",
         date_resposta: "2026-10-16T20:41:12.000Z",
         delta_date_s: 0,
@@ -232,7 +291,7 @@ describe("formatDiagReport", () => {
         "codigo=10010",
         "contagem=0",
         "duracao_ms=1012",
-        "mensagem=Parse Error",
+        "mensagem=Syntax Error",
         "hora_local_utc=2026-10-16T20:41:12.000Z",
         "date_resposta=2026-10-16T20:41:12.000Z",
         "delta_date_s=0",
@@ -242,7 +301,7 @@ describe("formatDiagReport", () => {
 
   it("usa marcadores fixos para mensagem e delta ausentes", () => {
     const printed = formatDiagReport({
-      degrau: "D0",
+      degrau: "-",
       codigo: "NETWORK",
       contagem: 0,
       duracao_ms: 30,
@@ -252,6 +311,7 @@ describe("formatDiagReport", () => {
       delta_date_s: null,
     });
     expect(printed.split("\n")).toHaveLength(8);
+    expect(printed).toContain("degrau=-");
     expect(printed).toContain(`mensagem=${ABSENT}`);
     expect(printed).toContain(`delta_date_s=${UNAVAILABLE}`);
   });
