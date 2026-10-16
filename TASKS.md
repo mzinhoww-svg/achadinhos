@@ -12,3 +12,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T9 | Comissão: conversionReport a cada 6 h idempotente (packages/commission) | Balanço | concluida | PR #9 mergeado |
 | T6 | packages/domain: estimativa, janela/fuso, filtros, antirrepetição (MVP 4–7 parte pura) | Compasso | em_revisao | PR #7 aprovado pelo QA; auditoria Farol |
 | T10 | Alertas por e-mail (MVP 13) | Sentinela | em_revisao | PR #8 aprovado pelo QA; auditoria Farol |
+| T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR (a preencher); D0 = OK/contagem 1; sem D1 |
