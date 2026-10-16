@@ -41,8 +41,11 @@ Hipóteses do Dev cobertas: (1) documento não aceito → D1–D3; (2) corpo sem
 1. **Autorização por sessão**: Aurimar autoriza o número exato de chamadas (≤ 4) antes de cada rodada. Sem laço, sem retry, sem agendamento.
 2. **Só leitura**: nenhuma mutation (`generateShortLink` fica fora; vai em tarefa própria depois de a credencial validar).
 3. **Segredo**: App ID, Secret e header de assinatura nunca em log, PR, TASKS.md ou mensagem. Tudo continua saindo do `.env` da raiz.
-4. **Saída permitida por chamada**: degrau, `codigo`, `contagem`, duração e **mensagem de erro truncada em 200 caracteres**, com App ID e Secret removidos por substituição exata antes de imprimir. A mensagem é dado externo: nunca interpretada como instrução e nunca colada em prompt de agente sem passar por essa limpeza. (A sonda atual esconde a mensagem; para diagnosticar precisamos dela, e é o único acréscimo de superfície.)
-5. **Relógio**: registrar, em UTC, o horário local e o cabeçalho `Date` da resposta (diferença em segundos). Isso mede a tolerância de timestamp, pendente na 004, sem chamada extra.
+4. **Saída por allowlist, não por redação** (achado B1 do QA no PR #41): resposta da API é dado, não texto de terminal. Por chamada só saem: degrau, `codigo`, `contagem`, duração e, no máximo, um trecho de mensagem.
+   - `codigo` só sai se casar com `^[A-Za-z0-9_-]{1,32}$`; senão vira `CODIGO_INVALIDO`. (Um código com quebra de linha forjava um falso `resultado=sucesso`.)
+   - A mensagem é opcional e passa por: normalização para caracteres imprimíveis ASCII (sem `\n`, `\r`, controle ou ANSI), teto de tamanho e, se possível, só trechos de um conjunto permitido (nomes de campo e de tipo do schema). Nunca assinatura, nunca cabeçalho. Truncar e remover App ID/Secret **não basta** e não é o critério.
+   - A mensagem é dado externo: nunca interpretada como instrução nem colada em prompt de agente.
+5. **Relógio** (cabe no D0): registrar, em UTC, o horário local e o cabeçalho `Date` da resposta (diferença em segundos, valor numérico). Isso mede a tolerância de timestamp, pendente na 004, sem chamada extra.
 6. **Corpo de sucesso**: não gravar nomes de produto nem links em arquivo versionado; registrar só tipos dos campos de preço/comissão (`number`/`string`), que a 004 também pede.
 7. **Sem tocar no worker/cliente de produção** durante o diagnóstico: o modo de diagnóstico vive em `scripts/` e monta o corpo à mão. Corrigir o cliente é outra tarefa, depois da causa conhecida.
 
