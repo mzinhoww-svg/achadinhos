@@ -12,3 +12,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T9 | Comissão: conversionReport a cada 6 h idempotente (packages/commission) | Balanço | concluida | PR #9 mergeado |
 | T6 | packages/domain: estimativa, janela/fuso, filtros, antirrepetição (MVP 4–7 parte pura) | Compasso | em_revisao | PR #7 aprovado pelo QA; auditoria Farol |
 | T10 | Alertas por e-mail (MVP 13) | Sentinela | em_revisao | PR #8 aprovado pelo QA; auditoria Farol |
+| T11 | Sonda real da credencial Shopee (MVP 2 e 10): script + 1 chamada somente-leitura | Sextante | em_revisao | branch feat/shopee-live-check; PR (a preencher); sonda = falha/10010/0 |

@@ -14,7 +14,7 @@
       "titulo": "Conexões: validar e salvar App ID/Secret (Vault)",
       "aceite": "Nenhuma rota ou payload RSC contém o Secret",
       "fase": "F1",
-      "status": "implementado; aguardando credencial Shopee para validar de verdade",
+      "status": "implementado; sonda real executada em 2026-10-16 (1 chamada somente-leitura productOfferV2): API respondeu HTTP 2xx com erro GraphQL 10010 (Parse Error). Credencial ainda NÃO validada — ver docs/decisions/004-endpoint-shopee.md",
       "depende_credencial": true
     },
     {
@@ -78,7 +78,7 @@
       "titulo": "Mandar agora",
       "aceite": "E2E com Shopee simulada",
       "fase": "F4",
-      "status": "implementado; falta e2e com Shopee simulada",
+      "status": "implementado; falta e2e com Shopee simulada; credencial Shopee (item 2) segue não validada pela sonda real",
       "depende_credencial": true
     },
     {

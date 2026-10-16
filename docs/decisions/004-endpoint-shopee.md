@@ -1,5 +1,7 @@
 # 004 — Endpoint Shopee Affiliate Open API (BR)
-Status: pendente de confirmação na documentação oficial (não confirmado a partir deste ambiente)
+Status: pendente de confirmação na documentação oficial (não confirmado a partir deste ambiente).
+A URL presumida passou a ter resposta real confirmada em 2026-10-16 (ver "Sonda real" no fim deste arquivo);
+o formato oficial e os demais pontos seguem pendentes.
 
 Presumido: https://open-api.affiliate.shopee.com.br/graphql (configurável por SHOPEE_ENDPOINT).
 
@@ -39,3 +41,41 @@ Estado geral: **parcialmente confirmado por fonte secundária; confirmação ofi
 1. Aurimar (ou o Dev com a credencial) executa uma chamada real de `productOfferV2` e uma de `generateShortLink` e registra aqui: URL, status HTTP e corpo de um erro de assinatura propositalmente inválido, tolerância de timestamp, tipos reais de preço/comissão, limite de taxa.
 2. Enquanto isso o item 1 do `mvp-checklist.json` fica "aguardando credencial" no teste de integração real; o cliente continua testado contra o servidor simulado.
 3. Pré-condições de segurança antes do worker usar o cliente: R1–R4 da auditoria no PR #1.
+
+## Sonda real de 2026-10-16 (Dev/Sextante, `feat/shopee-live-check`)
+
+Primeira chamada real registrada: **uma** consulta somente-leitura, sem laço e sem retry, por
+`scripts/shopee-live-check.ts` (`pnpm shopee:live-check`), usando o cliente assinado de `packages/shopee`
+e as credenciais do `.env` da raiz. App ID, Secret, header de assinatura e corpo de resposta nunca são
+impressos, logados ou versionados — a sonda imprime apenas três linhas.
+
+| Item | Resultado |
+|---|---|
+| Endpoint usado | `SHOPEE_ENDPOINT` do `.env` = `https://open-api.affiliate.shopee.com.br/graphql` |
+| Requisição | 1× `productOfferV2` com `limit: 1` (nada além disso) |
+| Resposta | HTTP 2xx com envelope GraphQL de erro: `errors[0].extensions.code = 10010` |
+| Sonda | `resultado=falha` / `codigo=10010` / `contagem=0` |
+| Duração | ~1 s (resposta de aplicação; não foi timeout nem falha de rede) |
+
+### O que fica confirmado
+- **A URL presumida existe e responde GraphQL.** A chamada retornou um envelope `errors` em JSON, não
+  404/HTML de SPA — o endpoint sai de "presumido por fonte secundária" para "confirmado por resposta real".
+- O erro voltou pelo caminho GraphQL do cliente (`10010`) e não pelo caminho HTTP (`HTTP_403`), o que
+  prova que o status foi 2xx (o cliente só produz `HTTP_<status>` em não-2xx).
+- **Não houve `10020` (Invalid Signature)**: a assinatura calculada sobre o corpo exato já está coberta por
+  vetor conhecido (teste) e não foi o item apontado pela API nesta chamada.
+
+### O que continua indeterminado
+- **A credencial NÃO está validada.** `10010` = "Parse Error" na referência não oficial
+  (affiliateshopee.com.br/documentacao). Como não se sabe se a API valida a assinatura antes ou depois de
+  parsear a query, um erro de parse **não prova** que App ID/Secret estão corretos — e também não prova o
+  contrário. Nenhuma nova tentativa foi feita (determinação da tarefa: sem retry).
+- Hipóteses para a próxima tarefa (exigem nova chamada, fora do escopo desta):
+  1. o documento `productOfferV2` do cliente não é aceito como está pelo schema real (argumento/campo
+     divergente do presumido — a API real só sabe disso; o servidor simulado valida a assinatura, mas não
+     parseia a query);
+  2. a API espera corpo apenas com `query` (sem `variables`), ou exige `operationName`;
+  3. o App ainda não está ativo para a Open API no painel Shopee (a doc lista `10035 No API Access` para
+     esse caso, o que não foi o código devolvido).
+- Seguem desconhecidos: formato de um erro de assinatura propositalmente inválido, tolerância de timestamp,
+  tipos reais de preço/comissão, limites de taxa e comportamento de `generateShortLink`.
