@@ -27,12 +27,12 @@ Cada degrau é **uma** chamada. Parar no primeiro que mudar o quadro. Máximo de
 
 | # | Chamada | Separa | Leitura do resultado |
 |---|---|---|---|
-| D0 | `{ __typename }` (corpo só com `query`, sem `variables`) | transporte/autenticação × nosso documento | dado retornado: corpo, header e credencial passam; o defeito está no documento `productOfferV2`. `10020`: assinatura/credencial. `10035`: App sem acesso à Open API. `10010` de novo: problema de envelope (formato do header, ordem, corpo) e não do documento |
+| D0 | `{ __typename }` (corpo só com `query`, sem `variables`) | transporte/autenticação × nosso documento | dado retornado: o **transporte e o corpo** passam e o defeito provável está no documento `productOfferV2`. **Não prova credencial nem assinatura**: a API pode responder `__typename` sem autenticar. Quem decide isso é o D4. `10020`: assinatura/credencial. `10035`: App sem acesso à Open API. `10010` de novo: problema de envelope (formato do header, ordem, corpo) e não do documento |
 | D1 | `productOfferV2(limit: 1)` com argumentos **inline**, sem `variables`, pedindo só `nodes { itemId productName }` | variáveis tipadas × campos | sucesso: causa em `variables`/tipos ou em algum dos outros 17 campos. `10010`: problema no próprio nome da operação ou dos argumentos |
 | D2 | D1 com `variables` tipadas como no cliente, mantendo 2 campos | variáveis | decide se o cliente passa a usar argumentos inline |
 | D3 | bisseção dos 17 campos restantes (metade por chamada) | campo divergente | só se D1 passou e D2 não explicou |
 
-Se D0 passar, uma chamada extra opcional (D4) com Secret **propositalmente inválido** captura o formato real do erro de assinatura, item pendente da 004. Usar um valor sentinela fixo no código (nunca o Secret real alterado).
+Se D0 passar, o **D4** (mesma consulta `{ __typename }` com Secret **propositalmente inválido**) deixa de ser opcional: separa "a API autentica antes de responder" de "a API não autentica `__typename`". `10020` ⇒ D0 provou credencial e assinatura; `OK` ⇒ D0 não provou nada sobre credencial e só o D1+ pode provar. Também captura o formato real do erro de assinatura, item pendente da 004. No D0, `contagem` conta campos de `data`, não ofertas. Usar um valor sentinela fixo no código (nunca o Secret real alterado).
 
 Hipóteses do Dev cobertas: (1) documento não aceito → D1–D3; (2) corpo sem `variables`/`operationName` → D0/D1/D2; (3) App sem acesso → D0 devolve 10035 ou segue 10010.
 
