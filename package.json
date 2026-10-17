@@ -10,6 +10,7 @@
     "typecheck": "pnpm -r --if-present --filter '!@achadinhos/telegram' --filter '!@achadinhos/alerts' typecheck && tsc --noEmit -p scripts/tsconfig.json",
     "lint": "pnpm -r --if-present lint",
     "shopee:diag": "tsx scripts/shopee-diag.ts",
+    "outbox:gerar": "pnpm --filter @achadinhos/worker run outbox:gerar",
     "shopee:live-check": "tsx scripts/shopee-live-check.ts"
   },
   "devDependencies": {

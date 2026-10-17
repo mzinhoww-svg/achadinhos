@@ -96,6 +96,9 @@ importers:
       '@achadinhos/alerts':
         specifier: workspace:*
         version: link:../../packages/alerts
+      '@achadinhos/channel':
+        specifier: workspace:*
+        version: link:../../packages/channel
       '@achadinhos/commission':
         specifier: workspace:*
         version: link:../../packages/commission
