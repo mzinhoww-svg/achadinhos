@@ -1,3 +1,7 @@
+> **SUSPENSO / DESATUALIZADO (2026-10-16).** A topologia e o custo abaixo (Supabase + Vercel + VPS)
+> estão suspensos pelo escopo sem persistência (`docs/plans/escopo-sem-supabase-telegram.md`, §2).
+> Custo esperado agora: R$ 0. O texto fica preservado como histórico; nada foi contratado.
+
 # Plano de deploy e custo mensal — achadinhos
 
 Autor: Farol (Planejador). Data: 2026-10-14. Base: decisões 001–003, `docs/security-checklist.md` (seções A, C, F), `docs/ACTIONS.md`.
