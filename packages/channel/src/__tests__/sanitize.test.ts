@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TITLE_LENGTH, sanitizeText, sanitizeTitle, stripLineSeparators } from "../sanitize";
+import {
+  MAX_TITLE_LENGTH,
+  neutralizeMultilineText,
+  sanitizeText,
+  sanitizeTitle,
+  stripLineSeparators,
+} from "../sanitize";
 
 describe("neutralização de texto externo (§1 regra 5)", () => {
   it("quebra de linha vira espaço e demais controles somem", () => {
@@ -31,6 +37,12 @@ describe("neutralização de texto externo (§1 regra 5)", () => {
 
   it("emoji é preservado", () => {
     expect(sanitizeTitle("🔥 promo")).toBe("🔥 promo");
+  });
+
+  it("texto multilinha preserva \\n e normaliza \\r\\n/\\r", () => {
+    expect(neutralizeMultilineText("a\r\nb\rc\nd")).toBe("a\nb\nc\nd");
+    expect(neutralizeMultilineText("a\u0000b\u0007c\u2028d\u202Ee")).toBe("abcde");
+    expect(neutralizeMultilineText("a\nb")).toBe("a\nb");
   });
 
   it("stripLineSeparators remove os separadores Unicode", () => {

@@ -7,8 +7,9 @@ Interface `Channel` + adaptador `FileOutbox` (plano `docs/plans/escopo-sem-supab
 - `FileOutbox` grava `outbox/<day>/<hhmm>-<itemId>-g<groupIndex>.{png,md}` e um `index.md` derivado.
   O `.md` é o único marcador de "entregue"; o `.png` vem antes e pode ficar órfão.
 - `text` (mensagem pronta para copiar) vai num bloco de código cercado (fence = maior sequência de
-  crases + 1, mínimo 3), sem escape de `*`/`_`; o título e a célula do `index.md` são escapados.
-  O link gravado no front matter e no corpo é sempre o normalizado (`new URL(...).href`).
+  crases + 1, mínimo 3), sem escape de `*`/`_` e **preservando `\n`** (`\r\n`/`\r` normalizados para
+  `\n`); o título e a célula do `index.md` são escapados. O link gravado no front matter e no corpo
+  é sempre o normalizado (`new URL(...).href`).
 
 ```ts
 import { createFileOutbox } from "@achadinhos/channel";

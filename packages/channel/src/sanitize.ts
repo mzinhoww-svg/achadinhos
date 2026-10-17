@@ -27,6 +27,21 @@ export function neutralizeExternal(value: string): string {
   return value.replace(/[\r\n]/g, " ").replace(C0_C1, "").replace(LINE_SEPARATORS, "").replace(BIDI, "");
 }
 
+/** Controles C0/C1 exceto `\n` (0x0A), que é a quebra de linha legítima do `text`. */
+const C0_C1_EXCEPT_NEWLINE = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g;
+
+/**
+ * Texto multilinha (`text`): preserva `\n` (dentro do bloco cercado ele não cria estrutura),
+ * normaliza `\r\n`/`\r` para `\n` e remove os demais controles, separadores e bidi.
+ */
+export function neutralizeMultilineText(value: string): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(C0_C1_EXCEPT_NEWLINE, "")
+    .replace(LINE_SEPARATORS, "")
+    .replace(BIDI, "");
+}
+
 /**
  * Escapa os metacaracteres de markdown e neutraliza marcadores no início da linha/string
  * (`---`, `#`) para que o dado externo nunca vire estrutura. `>` já sai escapado pelo passo anterior.

@@ -110,6 +110,16 @@ describe("§1 T7-A FileOutbox", () => {
     expect(md).toContain("````\nOferta *x* e _y_ ``` fim\n````");
   });
 
+  it("(texto) quebras de linha do text são preservadas dentro do bloco", async () => {
+    const root = await tmpRoot();
+    const channel = createFileOutbox({ dir: root });
+    const text = "Linha 1\r\nLinha 2\rLinha 3\nLinha 4";
+    await channel.deliver(makeOffer({ text }), { signal: SIGNAL });
+
+    const md = await readFile(join(root, "20261016", "1432-123456789-g1.md"), "utf8");
+    expect(md).toContain("```\nLinha 1\nLinha 2\nLinha 3\nLinha 4\n```");
+  });
+
   it("(link) URL com quebra interna é normalizada no front matter e no corpo", async () => {
     const root = await tmpRoot();
     const channel = createFileOutbox({ dir: root });

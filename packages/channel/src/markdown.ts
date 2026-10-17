@@ -1,6 +1,6 @@
 import {
   MAX_TITLE_LENGTH,
-  neutralizeExternal,
+  neutralizeMultilineText,
   sanitizeTitle,
   stripLineSeparators,
   truncateCodepoints,
@@ -37,9 +37,10 @@ function longestBacktickRun(value: string): number {
  * Mensagem pronta para copiar: neutralizada (controles, separadores, bidi) mas **sem escape** de
  * markdown, dentro de um bloco cercado por crases. O fence tem `maior sequência de crases do texto + 1`
  * (mínimo 3), então `*negrito*`, `_itálico_` e crases saem literais sem fechar o bloco.
+ * `\n` é preservado: dentro do fence ele não vira estrutura e a mensagem pode ter linhas.
  */
 export function renderTextBlock(rawText: string): string {
-  const text = neutralizeExternal(rawText);
+  const text = neutralizeMultilineText(rawText);
   const fence = "`".repeat(Math.max(3, longestBacktickRun(text) + 1));
   return [fence, text, fence].join("\n");
 }

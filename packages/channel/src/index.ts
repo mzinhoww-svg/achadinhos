@@ -16,6 +16,7 @@ export {
 export {
   MAX_TITLE_LENGTH,
   neutralizeExternal,
+  neutralizeMultilineText,
   sanitizeText,
   sanitizeTitle,
   stripLineSeparators,
