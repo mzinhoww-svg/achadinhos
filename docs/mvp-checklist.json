@@ -9,7 +9,7 @@
       "status": "parcial (aceite de testes cumprido; contra a API real o documento `productOfferV2` é recusado com `10010`)",
       "depende_credencial": true,
       "prova": [
-        "packages/shopee: 48 testes passam (vetor de assinatura conhecido + GraphQL simulado `startMockShopeeServer`)",
+        "packages/shopee: testes do cliente passam (vetor de assinatura conhecido + GraphQL simulado `startMockShopeeServer`)",
         "apps/worker/tests/e2e/sql.e2e.test.ts usa o cliente real contra o servidor simulado (link curto assinado)"
       ],
       "nota": "Aceite literal cumprido (vetor de assinatura + servidor simulado). O cliente nunca foi chamado com credencial validada e o formato da consulta é recusado pela API real; a correção do documento é a tarefa T12-FIX, depois do diagnóstico (docs/plans/shopee-diagnostico-10010.md).",
@@ -27,13 +27,13 @@
       "depende_credencial": true,
       "prova": [
         "Sonda real (PR #41): 1 chamada somente-leitura, saída allowlisted (resultado/código/contagem), sem App ID/Secret/assinatura; evidência em docs/decisions/004-endpoint-shopee.md",
-        "Diagnóstico D0 (PR #44): `{ __typename }` OK, 598 ms, relógio dentro da tolerância (delta 0 s, resolução 1 s); prova só envelope e transporte",
+        "Diagnóstico D0 (PR #44): `{ __typename }` OK, 598 ms; deslocamento do relógio 0 s (resolução 1 s). A tolerância de timestamp da Shopee segue desconhecida; o D0 prova só envelope e transporte, não credencial nem assinatura",
         "Saída por allowlist com modelo fixo de mensagem, proteções do script (host, redirect manual, timeout, teto de corpo, um degrau por invocação) testadas em scripts/diag-allowlist.test.ts"
       ],
       "falta": [
         "Autorização de Aurimar para D1 (documento inline) e D4 (Secret sentinela inválido, autorização própria)",
         "Corrigir o documento `productOfferV2` (T12-FIX) e então fazer UMA chamada do cliente de produção com ≥ 1 oferta",
-        "Registrar na 004 o estado \"formato recusado\" e a tolerância de timestamp só se houver rodada própria",
+        "Registrar na 004 o estado \"formato recusado\" e a tolerância de timestamp só se houver rodada própria (hoje desconhecida; só o deslocamento 0 s foi medido)",
         "Vault e `validateShopee` (apps/worker/src/validation) ficam dormentes; o worker de produção não deve validar contra a API real antes da correção"
       ],
       "titulo_anterior": "Conexões: validar e salvar App ID/Secret (Vault)"
@@ -56,19 +56,20 @@
       "titulo": "Automações lidas de arquivo de configuração só-leitura (limite 5)",
       "aceite": "Validação de limite 5 e filtros testada; sexta automação recusada",
       "fase": "F2",
-      "status": "pendente (T7-D, aguarda resposta 1 de Aurimar)",
+      "status": "concluida (T7-D, PR #54); falta o arquivo real de Aurimar",
       "depende_credencial": false,
       "prova": [
-        "supabase/tests/automation_limit.sql (3 ok; gatilho 5 por conta)",
-        "apps/web/test/db/adapters.test.ts: CRUD só com grupos ativos da conta e limite de 5 sob corrida, via adapters RPC em Postgres embutido com as migrações reais",
-        "apps/web/test/automacoes.test.ts: 6ª automação recusada com mensagem clara, mesmo concorrente",
-        "QA em Postgres Supabase real: 6ª recusada, `p_max` forjado barrado pelo gatilho, conta B não escreve na A"
+        "packages/domain (`parseAutomationsConfig`, `canCreateAutomation`): arquivo válido, automação inválida derruba o arquivo, 6ª automação recusada (`automacoes_limite`); apps/worker/tests/gerar/automacoes.test.ts e cli.test.ts: arquivo ausente/inválido falha fechado (exit 2) antes de montar adaptadores, agenda por janela+dias sem estado, `groupIndex` estável, `chamadas_max = vencidas × (páginas + limite)`, palavra-chave mapeada à busca, `nenhuma_automacao_vencida`",
+        "(dormente) supabase/tests/automation_limit.sql (3 ok; gatilho 5 por conta)",
+        "(dormente) apps/web/test/db/adapters.test.ts: CRUD só com grupos ativos da conta e limite de 5 sob corrida, via adapters RPC em Postgres embutido com as migrações reais",
+        "(dormente) apps/web/test/automacoes.test.ts: 6ª automação recusada com mensagem clara, mesmo concorrente",
+        "(dormente) QA em Postgres Supabase real: 6ª recusada, `p_max` forjado barrado pelo gatilho, conta B não escreve na A"
       ],
-      "nota": "As provas listadas são do código dormente (suíte dormente); não valem para o caminho ativo. O CRUD por tela (Supabase/RLS) está dormente; no caminho ativo o gerador recebe filtros por entrada e a leitura do arquivo não existe.",
+      "nota": "Ativo desde a T7-D: `config/automacoes.json` (só-leitura, versionado e vazio). O CRUD por tela e as provas Supabase/RLS marcadas \"(dormente)\" não valem para o caminho ativo. `header`, `footer` e `groups` do esquema são aceitos e ignorados; frequência e antirrepetição seguem adiadas.",
       "titulo_anterior": "Automações CRUD com limite de 5",
       "falta": [
-        "Resposta de Aurimar: automações em arquivo de configuração só-leitura?",
-        "T7-D: ler o arquivo, validar limite 5 e filtros, e passar ao gerador"
+        "Aurimar preencher `config/automacoes.json` com as automações reais (até 5)",
+        "E2E-1 cobrindo o modo `--automacoes`"
       ]
     },
     {
@@ -148,7 +149,8 @@
       "depende_credencial": true,
       "prova": [
         "apps/worker/tests/gerar/* (PR #50): argv, CLI com wiring injetado, gerador, mensagem, guarda `--permitir-real` (endpoint fora de loopback recusado antes do wiring; `--limite` obrigatório; `chamadas_max` impresso; 1 página no modo real)",
-        "Saída do terminal só com `slotKey`, status e código; exit ≠ 0 se houver `failed`/`unknown`/erro de busca"
+        "Saída do terminal só com `slotKey`, status e código; exit ≠ 0 se houver `failed`/`unknown`/erro de busca",
+        "Modo `--automacoes` (PR #54): roda só as automações vencidas, com teste e2e de portas contra o fake de Shopee"
       ],
       "falta": [
         "E2E-1: CLI real contra `startMockShopeeServer` + FileOutbox + render real em pasta temporária",
@@ -223,10 +225,10 @@
   ],
   "verificado": {
     "data": "2026-10-17",
-    "commit_main": "321bddc",
+    "commit_main": "b6b3515",
     "regra": "concluida só com código na main + prova no caminho ativo; item com prova só no código dormente fica adiado; senão parcial (o que falta)",
-    "suite": "Contagens reportadas nos PRs #50 e #51 (recontar no próximo gate): worker ativo 134, web 165, channel 75, shopee 57, creative 65, domain 54, commission 13 (ativos), scripts 29; typecheck e testes da raiz verdes na CI do #51; suítes dormentes só no workflow dormente.yml",
-    "resumo": "concluida: 3, 5, 9, 11, 13; parcial: 1, 10, 14; bloqueado: 2; pendente: 4; adiado: 6, 7, 8, 12",
+    "suite": "Contagens reexecutadas pelo QA na árvore do PR #53 sobre `321bddc`: domain 54, commission 13, channel 75, shopee 57, creative 65, worker 134, web 165, scripts 29; dormente: worker completo 395, commission 29. O PR #54 (T7-D, main `b6b3515`) reporta domain 59 e worker 147 (recontar no próximo gate).",
+    "resumo": "concluida: 3, 4, 5, 9, 11, 13; parcial: 1, 10, 14; bloqueado: 2; adiado: 6, 7, 8, 12",
     "observacoes": [
       "Nenhuma chamada real à Shopee passou do D0 e da sonda do #41; nenhuma nova está autorizada. O D4 exige autorização própria.",
       "Item 11 e 13 são `concluida` por cobertura do plano (T7-A e T7-B), não pelo escopo original; o Realtime e o e-mail estão adiados.",
@@ -257,10 +259,10 @@
     },
     {
       "ordem": 3,
-      "item": "T7-D automações em arquivo de configuração",
-      "detalhe": "Ler arquivo só-leitura, validar limite 5 e filtros, passar ao gerador",
-      "tarefa": "T7-D",
-      "depende": "resposta 1 de Aurimar"
+      "item": "Arquivo real de automações",
+      "detalhe": "Aurimar preenche `config/automacoes.json` (até 5, janela e dias, palavra-chave e filtros); T7-D já está na main",
+      "tarefa": "-",
+      "depende": "Aurimar"
     },
     {
       "ordem": 4,

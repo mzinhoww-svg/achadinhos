@@ -7,6 +7,10 @@ export interface CliArgs {
   handle?: string;
   endpoint?: string;
   permitirReal?: boolean;
+  /** Arquivo de automações (T7-D); ativa o modo "agenda sobre o gerador". */
+  automations?: string;
+  /** Instante de referência (ISO) para o agendamento; padrão agora. */
+  at?: string;
   help?: boolean;
 }
 
@@ -87,6 +91,18 @@ export function parseArgs(argv: string[]): CliArgs {
         i = next;
         break;
       }
+      case "--automacoes": {
+        const { value, next } = readValue();
+        args.automations = value;
+        i = next;
+        break;
+      }
+      case "--agora": {
+        const { value, next } = readValue();
+        args.at = value;
+        i = next;
+        break;
+      }
       default:
         throw new ArgvError(`argumento desconhecido: ${name}`);
     }
@@ -108,6 +124,8 @@ export const HELP = [
   "  --handle @x       @ do afiliado (padrão AFFILIATE_HANDLE)",
   "  --endpoint URL    endpoint GraphQL (padrão SHOPEE_ENDPOINT)",
   "  --permitir-real   autoriza endpoint fora de loopback; exige --limite e só com autorização de Aurimar",
+  "  --automacoes ARQ  roda as automações do arquivo (T7-D), ex.: config/automacoes.json",
+  "  --agora ISO       instante de referência do agendamento (padrão: agora)",
   "",
   "Ambiente: SHOPEE_APP_ID, SHOPEE_SECRET, SHOPEE_ENDPOINT, AFFILIATE_HANDLE, IMAGE_ALLOWED_HOSTS,",
   "OUTBOX_DIR, LOG_LEVEL. Nenhuma chamada real à Shopee sem SHOPEE_ENDPOINT explícito.",

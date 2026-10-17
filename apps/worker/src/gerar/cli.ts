@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { MAX_CREATIVE_PNG_BYTES, createFileOutbox } from "@achadinhos/channel";
 import { renderOfferCreative } from "@achadinhos/creative/render";
 import type { ImageMime } from "@achadinhos/creative/image";
+import type { AutomationInput } from "@achadinhos/domain";
 import { ShopeeClient } from "@achadinhos/shopee";
 
 import { downloadProductImage } from "../image.js";
@@ -13,9 +14,16 @@ import {
   clampLimit,
   exitCodeFor,
   generateOutbox,
+  type GenerateDeps,
   type GenerateSummary,
   type GenerateTracking,
 } from "./generate.js";
+import {
+  loadAutomationsFile,
+  runAutomations,
+  selectDueAutomations,
+  type AutomationsRunSummary,
+} from "./automacoes.js";
 import type { Channel, ImageFetcher, OfferSource, RenderCreative, ShortLinker } from "./ports.js";
 
 /** Mesma allowlist do worker de produção (`sql/build-deps.ts`). */
@@ -66,6 +74,8 @@ export interface RunCliOptions {
 export interface RunCliResult {
   exitCode: number;
   summary?: GenerateSummary;
+  /** Preenchido no modo `--automacoes` (T7-D). */
+  automations?: AutomationsRunSummary;
 }
 
 function imageHostsFrom(env: Record<string, string | undefined>): string[] {
@@ -185,7 +195,17 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
     return { exitCode: 2 };
   }
   const maxPages = allowReal ? REAL_PAGES_MAX : MAX_PAGES;
-  if (allowReal) write(`chamadas_max=${maxPages + config.limit}`);
+
+  // T7-D: valida o arquivo de automações ANTES de montar adaptadores (falha fechado, sem chamada).
+  let automationsList: AutomationInput[] | undefined;
+  if (args.automations !== undefined) {
+    const loaded = await loadAutomationsFile(args.automations);
+    if (!loaded.ok) {
+      write(JSON.stringify({ level: "error", msg: "automacoes", code: loaded.code }));
+      return { exitCode: 2 };
+    }
+    automationsList = loaded.automations;
+  }
 
   const secret = env["SHOPEE_SECRET"];
   const logger: Logger = createLogger({
@@ -193,10 +213,70 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
     level: (env["LOG_LEVEL"] as Level | undefined) ?? "info",
     ...(secret ? { secrets: [secret] } : {}),
   });
+  const nowFn = options.now ?? (() => new Date());
+  // O wiring só é montado depois de decidir quantas automações vencem (guarda de chamadas, R1/B2).
+  const buildDeps = (): GenerateDeps => {
+    const wiring = (options.makeWiring ?? makeRealWiring)(config, env);
+    return {
+      source: wiring.source,
+      shortLinker: wiring.shortLinker,
+      fetchImage: wiring.fetchImage,
+      renderCreative: wiring.renderCreative,
+      channel: wiring.channel,
+      logger,
+    };
+  };
 
-  const wiring = (options.makeWiring ?? makeRealWiring)(config, env);
-  const runStartedAt = (options.now ?? (() => new Date()))();
+  // T7-D: modo "agenda sobre o gerador" — roda as automações vencidas do arquivo.
+  if (automationsList !== undefined) {
+    let reference = nowFn();
+    if (args.at !== undefined) {
+      reference = new Date(args.at);
+      if (Number.isNaN(reference.getTime())) {
+        write(JSON.stringify({ level: "error", msg: "agora_invalido", code: "argumento_invalido" }));
+        return { exitCode: 2 };
+      }
+    }
+    const due = selectDueAutomations(automationsList, reference);
+    if (allowReal) write(`chamadas_max=${due.length * (maxPages + config.limit)}`);
+    if (due.length === 0) {
+      write("nenhuma_automacao_vencida");
+      return {
+        exitCode: 0,
+        automations: { results: [], delivered: 0, failed: 0, unknown: 0, discarded: 0, fetchErrors: 0, errorCodes: [] },
+      };
+    }
 
+    const automations = await runAutomations(
+      automationsList,
+      {
+        runStartedAt: reference,
+        affiliateHandle: config.affiliateHandle,
+        imageHosts: config.imageHosts,
+        limit: config.limit,
+        maxPages,
+        tracking: config.tracking,
+      },
+      buildDeps(),
+    );
+    for (const outcome of automations.results) {
+      write(
+        `automacao ${outcome.groupIndex} ${outcome.name}: ${outcome.summary.delivered} delivered, ` +
+          `${outcome.summary.failed} failed, ${outcome.summary.unknown} unknown`,
+      );
+    }
+    const codes = automations.errorCodes.length ? ` (${automations.errorCodes.join(",")})` : "";
+    write(
+      `resumo: ${automations.delivered} delivered, ${automations.failed} failed, ${automations.unknown} unknown, ` +
+        `${automations.discarded} descartadas (${automations.results.length} automacoes)${codes}`,
+    );
+    const exitCode =
+      automations.failed === 0 && automations.unknown === 0 && automations.fetchErrors === 0 ? 0 : 1;
+    return { exitCode, automations };
+  }
+
+  if (allowReal) write(`chamadas_max=${maxPages + config.limit}`);
+  const runStartedAt = nowFn();
   const summary = await generateOutbox(
     {
       runStartedAt,
@@ -208,14 +288,7 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
       ...(config.keyword ? { keyword: config.keyword } : {}),
       tracking: config.tracking,
     },
-    {
-      source: wiring.source,
-      shortLinker: wiring.shortLinker,
-      fetchImage: wiring.fetchImage,
-      renderCreative: wiring.renderCreative,
-      channel: wiring.channel,
-      logger,
-    },
+    buildDeps(),
   );
 
   write(
