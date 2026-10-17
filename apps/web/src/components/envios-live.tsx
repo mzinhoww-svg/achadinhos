@@ -9,10 +9,8 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconSend } from "@/components/ui/icons";
 import { DataTable } from "@/components/ui/table";
-import { countDay, type PublicSend } from "@/lib/envios-view";
+import { type PublicSend } from "@/lib/envios-view";
 import { formatDateTime } from "@/lib/format";
-import { applySendChange, shouldPoll, subscribeSends, type ConnectionState } from "@/lib/realtime";
-import { getRealtimeClient } from "@/lib/realtime-client";
 import type { EnviosView } from "@/server/envios";
 
 const POLL_MS = 8_000;
@@ -24,20 +22,18 @@ const CARDS = [
   { key: "skipped", label: "Ignorados hoje", tone: "text-ink-2" },
 ] as const;
 
-export function EnviosLive({ initial, accountId, empty, realtimeToken = null }: { initial: EnviosView; accountId: string; empty: boolean; realtimeToken?: string | null }) {
+/**
+ * T8-A: a tela não usa mais o Realtime do Supabase (dormente). Relê periodicamente do container
+ * em memória; sem persistência, é o único jeito de refletir mudanças de estado.
+ */
+export function EnviosLive({ initial, empty }: { initial: EnviosView; empty: boolean }) {
   const [items, setItems] = useState<PublicSend[]>(initial.items);
   const [today, setToday] = useState(initial.today);
-  const [conn, setConn] = useState<ConnectionState | "polling">("polling");
   const view = useRef(initial);
-  const itemsRef = useRef<PublicSend[]>(initial.items);
-  const winRef = useRef({ start: initial.dayStart, end: initial.dayEnd });
-  const filterKey = `${initial.filter.status}|${initial.filter.groupId ?? ""}`;
 
   // Nova navegação (outro filtro) entrega outro `initial`: recomeça do que o servidor mandou.
   useEffect(() => {
     view.current = initial;
-    itemsRef.current = initial.items;
-    winRef.current = { start: initial.dayStart, end: initial.dayEnd };
     setItems(initial.items);
     setToday(initial.today);
   }, [initial]);
@@ -46,40 +42,16 @@ export function EnviosLive({ initial, accountId, empty, realtimeToken = null }: 
     const r = await refreshEnviosAction(view.current.filter.status, view.current.filter.groupId);
     if (!r.ok) return;
     view.current = r.data;
-    itemsRef.current = r.data.items;
-    winRef.current = { start: r.data.dayStart, end: r.data.dayEnd };
     setItems(r.data.items);
     setToday(r.data.today);
   }, []);
 
-  // Assinatura Realtime (sob RLS). Sem env/JWT o cliente é null e só o polling abaixo atua.
+  // Releitura periódica (sem Realtime).
   useEffect(() => {
     if (empty) return;
-    const client = getRealtimeClient({ accessToken: realtimeToken });
-    if (!client) {
-      setConn("polling");
-      return;
-    }
-    return subscribeSends(
-      client,
-      accountId,
-      (change) => {
-        const r = applySendChange(itemsRef.current, change, accountId);
-        itemsRef.current = r.items;
-        setItems(r.items);
-        if (r.refresh) void reload();
-        else setToday(countDay(r.items, { start: new Date(winRef.current.start), end: new Date(winRef.current.end) }));
-      },
-      setConn,
-    );
-  }, [accountId, empty, filterKey, realtimeToken, reload]);
-
-  // Fallback: releitura periódica sempre que a assinatura não está ao vivo (sem Realtime, conectando ou caída).
-  useEffect(() => {
-    if (empty || !shouldPoll(conn)) return;
     const t = setInterval(() => void reload(), POLL_MS);
     return () => clearInterval(t);
-  }, [conn, empty, reload]);
+  }, [empty, reload]);
 
   const hasFilter = initial.filter.status !== "all" || initial.filter.groupId !== null;
 
@@ -97,8 +69,8 @@ export function EnviosLive({ initial, accountId, empty, realtimeToken = null }: 
       </section>
 
       <p className="mb-3 flex items-center gap-2 text-sm text-ink-2" role="status">
-        <span aria-hidden className={`size-2 rounded-full ${conn === "reconnecting" ? "bg-sun-ink" : "bg-ok"}`} />
-        {conn === "reconnecting" ? "Reconectando…" : conn === "live" ? "Ao vivo" : "Atualiza sozinho a cada poucos segundos"}
+        <span aria-hidden className="size-2 rounded-full bg-ok" />
+        Atualiza sozinho a cada poucos segundos
       </p>
 
       {items.length === 0 ? (

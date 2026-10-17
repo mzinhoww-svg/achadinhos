@@ -12,15 +12,21 @@ afterEach(() => {
   for (const k of KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
 });
 
-describe("container fora do demo", () => {
-  it("sem demo e sem Supabase configurado: sem sessão e dados falham fechado (nunca memória)", async () => {
+describe("container do painel (T8-A: só o container em memória)", () => {
+  it("monta sem nenhuma variável do Supabase (o caminho Supabase saiu do ativo)", async () => {
+    const { container } = await import("../src/server/context");
+    const c = await container();
+    // memória, não Supabase: os repos respondem de imediato, sem falha de configuração
+    expect(typeof c.automations.list).toBe("function");
+    expect(typeof c.connections.listGroups).toBe("function");
+    // a conta demo é semeada em memória
+    expect((await c.connections.listGroups("demo")).length).toBeGreaterThan(0);
+  });
+
+  it("sem demo não há sessão (as telas e actions usam guarded → Sessão necessária)", async () => {
     const { container } = await import("../src/server/context");
     const c = await container();
     expect(await c.sessions.current()).toBeNull();
-    await expect(c.connections.getShopee("demo")).rejects.toMatchObject({ pgMessage: "supabase_not_configured" });
-    await expect(c.automations.list("demo")).rejects.toMatchObject({ pgMessage: "supabase_not_configured" });
-    await expect(c.sends.list("demo", new Date())).rejects.toBeDefined();
-    expect((globalThis as { __achadinhos?: unknown }).__achadinhos).toBeUndefined(); // memória do demo não foi criada
   });
 
   it("em produção da Vercel o demo nunca liga, mesmo com a flag", async () => {
@@ -29,14 +35,24 @@ describe("container fora do demo", () => {
     const { container } = await import("../src/server/context");
     const c = await container();
     expect(await c.sessions.current()).toBeNull();
-    await expect(c.connections.listGroups("demo")).rejects.toBeDefined();
   });
 
-  it("modo demo continua em memória (QA visual)", async () => {
+  it("modo demo: sessão e dados em memória (QA visual)", async () => {
     process.env.ACHADINHOS_DEMO_SESSION = "1";
     const { container } = await import("../src/server/context");
     const c = await container();
     expect((await c.sessions.current())?.accountId).toBe("demo");
+    expect((await c.connections.listGroups("demo")).length).toBeGreaterThan(0);
+  });
+
+  it("variáveis do Supabase no ambiente não mudam nada: o container é sempre memória", async () => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_ANON_KEY = "public-anon-key";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "public-anon-key";
+    const { container } = await import("../src/server/context");
+    const c = await container();
+    expect(await c.sessions.current()).toBeNull();
     expect((await c.connections.listGroups("demo")).length).toBeGreaterThan(0);
   });
 });
