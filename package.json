@@ -9,7 +9,8 @@
     "test:db:concurrency": "bash supabase/tests/concurrency/claim_next_send.sh",
     "typecheck": "pnpm -r --if-present --filter '!@achadinhos/telegram' --filter '!@achadinhos/alerts' typecheck && tsc --noEmit -p scripts/tsconfig.json",
     "lint": "pnpm -r --if-present lint",
-    "shopee:diag": "tsx scripts/shopee-diag.ts"
+    "shopee:diag": "tsx scripts/shopee-diag.ts",
+    "shopee:live-check": "tsx scripts/shopee-live-check.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
