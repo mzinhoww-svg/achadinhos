@@ -13,4 +13,5 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T6 | packages/domain: estimativa, janela/fuso, filtros, antirrepetição (MVP 4–7 parte pura) | Compasso | em_revisao | PR #7 aprovado pelo QA; auditoria Farol |
 | T10 | Alertas por e-mail (MVP 13) | Sentinela | em_revisao | PR #8 aprovado pelo QA; auditoria Farol |
 | T7-C | Isolar o código dormente (exclude tsconfig/vitest, filtros pnpm, configs e workflow dormentes, READMEs, avisos) | Vigia | em_revisao | PR #46; worker: 87 ativos + 261 dormentes = 339 (+9 novos); typecheck/test verdes; workflow dormente |
-| T11 | Sonda real da credencial Shopee (MVP 2 e 10): script + 1 chamada somente-leitura | Sextante | em_revisao | PR #41 (main #42/#43 trazida por merge, conflitos resolvidos); 57 testes do pacote ok; sonda real = falha/10010/0 |
+| T11 | Sonda real da credencial Shopee (MVP 2 e 10): script + 1 chamada somente-leitura | Sextante | em_revisao | PR #41 (main #42/#43/#49 trazida por merge, conflitos resolvidos); 57 testes do pacote ok; sonda real = falha/10010/0 |
+| T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44 (na main via #49); D0 = OK/contagem 1; sem D1 |
