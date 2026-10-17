@@ -53,6 +53,41 @@ Ambiente: `SHOPEE_ENDPOINT`, `SHOPEE_APP_ID`, `SHOPEE_SECRET`, `AFFILIATE_HANDLE
 - Arquivos: `outbox/<AAAAMMDD>/<HHMM>-<itemId>-g<indice>.md` e `.png`, mais o `index.md` do dia.
   O `.md` é o único marcador de "entregue".
 
+## Automações por arquivo (T7-D)
+
+Em vez de rodar uma oferta só, dá para descrever até **5 automações** num arquivo JSON só-leitura,
+editado à mão (sem segredo): `config/automacoes.json`.
+
+```json
+{
+  "automacoes": [
+    {
+      "name": "Promoções do dia",
+      "filters": { "minDiscount": 20, "sort": "discount_desc" },
+      "days": [1, 2, 3, 4, 5],
+      "windowStart": "08:00",
+      "windowEnd": "22:00",
+      "frequencyMin": 30,
+      "timeZone": "America/Cuiaba"
+    }
+  ]
+}
+```
+
+```sh
+pnpm outbox:gerar -- --automacoes config/automacoes.json
+# opcional: rodar como se fosse um instante específico
+pnpm outbox:gerar -- --automacoes config/automacoes.json --agora 2026-10-16T18:32:00Z
+```
+
+- Cada automação vira uma busca com os **filtros** dela; a `--limite` vale por automação.
+- `groupIndex` no nome do arquivo é a posição da automação no arquivo (1..5).
+- **Agendamento sem estado**: roda só as automações cuja janela/dias contêm o instante da execução.
+  Frequência/antirrepetição dependem de persistência e seguem adiadas (§4) — invocações repetidas
+  dentro da janela geram slots novos.
+- **Falha fechado**: arquivo ausente, JSON inválido, automação inválida ou **6ª automação** →
+  exit 2 com código fixo (`automacoes_ausentes`/`automacoes_invalidas`/`automacoes_limite`).
+
 ## Servidor simulado
 
 Enquanto a credencial real não é validada, use o servidor da própria stack:

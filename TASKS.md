@@ -17,4 +17,5 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T7-B | packages/worker: gerador + CLI `pnpm outbox:gerar` (Channel FileOutbox) | Cinzel | em_revisao | PR #50; worker 134 testes (+47) e typecheck verdes; e2e com Shopee simulada |
 | T11 | Sonda real da credencial Shopee (MVP 2 e 10): script + 1 chamada somente-leitura | Sextante | em_revisao | PR #41 (main #42/#43/#49 trazida por merge, conflitos resolvidos); 57 testes do pacote ok; sonda real = falha/10010/0 |
 | T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44 (na main via #49); D0 = OK/contagem 1; sem D1 |
+| T7-D | Automações por arquivo (`config/automacoes.json`, limite 5) + agendamento sobre o gerador | Cinzel | em_revisao | PR #54; domain 59 e worker 142 testes; arquivo inválido e 6ª automação recusados |
 | T8-A | Desacoplar o web: só container em memória; /conexoes e Telegram atrás de flag (sem Supabase/Telegram/Vault ativos) | Vigia | em_revisao | PR #51; build e testes verdes sem env do Supabase |
