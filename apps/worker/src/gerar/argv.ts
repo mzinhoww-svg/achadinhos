@@ -6,6 +6,7 @@ export interface CliArgs {
   keyword?: string;
   handle?: string;
   endpoint?: string;
+  permitirReal?: boolean;
   help?: boolean;
 }
 
@@ -38,6 +39,10 @@ export function parseArgs(argv: string[]): CliArgs {
       case "--help":
       case "-h":
         args.help = true;
+        i += 1;
+        break;
+      case "--permitir-real":
+        args.permitirReal = true;
         i += 1;
         break;
       case "--limite": {
@@ -101,7 +106,8 @@ export const HELP = [
   "  --grupo-indice N  posição do grupo na configuração, 1..99 (padrão 1)",
   "  --keyword TXT     filtro de palavra-chave da busca",
   "  --handle @x       @ do afiliado (padrão AFFILIATE_HANDLE)",
-  "  --endpoint URL    endpoint GraphQL (padrão SHOPEE_ENDPOINT); exigido, aponta ao simulado",
+  "  --endpoint URL    endpoint GraphQL (padrão SHOPEE_ENDPOINT)",
+  "  --permitir-real   autoriza endpoint fora de loopback; exige --limite e só com autorização de Aurimar",
   "",
   "Ambiente: SHOPEE_APP_ID, SHOPEE_SECRET, SHOPEE_ENDPOINT, AFFILIATE_HANDLE, IMAGE_ALLOWED_HOSTS,",
   "OUTBOX_DIR, LOG_LEVEL. Nenhuma chamada real à Shopee sem SHOPEE_ENDPOINT explícito.",

@@ -208,11 +208,26 @@ describe("generateOutbox (T7-B, §3)", () => {
       delivered: 0,
       failed: 0,
       unknown: 0,
+      discarded: 0,
     };
     expect(exitCodeFor(base)).toBe(0);
     expect(exitCodeFor({ ...base, failed: 1 })).toBe(1);
     expect(exitCodeFor({ ...base, unknown: 1 })).toBe(1);
     expect(exitCodeFor({ ...base, fetchError: "shopee_http" })).toBe(1);
+  });
+
+  it("conta descartes e avisa quando nada é utilizável (host de imagem fora da allowlist)", async () => {
+    const server = await startOffersServer({ nodes: [offerNode(11, { imageUrl: "https://fora.test/x.png" })] });
+    try {
+      const client = clientFor(server.url);
+      const { deps, lines } = await harness({ source: client, shortLinker: client });
+      const summary = await generateOutbox(makeInput(), deps);
+      expect(summary.discarded).toBe(1);
+      expect(summary.delivered).toBe(0);
+      expect(lines.join("\n")).toContain("sem_ofertas_utilizaveis");
+    } finally {
+      await server.close();
+    }
   });
 
   it("nenhum arquivo nem linha de log contém o Secret", async () => {

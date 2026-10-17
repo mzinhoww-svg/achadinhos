@@ -6,8 +6,12 @@ pelo canal **FileOutbox** (`@achadinhos/channel`). Sem banco, sem Telegram, sem 
 
 ## Segurança
 
-- **Nenhuma chamada real à Shopee sem `SHOPEE_ENDPOINT` explícito**: o CLI exige a variável e falha
-  fechado se ela não existir. Enquanto o 10010 estiver aberto, aponte para o servidor simulado.
+- **Por padrão, só endpoint de loopback** (`127.0.0.1`, `localhost`, `::1`). Endpoint fora de loopback
+  é **recusado localmente** (exit 2, sem montar adaptadores nem chamar a Shopee), a menos que
+  `--permitir-real` seja passado **explicitamente nesta invocação**.
+- **`--permitir-real` exige `--limite N` explícito** e imprime `chamadas_max = paginas_max + limite`
+  antes de começar (`paginas_max = 1` nesse modo). Use **somente** com autorização de Aurimar e
+  **depois** de o item 2 do checklist validar a credencial — hoje o `productOfferV2` ainda dá 10010.
 - Segredos (`SHOPEE_APP_ID`, `SHOPEE_SECRET`) ficam só em `.env`/ambiente, nunca em log, PR ou
   arquivo gerado; o logger redige o Secret.
 - `outbox/` é gitignored.
@@ -34,6 +38,7 @@ Flags:
 | `--keyword TXT` | filtro de palavra-chave da busca |
 | `--handle @x` | @ do afiliado (padrão `AFFILIATE_HANDLE`) |
 | `--endpoint URL` | endpoint GraphQL (padrão `SHOPEE_ENDPOINT`) |
+| `--permitir-real` | autoriza endpoint fora de loopback (exige `--limite`); só com autorização de Aurimar |
 
 Ambiente: `SHOPEE_ENDPOINT`, `SHOPEE_APP_ID`, `SHOPEE_SECRET`, `AFFILIATE_HANDLE`,
 `IMAGE_ALLOWED_HOSTS` (allowlist do download), `OUTBOX_DIR`, `OUTBOX_LIMIT`, `OUTBOX_ACCOUNT`,
@@ -42,7 +47,9 @@ Ambiente: `SHOPEE_ENDPOINT`, `SHOPEE_APP_ID`, `SHOPEE_SECRET`, `AFFILIATE_HANDLE
 ## Saída
 
 - Por oferta: `slotKey` e `delivered|failed|unknown` (+ código fixo); nada de mensagem de erro.
-- Resumo no fim; **exit code ≠ 0** se alguma oferta falhar (ou se a busca falhar inteira).
+- Resumo no fim (inclui `descartadas`); **exit code ≠ 0** se alguma oferta falhar (ou se a busca falhar
+  inteira). No modo local a busca pode paginar até 10 vezes (`productOfferV2`); com `--permitir-real`
+  é 1 página.
 - Arquivos: `outbox/<AAAAMMDD>/<HHMM>-<itemId>-g<indice>.md` e `.png`, mais o `index.md` do dia.
   O `.md` é o único marcador de "entregue".
 

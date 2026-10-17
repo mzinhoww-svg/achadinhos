@@ -9,6 +9,7 @@ import { downloadProductImage } from "../image.js";
 import { createLogger, type Level, type Logger } from "../logger.js";
 import { ArgvError, HELP, parseArgs, type CliArgs } from "./argv.js";
 import {
+  MAX_PAGES,
   clampLimit,
   exitCodeFor,
   generateOutbox,
@@ -21,6 +22,18 @@ import type { Channel, ImageFetcher, OfferSource, RenderCreative, ShortLinker } 
 export const DEFAULT_IMAGE_HOSTS = ["shopee.com.br", "susercontent.com", "shopeemobile.com"];
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 const DEFAULT_GROUP_INDEX = 1;
+/** Com `--permitir-real`, uma única página é consultada (limita o número de chamadas reais). */
+const REAL_PAGES_MAX = 1;
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
+/** Só loopback é considerado "simulado". Qualquer outro host exige `--permitir-real`. */
+export function isLoopbackEndpoint(endpoint: string): boolean {
+  try {
+    return LOOPBACK_HOSTS.has(new URL(endpoint).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 export interface CliConfig {
   endpoint: string;
@@ -76,6 +89,10 @@ export function resolveConfig(args: CliArgs, env: Record<string, string | undefi
 
   const affiliateHandle = args.handle ?? env["AFFILIATE_HANDLE"];
   if (!affiliateHandle) return "defina AFFILIATE_HANDLE ou --handle";
+
+  if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
+    return "--limite deve ser um inteiro >= 1";
+  }
 
   const groupIndex = args.groupIndex ?? DEFAULT_GROUP_INDEX;
   if (!Number.isInteger(groupIndex) || groupIndex < 1 || groupIndex > 99) return "--grupo-indice fora de 1..99";
@@ -155,6 +172,21 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
     return { exitCode: 2 };
   }
 
+  // R1: nenhuma chamada real sem autorização explícita por invocação.
+  const allowReal = args.permitirReal === true;
+  if (!allowReal && !isLoopbackEndpoint(config.endpoint)) {
+    write(JSON.stringify({ level: "error", msg: "endpoint_nao_loopback", code: "endpoint_nao_loopback" }));
+    write("endpoint fora de loopback: só com --permitir-real e autorização de Aurimar (item 2 do checklist)");
+    return { exitCode: 2 };
+  }
+  if (allowReal && args.limit === undefined) {
+    write(JSON.stringify({ level: "error", msg: "limite_obrigatorio", code: "limite_obrigatorio" }));
+    write("--permitir-real exige --limite N explícito");
+    return { exitCode: 2 };
+  }
+  const maxPages = allowReal ? REAL_PAGES_MAX : MAX_PAGES;
+  if (allowReal) write(`chamadas_max=${maxPages + config.limit}`);
+
   const secret = env["SHOPEE_SECRET"];
   const logger: Logger = createLogger({
     sink: write,
@@ -172,6 +204,7 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
       affiliateHandle: config.affiliateHandle,
       imageHosts: config.imageHosts,
       limit: config.limit,
+      maxPages,
       ...(config.keyword ? { keyword: config.keyword } : {}),
       tracking: config.tracking,
     },
@@ -186,7 +219,8 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
   );
 
   write(
-    `resumo: ${summary.delivered} delivered, ${summary.failed} failed, ${summary.unknown} unknown` +
+    `resumo: ${summary.delivered} delivered, ${summary.failed} failed, ${summary.unknown} unknown, ` +
+      `${summary.discarded} descartadas` +
       (summary.fetchError ? ` (${summary.fetchError})` : ""),
   );
   return { exitCode: exitCodeFor(summary), summary };

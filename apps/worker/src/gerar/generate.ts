@@ -28,7 +28,8 @@ export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
 /** Tamanho de página pedido à Shopee (mesmo valor de `offer-selection`). */
 export const PAGE_LIMIT = 50;
-const MAX_PAGES = 10;
+/** Páginas máximas por execução no caminho simulado/local. */
+export const MAX_PAGES = 10;
 
 export interface GenerateGroup {
   index: number;
@@ -50,6 +51,8 @@ export interface GenerateInput {
   /** Allowlist do download da imagem (mesma decisão 002 C1 do worker). */
   imageHosts: readonly string[];
   limit?: number;
+  /** Páginas máximas de busca (padrão `MAX_PAGES`). A CLI reduz para 1 quando `--permitir-real`. */
+  maxPages?: number;
   filters?: OfferFilters;
   keyword?: string;
   tracking?: GenerateTracking;
@@ -82,6 +85,8 @@ export interface GenerateSummary {
   delivered: number;
   failed: number;
   unknown: number;
+  /** Nós válidos fora do lote por formato/host inválido ou repetidos dentro do lote. */
+  discarded: number;
   /** Código fixo quando a busca de ofertas falhou inteira (nada foi tentado). */
   fetchError?: string;
 }
@@ -120,11 +125,22 @@ function shopeeCode(error: unknown, fallback: string): string {
   return fallback;
 }
 
+interface CollectedOffers {
+  chosen: ProductOfferNode[];
+  /** Nós recebidos da Shopee (após formato da página). */
+  fetched: number;
+  /** Nós válidos descartados por formato/host inválido ou por repetição dentro do lote. */
+  discarded: number;
+}
+
 /** Busca páginas de ofertas até juntar `limit` ofertas válidas, filtrando e deduplicando só dentro do lote. */
-async function collectOffers(input: GenerateInput, deps: GenerateDeps, limit: number): Promise<ProductOfferNode[]> {
+async function collectOffers(input: GenerateInput, deps: GenerateDeps, limit: number): Promise<CollectedOffers> {
   const chosen: ProductOfferNode[] = [];
   const seen = new Set<string>();
-  for (let page = 1; page <= MAX_PAGES && chosen.length < limit; page += 1) {
+  let fetched = 0;
+  let discarded = 0;
+  const maxPages = input.maxPages ?? MAX_PAGES;
+  for (let page = 1; page <= maxPages && chosen.length < limit; page += 1) {
     const params: { page: number; limit: number; keyword?: string } = { page, limit: PAGE_LIMIT };
     if (input.keyword) params.keyword = input.keyword;
     const page0 = await deps.source.productOfferV2(params);
@@ -133,10 +149,20 @@ async function collectOffers(input: GenerateInput, deps: GenerateDeps, limit: nu
     }
     const usable: ProductOfferNode[] = [];
     for (const node of page0.nodes) {
-      if (!node || typeof node !== "object") continue;
-      if (invalidNodeReason(node, { imageHosts: input.imageHosts })) continue;
+      fetched += 1;
+      if (!node || typeof node !== "object") {
+        discarded += 1;
+        continue;
+      }
+      if (invalidNodeReason(node, { imageHosts: input.imageHosts })) {
+        discarded += 1;
+        continue;
+      }
       const id = String(node.itemId);
-      if (seen.has(id)) continue;
+      if (seen.has(id)) {
+        discarded += 1;
+        continue;
+      }
       seen.add(id);
       usable.push(node);
     }
@@ -147,7 +173,7 @@ async function collectOffers(input: GenerateInput, deps: GenerateDeps, limit: nu
     }
     if (!page0.pageInfo.hasNextPage) break;
   }
-  return chosen;
+  return { chosen, fetched, discarded };
 }
 
 interface DeliverContext {
@@ -237,13 +263,22 @@ export async function generateOutbox(input: GenerateInput, deps: GenerateDeps): 
   const results: OfferOutcome[] = [];
 
   let offers: ProductOfferNode[] = [];
+  let discarded = 0;
+  let fetched = 0;
   let fetchError: string | undefined;
   try {
-    offers = await collectOffers(input, deps, limit);
+    const collected = await collectOffers(input, deps, limit);
+    offers = collected.chosen;
+    discarded = collected.discarded;
+    fetched = collected.fetched;
   } catch (error) {
     fetchError = shopeeCode(error, "busca_falhou");
     deps.logger.error("busca_falhou", { code: fetchError });
   }
+  if (fetchError === undefined && fetched > 0 && offers.length === 0) {
+    deps.logger.warn("sem_ofertas_utilizaveis", { descartadas: discarded });
+  }
+  if (discarded > 0) deps.logger.info("ofertas_descartadas", { descartadas: discarded });
 
   const context: DeliverContext = { slot, generatedAtUtc, input, deps };
   for (const offer of offers) {
@@ -267,6 +302,7 @@ export async function generateOutbox(input: GenerateInput, deps: GenerateDeps): 
     delivered,
     failed,
     unknown,
+    discarded,
     ...(fetchError ? { fetchError } : {}),
   };
 }
