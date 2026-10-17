@@ -49,7 +49,7 @@ Hipóteses do Dev cobertas: (1) documento não aceito → D1–D3; (2) corpo sem
 
 ## 4. Regras de execução (auditoria)
 
-1. **Autorização por sessão**: Aurimar autoriza o número exato de chamadas (≤ 4) antes de cada rodada. Sem laço, sem retry, sem agendamento.
+1. **Autorização por rodada**: Aurimar autoriza os degraus e o número exato de chamadas de cada um (teto por degrau no §3) antes de cada rodada. Sem laço, sem retry, sem agendamento.
 2. **Só leitura**: nenhuma mutation (`generateShortLink` fica fora; vai em tarefa própria depois de a credencial validar).
 3. **Segredo**: App ID, Secret e header de assinatura nunca em log, PR, TASKS.md ou mensagem. Tudo continua saindo do `.env` da raiz.
 4. **Saída por allowlist, não por redação** (achado B1 do QA nos PRs #41 e #42): resposta da API é dado, não texto de terminal. Por chamada só saem: degrau, `codigo`, `contagem`, duração e, no máximo, uma mensagem **que case com um modelo fixo**.
@@ -70,7 +70,7 @@ Hipóteses do Dev cobertas: (1) documento não aceito → D1–D3; (2) corpo sem
 ## 5. Critérios de aceite da T12
 
 - Causa do 10010 identificada **ou** lista de causas restantes com as chamadas já gastas.
-- `004-endpoint-shopee.md` atualizada: formato do header (ordem `Credential/Timestamp/Signature`), operação aceita, tipos de preço/comissão, tolerância de timestamp, formato do erro de assinatura (se D4 rodou).
+- `004-endpoint-shopee.md` atualizada: formato do header (ordem `Credential/Timestamp/Signature`), operação aceita, tipos de preço/comissão, deslocamento do relógio (a tolerância de timestamp só se houver rodada própria), formato do erro de assinatura (se D4 rodou).
 - Item 2 do `mvp-checklist.json` só vira "validado" com **uma** chamada `productOfferV2` do próprio cliente de produção devolvendo `nodes.length >= 1`.
 - Decisão registrada sobre o estado de conexão para "formato recusado" (§2).
 - Teste automatizado novo para cada correção no cliente, contra o servidor simulado atualizado para refletir o formato real descoberto.
