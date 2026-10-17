@@ -1,3 +1,5 @@
 497b86277d1f0d88633e59d8562bfd2cf7e69146:packages/shopee/src/__tests__/hardening.test.ts:generic-api-key:16
 # Valor sintético de teste (já substituído pelo SECRET_CANARY nos commits seguintes)
 5e9e374b78ebe2ebe9d824760e76ff05ce429e93:apps/web/test/db/adapters.test.ts:generic-api-key:257
+# Segredo falso do teste da allowlist do diagnóstico (T12); valor sintético, já trocado por "test-secret" no commit seguinte
+0a4849ceb3705625caaa0e17ba2b6387ce058489:scripts/diag-allowlist.test.ts:generic-api-key:25
