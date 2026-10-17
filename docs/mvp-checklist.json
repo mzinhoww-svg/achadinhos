@@ -7,31 +7,64 @@
       "aceite": "Testes unitários com vetor conhecido + teste contra GraphQL simulado",
       "fase": "F1",
       "status": "concluida",
-      "depende_credencial": true
+      "depende_credencial": true,
+      "prova": [
+        "packages/shopee: 48 testes passam (vetor de assinatura conhecido + GraphQL simulado `startMockShopeeServer`)",
+        "apps/worker/tests/e2e/sql.e2e.test.ts usa o cliente real contra o servidor simulado (link curto assinado)"
+      ],
+      "nota": "Aceite cumprido; o cliente nunca foi chamado com credencial real (ver itens 2 e 10)."
     },
     {
       "id": 2,
       "titulo": "Conexões: validar e salvar App ID/Secret (Vault)",
       "aceite": "Nenhuma rota ou payload RSC contém o Secret",
       "fase": "F1",
-      "status": "implementado; sonda real executada em 2026-10-16 (1 chamada somente-leitura productOfferV2): API respondeu HTTP 2xx com erro GraphQL 10010 (Parse Error). Credencial ainda NÃO validada — ver docs/decisions/004-endpoint-shopee.md",
-      "depende_credencial": true
+      "status": "parcial (salvar no Vault na main; validar de verdade não acontece em produção); sonda real de 2026-10-16 (1 chamada somente-leitura productOfferV2) devolveu HTTP 2xx com erro GraphQL 10010 (Parse Error) — credencial ainda NÃO validada; ver docs/decisions/004-endpoint-shopee.md",
+      "depende_credencial": true,
+      "prova": [
+        "Salvar: apps/web/test/conexoes.test.ts e rotas-segredo.test.ts (nenhuma rota/payload RSC contém o Secret); supabase/tests/indexes_vault.sql + rls_isolation.sql; QA em Postgres real: Secret write-only (`web_put_secret` devolve só o id), conta B não usa o segredo da A",
+        "Validar: apps/worker/src/validation (runner + validators) com testes em memória (apps/worker/tests/validation.test.ts)",
+        "Sonda real (PR #41): uma chamada assinada somente-leitura contra o endpoint real, com saída allowlisted (resultado/código/contagem) e sem App ID/Secret/assinatura na saída; evidência em docs/decisions/004-endpoint-shopee.md"
+      ],
+      "falta": [
+        "Adaptador SQL do `ValidationStore`: só existe `MemoryValidationStore`; `createSqlBuildDeps` não devolve `validation` (conferido na main c69556e: chaves = alerts, executor, groups, heartbeatStore, now, queue, scheduler), então o status fica `pending_validation` para sempre",
+        "Credencial real: App ID e Secret da Shopee Affiliate Open API (docs/ACTIONS.md, pendente) para a primeira chamada assinada real e validação com resposta verdadeira",
+        "Atualização da sonda real: a primeira chamada assinada real já aconteceu (sonda do #41 e degrau D0 do #44, 2026-10-16), mas `productOfferV2` ainda responde 10010 — falta fechar o diagnóstico e ver o cliente de produção devolver ≥ 1 oferta",
+        "E2E: painel salva → worker valida → status `validated` visível no painel, sobre Postgres com Shopee simulada; depois uma execução com credencial real"
+      ]
     },
     {
       "id": 3,
       "titulo": "Canal Telegram: token, grupos, ativar, sub_id único",
       "aceite": "Grupo de teste aparece e recebe mensagem de verificação",
       "fase": "F1",
-      "status": "implementado; aguardando token do bot e grupo de teste",
-      "depende_credencial": true
+      "status": "parcial (token, listagem e ativação de grupos na main; verificação do canal não roda em produção)",
+      "depende_credencial": true,
+      "prova": [
+        "apps/web/test/telegram-gateway.test.ts e conexoes.test.ts (token salvo no Vault, grupos via my_chat_member, ativar grupo)",
+        "sub_id único: `groups_account_sub_id_key UNIQUE (account_id, sub_id)` em supabase/migrations/20261013120000_t7_queue_sql.sql (provado nos pgTAP cross_tenant/indexes e nos adapters web); worker: bot removido desativa o grupo (apps/worker/tests/e2e/sql.e2e.test.ts)",
+        "Mensagem de verificação: apps/worker/src/validation/validators.ts (testes em memória)"
+      ],
+      "falta": [
+        "Mesmo adaptador SQL do `ValidationStore` e ligação em `createSqlBuildDeps` (sem ele o worker nunca envia a mensagem de verificação nem marca o canal `validated`)",
+        "Credencial real: token do bot (BotFather) e um grupo de teste com o bot adicionado (docs/ACTIONS.md, pendente)",
+        "E2E: grupo aparece na lista → ativar → worker envia a mensagem de verificação → `validated`; depois com o bot real"
+      ]
     },
     {
       "id": 4,
       "titulo": "Automações CRUD com limite de 5",
       "aceite": "Validação testada e 6a automação recusada",
       "fase": "F2",
-      "status": "parcial (UI e schema na main; falta adaptador Supabase sob RLS)",
-      "depende_credencial": false
+      "status": "concluida",
+      "depende_credencial": false,
+      "prova": [
+        "supabase/tests/automation_limit.sql (3 ok; gatilho 5 por conta)",
+        "apps/web/test/db/adapters.test.ts: CRUD só com grupos ativos da conta e limite de 5 sob corrida, via adapters RPC em Postgres embutido com as migrações reais",
+        "apps/web/test/automacoes.test.ts: 6ª automação recusada com mensagem clara, mesmo concorrente",
+        "QA em Postgres Supabase real: 6ª recusada, `p_max` forjado barrado pelo gatilho, conta B não escreve na A"
+      ],
+      "nota": "Endurecimento aberto (não bloqueia o aceite): a RPC aceita `days` fora de 0–6 e janela início=fim se chamada direto (falta CHECK); a validação existe só na camada web."
     },
     {
       "id": 5,
@@ -39,79 +72,167 @@
       "aceite": "Teste de unidade da fórmula",
       "fase": "F2",
       "status": "concluida",
-      "depende_credencial": false
+      "depende_credencial": false,
+      "prova": [
+        "apps/web/test/estimate.test.ts e packages/domain/src/__tests__/core.test.ts (estimate): grupos × (janela ÷ frequência), teto 200/dia, janela que cruza a meia-noite (22:00→02:00 = 4 h), janela vazia = 0"
+      ]
     },
     {
       "id": 6,
       "titulo": "Worker agendador a cada minuto",
       "aceite": "Relógio simulado: borda de janela e virada de dia em America/Cuiaba",
       "fase": "F3",
-      "status": "parcial (lógica na main; falta adaptador SQL do SchedulerStore e worker-entry, PR #30)",
-      "depende_credencial": false
+      "status": "concluida",
+      "depende_credencial": false,
+      "prova": [
+        "packages/domain (scheduling/timezone) e apps/worker/tests/scheduler/*: borda de janela e virada de dia em America/Cuiaba com relógio simulado",
+        "apps/worker/tests/e2e/pipeline.test.ts (virada 22:00–02:00, 1 envio por slot) e scheduler-store.pg.test.ts (PgSchedulerStore sobre Postgres embutido)",
+        "apps/worker/tests/e2e/sql.e2e.test.ts: `createSqlBuildDeps` + runtime sobre Postgres; QA em Postgres Supabase real: `tickOnce` ×3 concorrente no mesmo slot = 1 envio"
+      ],
+      "nota": "Não exercitado ainda no projeto Supabase hospedado nem pelo pooler 6543."
     },
     {
       "id": 7,
       "titulo": "Antirrepetição 7 dias",
       "aceite": "Reexecução do worker 2x sem duplicata",
       "fase": "F3",
-      "status": "parcial (regra na main; depende do adaptador SQL do histórico)",
-      "depende_credencial": false
+      "status": "concluida",
+      "depende_credencial": false,
+      "prova": [
+        "apps/worker/tests/scheduler/offer-selection.test.ts: pula item enviado há menos de 7 dias, no dia 8 volta; tudo repetido ⇒ none/repetida",
+        "apps/worker/tests/scheduler-store.pg.test.ts: `listRecentSends` por item e `since`; sql.e2e.test.ts: reexecução 2x não duplica",
+        "QA em Postgres Supabase real: reexecução do agendador (×3 e ×2) mantém 1 envio por slot"
+      ],
+      "nota": "O agendador cumpre a regra; \"Mandar agora\" só avisa a repetição (decisão do Aurimar pendente: Mandar agora × antirrepetição 7 dias)."
     },
     {
       "id": 8,
       "titulo": "Fila: 1 por canal, 60 s, teto 200, prioridade 100",
       "aceite": "Concorrência com 2 workers sem envio duplo",
       "fase": "F3",
-      "status": "parcial (SQL + executor na main; falta worker-entry que liga claim -> executor -> finish_send; executor ainda não usa o downloader seguro do #23)",
-      "depende_credencial": false
+      "status": "concluida",
+      "depende_credencial": false,
+      "prova": [
+        "supabase/tests/queue_claim.sql, queue_finish_enqueue.sql, queue_schema.sql (pgTAP; total 179 ok, 0 falhas)",
+        "supabase/tests/concurrency/claim_next_send.sh em Postgres Supabase real: 12 claims simultâneos = 1 sending; 6 canais × 3 = 1 por canal; SKIP LOCKED; duplo clique = 1 linha (todos PASS)",
+        "apps/worker/tests/queue.pg.test.ts (PgQueue por RPC) e sql.e2e.test.ts; QA com 2 pools `pg` como `achadinhos_worker`: 4 chamadas concorrentes = 1 envio, <60 s nada, após 60 s o 2º; 6 canais = 6 envios, nenhum `external_message_id` repetido",
+        "apps/worker/tests/executor.test.ts + image.test.ts: executor usa o downloader seguro (29 ataques sem regressão)"
+      ],
+      "nota": "O e2e de 2 workers em pools reais roda só manualmente; vale virar teste de contrato opcional. Não exercitado no pooler 6543."
     },
     {
       "id": 9,
       "titulo": "Criativo PNG 1080x1080",
       "aceite": "Snapshot visual aprovado pelo Designer",
       "fase": "F2",
-      "status": "concluida (PNG real, QA aprovado)",
-      "depende_credencial": false
+      "status": "concluida",
+      "depende_credencial": false,
+      "prova": [
+        "packages/creative/test/render-servidor.test.ts: PNG 1080×1080 por fixture (65 testes do pacote passam), legibilidade e proporções",
+        "docs/design/creative-sample.png (amostra de referência) e render real no pipeline do worker (e2e sql)"
+      ],
+      "nota": "A aprovação visual do Designer consta do histórico do PR #5; não reaprovada nesta verificação."
     },
     {
       "id": 10,
       "titulo": "Mandar agora",
       "aceite": "E2E com Shopee simulada",
       "fase": "F4",
-      "status": "implementado; falta e2e com Shopee simulada; credencial Shopee (item 2) segue não validada pela sonda real",
-      "depende_credencial": true
+      "status": "parcial (UI e RPC na main; busca de oferta/link real não existe em produção); credencial Shopee (item 2) segue não validada pela sonda real",
+      "depende_credencial": true,
+      "prova": [
+        "apps/web/test/mandar-agora.test.ts, mandar-agora-fonte.test.ts e shopee-finder.test.ts (palavra-chave/URL, https, subIds ≤5, aviso de repetição) sobre portas em memória + Shopee simulada",
+        "`enqueue_send_now` e duplo clique: supabase/tests/queue_finish_enqueue.sql e concurrency/claim_next_send.sh; chave `now:` tratada como manual no worker (vault-context.pg.test.ts)"
+      ],
+      "falta": [
+        "Adaptador real do `OfferFinder`/`ShortLinkGateway`: em produção a web usa `offlineFinder`/`offlineLinks` (apps/web/src/server/context.ts:185) e lança `finder_not_configured`; `shopee-finder.ts` existe mas não é instanciado em lugar nenhum, e a web não lê o Secret (decisão 003 H1), então a busca precisa de endpoint interno ou de ir para o worker",
+        "E2E ponta a ponta: web → `web_enqueue_send_now` → worker → Telegram com Shopee simulada (hoje cada trecho é testado separado; nenhum teste cobre a cadeia)",
+        "Credencial real da Shopee (App ID/Secret) para a primeira busca e link curto reais",
+        "Decisão pendente: Mandar agora × antirrepetição de 7 dias"
+      ]
     },
     {
       "id": 11,
       "titulo": "Envios: cards, lista 30 dias, Realtime",
       "aceite": "E2E: status muda e tela atualiza sem recarregar",
       "fase": "F4",
-      "status": "parcial (tela e polling na main; Realtime desligado: getRealtimeClient() nulo e sends fora da publicação supabase_realtime)",
-      "depende_credencial": false
+      "status": "parcial (tela, polling e publicação Realtime na main; Realtime nunca é ativado em produção)",
+      "depende_credencial": false,
+      "prova": [
+        "apps/web/test/envios.test.ts, envios-page.test.ts, realtime.test.ts, realtime-client.test.ts e realtime-sql.test.ts",
+        "supabase/tests/realtime_publication.sql (3 ok): `sends` na publicação `supabase_realtime`",
+        "QA com serviço Realtime real (supabase/realtime v2.130.0): conta A recebe seus eventos; B e anon não (RLS)"
+      ],
+      "falta": [
+        "`createSupabaseSessions` (apps/web/src/server/supabase/session.ts) não devolve `accessToken`, então `getRealtimeClient` retorna `null` e a tela só usa polling em produção; preencher o token no servidor depois de `getUser()`",
+        "E2E \"status muda e a tela atualiza sem recarregar\" com sessão Supabase real (hoje só em memória e com cliente simulado)",
+        "Publicar só as colunas que a tela usa (a linha inteira trafega)"
+      ]
     },
     {
       "id": 12,
       "titulo": "Comissão: conversionReport a cada 6 h idempotente",
       "aceite": "Reexecução não duplica; soma por grupo bate com fixture",
       "fase": "F5",
-      "status": "parcial (coletor idempotente em memória; persistência SQL pendente)",
-      "depende_credencial": true
+      "status": "parcial (coletor, persistência SQL e job na main; job não roda e não há credencial)",
+      "depende_credencial": true,
+      "prova": [
+        "packages/commission: 29 testes (idempotência por (conta, checkout), insert-only com histórico em `commission_events`, soma por sub_id do grupo, transições monotônicas)",
+        "apps/worker/tests/commission-job.test.ts (ciclo de 6 h, falha isolada por conta, sem sobreposição)",
+        "QA em Postgres Supabase real: 12 conexões no mesmo checkout = 1 inserted + 11 duplicate; UPDATE/DELETE barrados até para `service_role`; conta B só vê a própria soma"
+      ],
+      "falta": [
+        "Ligar o job: `startCommissionJob` só é chamado em testes; `createSqlBuildDeps` não o monta (sem `sourceFor` por conta com a credencial do Vault, sem `repositoryFor`, sem lista de contas)",
+        "E2E: `conversionReport` simulado → job → Postgres → soma por grupo no painel, com reexecução 2x",
+        "Credencial real da Shopee (conversionReport) e decisão insert-only × atualização de comissão (M6)"
+      ]
     },
     {
       "id": 13,
       "titulo": "Alertas por e-mail",
       "aceite": "Teste com transporte de e-mail simulado",
       "fase": "F5",
-      "status": "parcial (alertas com transporte simulado; falta heartbeat exposto e provedor real)",
-      "depende_credencial": false
+      "status": "parcial (alertas, heartbeat persistido e transporte HTTP na main; provedor e monitor externo não existem)",
+      "depende_credencial": false,
+      "prova": [
+        "packages/alerts: 24 testes (dedupe por causa, transporte HTTP por env, chave fora de log/cause/inspect)",
+        "apps/worker/tests/heartbeat/*: monitor + `SqlHeartbeatStore`; QA em Postgres real: 4 min parado = 1 e-mail, sem repetir, re-arme, borda 179/181 s, só `service_role` executa",
+        "`createSqlBuildDeps` liga alerts + heartbeatStore ao runtime; bot removido/credencial inválida disparam alerta (e2e sql)"
+      ],
+      "falta": [
+        "Provedor real: EMAIL_PROVIDER_ENDPOINT, EMAIL_PROVIDER_API_KEY, EMAIL_FROM e ALERT_EMAIL_TO definidos, e prova de um e-mail real recebido (docs/ACTIONS.md, pendente)",
+        "Monitor externo ao VPS (healthchecks.io/UptimeRobot ou pg_cron) que alerta se o processo morrer; o ping do worker ainda não existe (plano de deploy 3.2): sem ele \"parado > 3 min\" não é cumprível",
+        "Remover o e-mail pessoal fixo de `DEFAULT_ALERT_EMAIL_TO` (packages/alerts/src/types.ts:99)"
+      ]
     },
     {
       "id": 14,
       "titulo": "Onboarding e estados vazios",
       "aceite": "QA visual 390x844 e 1440x900",
       "fase": "F4",
-      "status": "parcial (UI na main; 'validado' depende do adaptador SQL do ValidationStore e da entrada do worker (#30))",
-      "depende_credencial": false
+      "status": "parcial (telas e estados vazios na main; o passo \"validado\" nunca fecha em produção)",
+      "depende_credencial": false,
+      "prova": [
+        "apps/web/test/onboarding.test.ts (passos derivados do banco; estados vazios)",
+        "QA visual: docs/design/screenshots/*-390.png e *-1440.png e docs/design/t8-onboarding (390×844 e 1440×900, com dados e `?vazio=1`)"
+      ],
+      "falta": [
+        "Os passos Conexões/Canal só ficam `done` com status `validated` (apps/web/src/server/onboarding.ts:48), que depende do `ValidationStore` SQL e da ligação no worker (itens 2 e 3); hoje a conta nova nunca avança",
+        "Repetir o QA visual do estado final com conta validada de verdade (depende dos itens 2 e 3)"
+      ]
     }
-  ]
+  ],
+  "verificado": {
+    "data": "2026-10-14",
+    "commit_main": "c69556e",
+    "regra": "concluida só com código na main + persistência real + prova ponta a ponta; senão parcial (o que falta)",
+    "suite": "typecheck 0 erros nos 8 pacotes; alerts 24, domain 54, telegram 23, shopee 48, commission 29, creative 65, web 161, worker 339; pgTAP 179 ok, 0 falhas; concurrency/claim_next_send.sh todos PASS; next build ok",
+    "resumo": "concluida: 1, 4, 5, 6, 7, 8, 9; parcial: 2, 3, 10, 11, 12, 13, 14",
+    "observacoes": [
+      "O worker de produção (`createSqlBuildDeps`) monta: relógio do banco, agendador SQL, fila por RPC, Vault, executor, heartbeat e alertas. NÃO monta: validação de credenciais, job de comissão.",
+      "Nenhuma credencial real (Shopee, Telegram, e-mail) foi usada em qualquer prova; nada foi exercitado no projeto Supabase hospedado nem pelo pooler 6543.",
+      "A main tem duas migrações com a versão 20261015120000 (t7_worker_heartbeats e t8_realtime_sends): o primeiro `db push` falha na segunda; renomear uma delas.",
+      "Testes intermitentes sob carga: apps/web/test/realtime-sql.test.ts na 1ª execução fria e 1–3 testes de apps/worker/tests/e2e/pipeline.test.ts por timeout de 5 s (render de PNG, máquina com load average > 100); isolados passam. Sugestão: testTimeout/hookTimeout maiores."
+    ]
+  }
 }
