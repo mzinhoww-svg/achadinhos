@@ -36,7 +36,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Fixado para a revalidação semanal ser reprodutível (mesma versão validada localmente).
+          version: 2.117.0
       - run: supabase start
       - run: supabase test db --local
       - if: always()
