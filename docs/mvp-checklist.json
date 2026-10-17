@@ -6,57 +6,57 @@
       "titulo": "Cliente Shopee assinado",
       "aceite": "Testes unitários com vetor conhecido + teste contra GraphQL simulado",
       "fase": "F1",
-      "status": "concluida",
+      "status": "parcial (aceite de testes cumprido; contra a API real o documento `productOfferV2` é recusado com `10010`)",
       "depende_credencial": true,
       "prova": [
         "packages/shopee: 48 testes passam (vetor de assinatura conhecido + GraphQL simulado `startMockShopeeServer`)",
         "apps/worker/tests/e2e/sql.e2e.test.ts usa o cliente real contra o servidor simulado (link curto assinado)"
       ],
-      "nota": "Aceite cumprido; o cliente nunca foi chamado com credencial real (ver itens 2 e 10)."
+      "nota": "Aceite literal cumprido (vetor de assinatura + servidor simulado). O cliente nunca foi chamado com credencial validada e o formato da consulta é recusado pela API real; a correção do documento é a tarefa T12-FIX, depois do diagnóstico (docs/plans/shopee-diagnostico-10010.md).",
+      "falta": [
+        "Diagnóstico D1 e D4 (autorização de Aurimar)",
+        "Corrigir o documento no `ShopeeClient` e atualizar o servidor simulado para o formato real descoberto, com teste por correção"
+      ]
     },
     {
       "id": 2,
-      "titulo": "Conexões: validar e salvar App ID/Secret (Vault)",
-      "aceite": "Nenhuma rota ou payload RSC contém o Secret",
+      "titulo": "Credencial Shopee por variável de ambiente, validada pela sonda",
+      "aceite": "Nenhum arquivo, log ou saída contém o Secret; uma chamada `productOfferV2` do cliente de produção devolve ≥ 1 oferta",
       "fase": "F1",
-      "status": "parcial (salvar no Vault na main; validar de verdade não acontece em produção); sonda real de 2026-10-16 (1 chamada somente-leitura productOfferV2) devolveu HTTP 2xx com erro GraphQL 10010 (Parse Error) — credencial ainda NÃO validada; ver docs/decisions/004-endpoint-shopee.md",
+      "status": "bloqueado (credencial NÃO validada): sonda real de 2026-10-16 (PR #41) = HTTP 2xx + erro GraphQL `10010`; D0 (PR #44) = OK, mas não prova credencial",
       "depende_credencial": true,
       "prova": [
-        "Salvar: apps/web/test/conexoes.test.ts e rotas-segredo.test.ts (nenhuma rota/payload RSC contém o Secret); supabase/tests/indexes_vault.sql + rls_isolation.sql; QA em Postgres real: Secret write-only (`web_put_secret` devolve só o id), conta B não usa o segredo da A",
-        "Validar: apps/worker/src/validation (runner + validators) com testes em memória (apps/worker/tests/validation.test.ts)",
-        "Sonda real (PR #41): uma chamada assinada somente-leitura contra o endpoint real, com saída allowlisted (resultado/código/contagem) e sem App ID/Secret/assinatura na saída; evidência em docs/decisions/004-endpoint-shopee.md"
+        "Sonda real (PR #41): 1 chamada somente-leitura, saída allowlisted (resultado/código/contagem), sem App ID/Secret/assinatura; evidência em docs/decisions/004-endpoint-shopee.md",
+        "Diagnóstico D0 (PR #44): `{ __typename }` OK, 598 ms, relógio dentro da tolerância (delta 0 s, resolução 1 s); prova só envelope e transporte",
+        "Saída por allowlist com modelo fixo de mensagem, proteções do script (host, redirect manual, timeout, teto de corpo, um degrau por invocação) testadas em scripts/diag-allowlist.test.ts"
       ],
       "falta": [
-        "Adaptador SQL do `ValidationStore`: só existe `MemoryValidationStore`; `createSqlBuildDeps` não devolve `validation` (conferido na main c69556e: chaves = alerts, executor, groups, heartbeatStore, now, queue, scheduler), então o status fica `pending_validation` para sempre",
-        "Credencial real: App ID e Secret da Shopee Affiliate Open API (docs/ACTIONS.md, pendente) para a primeira chamada assinada real e validação com resposta verdadeira",
-        "Atualização da sonda real: a primeira chamada assinada real já aconteceu (sonda do #41 e degrau D0 do #44, 2026-10-16), mas `productOfferV2` ainda responde 10010 — falta fechar o diagnóstico e ver o cliente de produção devolver ≥ 1 oferta",
-        "E2E: painel salva → worker valida → status `validated` visível no painel, sobre Postgres com Shopee simulada; depois uma execução com credencial real"
-      ]
+        "Autorização de Aurimar para D1 (documento inline) e D4 (Secret sentinela inválido, autorização própria)",
+        "Corrigir o documento `productOfferV2` (T12-FIX) e então fazer UMA chamada do cliente de produção com ≥ 1 oferta",
+        "Registrar na 004 o estado \"formato recusado\" e a tolerância de timestamp só se houver rodada própria",
+        "Vault e `validateShopee` (apps/worker/src/validation) ficam dormentes; o worker de produção não deve validar contra a API real antes da correção"
+      ],
+      "titulo_anterior": "Conexões: validar e salvar App ID/Secret (Vault)"
     },
     {
       "id": 3,
-      "titulo": "Canal Telegram: token, grupos, ativar, sub_id único",
-      "aceite": "Grupo de teste aparece e recebe mensagem de verificação",
+      "titulo": "Canal FileOutbox (Telegram removido do MVP)",
+      "aceite": "Dada uma oferta, gera `.md` + `.png` + `index.md`; testes hostis do plano §1 passam",
       "fase": "F1",
-      "status": "parcial (token, listagem e ativação de grupos na main; verificação do canal não roda em produção)",
-      "depende_credencial": true,
+      "status": "concluida",
+      "depende_credencial": false,
       "prova": [
-        "apps/web/test/telegram-gateway.test.ts e conexoes.test.ts (token salvo no Vault, grupos via my_chat_member, ativar grupo)",
-        "sub_id único: `groups_account_sub_id_key UNIQUE (account_id, sub_id)` em supabase/migrations/20261013120000_t7_queue_sql.sql (provado nos pgTAP cross_tenant/indexes e nos adapters web); worker: bot removido desativa o grupo (apps/worker/tests/e2e/sql.e2e.test.ts)",
-        "Mensagem de verificação: apps/worker/src/validation/validators.ts (testes em memória)"
+        "packages/channel: 75 testes (PR #45): título hostil, `itemId` não numérico, link fora da allowlist, mesmo slot duas vezes = um arquivo, permissões 0600/0700, symlink recusado, PNG antes do `.md`, `.md` nunca sobrescrito, temporário com sufixo aleatório e `wx`, duas instâncias com 20 `deliver` concorrentes, índice do dia com título hostil, `text` em bloco cercado"
       ],
-      "falta": [
-        "Mesmo adaptador SQL do `ValidationStore` e ligação em `createSqlBuildDeps` (sem ele o worker nunca envia a mensagem de verificação nem marca o canal `validated`)",
-        "Credencial real: token do bot (BotFather) e um grupo de teste com o bot adicionado (docs/ACTIONS.md, pendente)",
-        "E2E: grupo aparece na lista → ativar → worker envia a mensagem de verificação → `validated`; depois com o bot real"
-      ]
+      "titulo_anterior": "Canal Telegram: token, grupos, ativar, sub_id único",
+      "nota": "Telegram, token, grupos e `sub_id` por grupo ficam dormentes (código preservado; suíte no workflow dormente)."
     },
     {
       "id": 4,
-      "titulo": "Automações CRUD com limite de 5",
-      "aceite": "Validação testada e 6a automação recusada",
+      "titulo": "Automações lidas de arquivo de configuração só-leitura (limite 5)",
+      "aceite": "Validação de limite 5 e filtros testada; sexta automação recusada",
       "fase": "F2",
-      "status": "concluida",
+      "status": "pendente (T7-D, aguarda resposta 1 de Aurimar)",
       "depende_credencial": false,
       "prova": [
         "supabase/tests/automation_limit.sql (3 ok; gatilho 5 por conta)",
@@ -64,7 +64,12 @@
         "apps/web/test/automacoes.test.ts: 6ª automação recusada com mensagem clara, mesmo concorrente",
         "QA em Postgres Supabase real: 6ª recusada, `p_max` forjado barrado pelo gatilho, conta B não escreve na A"
       ],
-      "nota": "Endurecimento aberto (não bloqueia o aceite): a RPC aceita `days` fora de 0–6 e janela início=fim se chamada direto (falta CHECK); a validação existe só na camada web."
+      "nota": "As provas listadas são do código dormente (suíte dormente); não valem para o caminho ativo. O CRUD por tela (Supabase/RLS) está dormente; no caminho ativo o gerador recebe filtros por entrada e a leitura do arquivo não existe.",
+      "titulo_anterior": "Automações CRUD com limite de 5",
+      "falta": [
+        "Resposta de Aurimar: automações em arquivo de configuração só-leitura?",
+        "T7-D: ler o arquivo, validar limite 5 e filtros, e passar ao gerador"
+      ]
     },
     {
       "id": 5,
@@ -75,42 +80,43 @@
       "depende_credencial": false,
       "prova": [
         "apps/web/test/estimate.test.ts e packages/domain/src/__tests__/core.test.ts (estimate): grupos × (janela ÷ frequência), teto 200/dia, janela que cruza a meia-noite (22:00→02:00 = 4 h), janela vazia = 0"
-      ]
+      ],
+      "nota": "Função pura em `packages/domain`; mantida (não muda no escopo novo). Uso na tela de automações depende da T7-D."
     },
     {
       "id": 6,
       "titulo": "Worker agendador a cada minuto",
       "aceite": "Relógio simulado: borda de janela e virada de dia em America/Cuiaba",
       "fase": "F3",
-      "status": "concluida",
+      "status": "adiado (fora do MVP atual)",
       "depende_credencial": false,
       "prova": [
         "packages/domain (scheduling/timezone) e apps/worker/tests/scheduler/*: borda de janela e virada de dia em America/Cuiaba com relógio simulado",
         "apps/worker/tests/e2e/pipeline.test.ts (virada 22:00–02:00, 1 envio por slot) e scheduler-store.pg.test.ts (PgSchedulerStore sobre Postgres embutido)",
         "apps/worker/tests/e2e/sql.e2e.test.ts: `createSqlBuildDeps` + runtime sobre Postgres; QA em Postgres Supabase real: `tickOnce` ×3 concorrente no mesmo slot = 1 envio"
       ],
-      "nota": "Não exercitado ainda no projeto Supabase hospedado nem pelo pooler 6543."
+      "nota": "As provas listadas são do código dormente (suíte dormente); não valem para o caminho ativo. Hoje a execução é sob demanda pela CLI (sem agendador)."
     },
     {
       "id": 7,
       "titulo": "Antirrepetição 7 dias",
       "aceite": "Reexecução do worker 2x sem duplicata",
       "fase": "F3",
-      "status": "concluida",
+      "status": "adiado (parcial em memória): dedupe só dentro do lote",
       "depende_credencial": false,
       "prova": [
         "apps/worker/tests/scheduler/offer-selection.test.ts: pula item enviado há menos de 7 dias, no dia 8 volta; tudo repetido ⇒ none/repetida",
         "apps/worker/tests/scheduler-store.pg.test.ts: `listRecentSends` por item e `since`; sql.e2e.test.ts: reexecução 2x não duplica",
         "QA em Postgres Supabase real: reexecução do agendador (×3 e ×2) mantém 1 envio por slot"
       ],
-      "nota": "O agendador cumpre a regra; \"Mandar agora\" só avisa a repetição (decisão do Aurimar pendente: Mandar agora × antirrepetição 7 dias)."
+      "nota": "As provas listadas são do código dormente (suíte dormente); não valem para o caminho ativo. No ativo, `collectOffers` não repete `itemId` dentro do lote (T7-B); a antirrepetição de 7 dias volta antes de ligar o WhatsApp."
     },
     {
       "id": 8,
       "titulo": "Fila: 1 por canal, 60 s, teto 200, prioridade 100",
       "aceite": "Concorrência com 2 workers sem envio duplo",
       "fase": "F3",
-      "status": "concluida",
+      "status": "adiado (fora do MVP atual)",
       "depende_credencial": false,
       "prova": [
         "supabase/tests/queue_claim.sql, queue_finish_enqueue.sql, queue_schema.sql (pgTAP; total 179 ok, 0 falhas)",
@@ -118,7 +124,7 @@
         "apps/worker/tests/queue.pg.test.ts (PgQueue por RPC) e sql.e2e.test.ts; QA com 2 pools `pg` como `achadinhos_worker`: 4 chamadas concorrentes = 1 envio, <60 s nada, após 60 s o 2º; 6 canais = 6 envios, nenhum `external_message_id` repetido",
         "apps/worker/tests/executor.test.ts + image.test.ts: executor usa o downloader seguro (29 ataques sem regressão)"
       ],
-      "nota": "O e2e de 2 workers em pools reais roda só manualmente; vale virar teste de contrato opcional. Não exercitado no pooler 6543."
+      "nota": "As provas listadas são do código dormente (suíte dormente); não valem para o caminho ativo. Substituído pelo teto por execução: `--limite` padrão 10, máximo 50."
     },
     {
       "id": 9,
@@ -131,50 +137,45 @@
         "packages/creative/test/render-servidor.test.ts: PNG 1080×1080 por fixture (65 testes do pacote passam), legibilidade e proporções",
         "docs/design/creative-sample.png (amostra de referência) e render real no pipeline do worker (e2e sql)"
       ],
-      "nota": "A aprovação visual do Designer consta do histórico do PR #5; não reaprovada nesta verificação."
+      "nota": "Função de render testada (65 testes). Falta provar o criativo real ponta a ponta na CLI com imagem de produto baixada pelo downloader seguro (E2E-1); a CLI passa dimensões 0×0 ao render e isso nunca foi exercitado com PNG real."
     },
     {
       "id": 10,
-      "titulo": "Mandar agora",
-      "aceite": "E2E com Shopee simulada",
+      "titulo": "Gerar agora (CLI → outbox)",
+      "aceite": "E2E com Shopee simulada: N ofertas → N pares `.md`/`.png` + `index.md`; reexecução no mesmo minuto não duplica",
       "fase": "F4",
-      "status": "parcial (UI e RPC na main; busca de oferta/link real não existe em produção); credencial Shopee (item 2) segue não validada pela sonda real",
+      "status": "parcial (CLI e gerador na main com portas injetadas; falta o E2E contra a Shopee simulada e o criativo real; credencial real bloqueada pelo `10010`)",
       "depende_credencial": true,
       "prova": [
-        "apps/web/test/mandar-agora.test.ts, mandar-agora-fonte.test.ts e shopee-finder.test.ts (palavra-chave/URL, https, subIds ≤5, aviso de repetição) sobre portas em memória + Shopee simulada",
-        "`enqueue_send_now` e duplo clique: supabase/tests/queue_finish_enqueue.sql e concurrency/claim_next_send.sh; chave `now:` tratada como manual no worker (vault-context.pg.test.ts)"
+        "apps/worker/tests/gerar/* (PR #50): argv, CLI com wiring injetado, gerador, mensagem, guarda `--permitir-real` (endpoint fora de loopback recusado antes do wiring; `--limite` obrigatório; `chamadas_max` impresso; 1 página no modo real)",
+        "Saída do terminal só com `slotKey`, status e código; exit ≠ 0 se houver `failed`/`unknown`/erro de busca"
       ],
       "falta": [
-        "Adaptador real do `OfferFinder`/`ShortLinkGateway`: em produção a web usa `offlineFinder`/`offlineLinks` (apps/web/src/server/context.ts:185) e lança `finder_not_configured`; `shopee-finder.ts` existe mas não é instanciado em lugar nenhum, e a web não lê o Secret (decisão 003 H1), então a busca precisa de endpoint interno ou de ir para o worker",
-        "E2E ponta a ponta: web → `web_enqueue_send_now` → worker → Telegram com Shopee simulada (hoje cada trecho é testado separado; nenhum teste cobre a cadeia)",
-        "Credencial real da Shopee (App ID/Secret) para a primeira busca e link curto reais",
-        "Decisão pendente: Mandar agora × antirrepetição de 7 dias"
-      ]
+        "E2E-1: CLI real contra `startMockShopeeServer` + FileOutbox + render real em pasta temporária",
+        "Credencial/documento Shopee validados (item 2)",
+        "T8-B só se o web continuar (resposta 2)"
+      ],
+      "titulo_anterior": "Mandar agora"
     },
     {
       "id": 11,
-      "titulo": "Envios: cards, lista 30 dias, Realtime",
-      "aceite": "E2E: status muda e tela atualiza sem recarregar",
+      "titulo": "`index.md` do dia",
+      "aceite": "Índice lista as entregas do dia e resiste a título hostil",
       "fase": "F4",
-      "status": "parcial (tela, polling e publicação Realtime na main; Realtime nunca é ativado em produção)",
+      "status": "concluida (coberto por T7-A)",
       "depende_credencial": false,
       "prova": [
-        "apps/web/test/envios.test.ts, envios-page.test.ts, realtime.test.ts, realtime-client.test.ts e realtime-sql.test.ts",
-        "supabase/tests/realtime_publication.sql (3 ok): `sends` na publicação `supabase_realtime`",
-        "QA com serviço Realtime real (supabase/realtime v2.130.0): conta A recebe seus eventos; B e anon não (RLS)"
+        "packages/channel: `index.md` derivado dos `.md` existentes, escape de `|`, crase, U+2028/U+2029 e `---` (PR #45)"
       ],
-      "falta": [
-        "`createSupabaseSessions` (apps/web/src/server/supabase/session.ts) não devolve `accessToken`, então `getRealtimeClient` retorna `null` e a tela só usa polling em produção; preencher o token no servidor depois de `getUser()`",
-        "E2E \"status muda e a tela atualiza sem recarregar\" com sessão Supabase real (hoje só em memória e com cliente simulado)",
-        "Publicar só as colunas que a tela usa (a linha inteira trafega)"
-      ]
+      "titulo_anterior": "Envios: cards, lista 30 dias, Realtime",
+      "nota": "Cards, lista de 30 dias e Realtime do web ficam dormentes. O painel em memória é só demonstração local."
     },
     {
       "id": 12,
       "titulo": "Comissão: conversionReport a cada 6 h idempotente",
       "aceite": "Reexecução não duplica; soma por grupo bate com fixture",
       "fase": "F5",
-      "status": "parcial (coletor, persistência SQL e job na main; job não roda e não há credencial)",
+      "status": "adiado (fora do MVP atual)",
       "depende_credencial": true,
       "prova": [
         "packages/commission: 29 testes (idempotência por (conta, checkout), insert-only com histórico em `commission_events`, soma por sub_id do grupo, transições monotônicas)",
@@ -185,54 +186,109 @@
         "Ligar o job: `startCommissionJob` só é chamado em testes; `createSqlBuildDeps` não o monta (sem `sourceFor` por conta com a credencial do Vault, sem `repositoryFor`, sem lista de contas)",
         "E2E: `conversionReport` simulado → job → Postgres → soma por grupo no painel, com reexecução 2x",
         "Credencial real da Shopee (conversionReport) e decisão insert-only × atualização de comissão (M6)"
-      ]
+      ],
+      "nota": "As provas listadas são do código dormente (suíte dormente); não valem para o caminho ativo. Sem persistência não há soma de comissão; volta quando houver armazenamento."
     },
     {
       "id": 13,
-      "titulo": "Alertas por e-mail",
-      "aceite": "Teste com transporte de e-mail simulado",
+      "titulo": "Resumo no terminal e exit code (alertas por e-mail adiados)",
+      "aceite": "Execução com falha sai ≠ 0",
       "fase": "F5",
-      "status": "parcial (alertas, heartbeat persistido e transporte HTTP na main; provedor e monitor externo não existem)",
+      "status": "concluida (coberto por T7-B); e-mail adiado",
       "depende_credencial": false,
       "prova": [
-        "packages/alerts: 24 testes (dedupe por causa, transporte HTTP por env, chave fora de log/cause/inspect)",
-        "apps/worker/tests/heartbeat/*: monitor + `SqlHeartbeatStore`; QA em Postgres real: 4 min parado = 1 e-mail, sem repetir, re-arme, borda 179/181 s, só `service_role` executa",
-        "`createSqlBuildDeps` liga alerts + heartbeatStore ao runtime; bot removido/credencial inválida disparam alerta (e2e sql)"
+        "apps/worker/tests/gerar (PR #50): resumo `delivered/failed/unknown/descartadas` e `exitCodeFor`"
       ],
-      "falta": [
-        "Provedor real: EMAIL_PROVIDER_ENDPOINT, EMAIL_PROVIDER_API_KEY, EMAIL_FROM e ALERT_EMAIL_TO definidos, e prova de um e-mail real recebido (docs/ACTIONS.md, pendente)",
-        "Monitor externo ao VPS (healthchecks.io/UptimeRobot ou pg_cron) que alerta se o processo morrer; o ping do worker ainda não existe (plano de deploy 3.2): sem ele \"parado > 3 min\" não é cumprível",
-        "Remover o e-mail pessoal fixo de `DEFAULT_ALERT_EMAIL_TO` (packages/alerts/src/types.ts:99)"
-      ]
+      "titulo_anterior": "Alertas por e-mail",
+      "nota": "Alertas por e-mail, heartbeat e monitor externo ficam dormentes."
     },
     {
       "id": 14,
-      "titulo": "Onboarding e estados vazios",
-      "aceite": "QA visual 390x844 e 1440x900",
+      "titulo": "README do CLI e estados do painel",
+      "aceite": "README reproduzível do zero; QA visual só se o web continuar",
       "fase": "F4",
-      "status": "parcial (telas e estados vazios na main; o passo \"validado\" nunca fecha em produção)",
+      "status": "parcial (README do gerador existe em apps/worker/src/gerar/README.md; reprodutibilidade do zero não verificada; painel é demonstração local)",
       "depende_credencial": false,
       "prova": [
         "apps/web/test/onboarding.test.ts (passos derivados do banco; estados vazios)",
         "QA visual: docs/design/screenshots/*-390.png e *-1440.png e docs/design/t8-onboarding (390×844 e 1440×900, com dados e `?vazio=1`)"
       ],
       "falta": [
-        "Os passos Conexões/Canal só ficam `done` com status `validated` (apps/web/src/server/onboarding.ts:48), que depende do `ValidationStore` SQL e da ligação no worker (itens 2 e 3); hoje a conta nova nunca avança",
-        "Repetir o QA visual do estado final com conta validada de verdade (depende dos itens 2 e 3)"
-      ]
+        "DOC-1: percorrer o README do zero numa máquina limpa contra o servidor simulado",
+        "Resposta 2 de Aurimar: o web continua? Se sim, QA visual do painel em memória"
+      ],
+      "titulo_anterior": "Onboarding e estados vazios",
+      "nota": "O onboarding de Conexões/Canal/validação não faz sentido no escopo atual (Telegram e Vault dormentes)."
     }
   ],
   "verificado": {
-    "data": "2026-10-14",
-    "commit_main": "c69556e",
-    "regra": "concluida só com código na main + persistência real + prova ponta a ponta; senão parcial (o que falta)",
-    "suite": "typecheck 0 erros nos 8 pacotes; alerts 24, domain 54, telegram 23, shopee 48, commission 29, creative 65, web 161, worker 339; pgTAP 179 ok, 0 falhas; concurrency/claim_next_send.sh todos PASS; next build ok",
-    "resumo": "concluida: 1, 4, 5, 6, 7, 8, 9; parcial: 2, 3, 10, 11, 12, 13, 14",
+    "data": "2026-10-17",
+    "commit_main": "321bddc",
+    "regra": "concluida só com código na main + prova no caminho ativo; item com prova só no código dormente fica adiado; senão parcial (o que falta)",
+    "suite": "Contagens reportadas nos PRs #50 e #51 (recontar no próximo gate): worker ativo 134, web 165, channel 75, shopee 57, creative 65, domain 54, commission 13 (ativos), scripts 29; typecheck e testes da raiz verdes na CI do #51; suítes dormentes só no workflow dormente.yml",
+    "resumo": "concluida: 3, 5, 9, 11, 13; parcial: 1, 10, 14; bloqueado: 2; pendente: 4; adiado: 6, 7, 8, 12",
     "observacoes": [
-      "O worker de produção (`createSqlBuildDeps`) monta: relógio do banco, agendador SQL, fila por RPC, Vault, executor, heartbeat e alertas. NÃO monta: validação de credenciais, job de comissão.",
-      "Nenhuma credencial real (Shopee, Telegram, e-mail) foi usada em qualquer prova; nada foi exercitado no projeto Supabase hospedado nem pelo pooler 6543.",
-      "A main tem duas migrações com a versão 20261015120000 (t7_worker_heartbeats e t8_realtime_sends): o primeiro `db push` falha na segunda; renomear uma delas.",
-      "Testes intermitentes sob carga: apps/web/test/realtime-sql.test.ts na 1ª execução fria e 1–3 testes de apps/worker/tests/e2e/pipeline.test.ts por timeout de 5 s (render de PNG, máquina com load average > 100); isolados passam. Sugestão: testTimeout/hookTimeout maiores."
+      "Nenhuma chamada real à Shopee passou do D0 e da sonda do #41; nenhuma nova está autorizada. O D4 exige autorização própria.",
+      "Item 11 e 13 são `concluida` por cobertura do plano (T7-A e T7-B), não pelo escopo original; o Realtime e o e-mail estão adiados.",
+      "As migrações duplicadas de versão 20261015120000 (heartbeat e realtime) só importam se o Supabase for reaberto.",
+      "Testes intermitentes sob carga em apps/worker/tests/e2e/pipeline.test.ts (timeout de 5 s no render de PNG) pertencem à suíte dormente."
     ]
-  }
+  },
+  "escopo": {
+    "data": "2026-10-17",
+    "plano": "docs/plans/escopo-sem-supabase-telegram.md",
+    "resumo": "Sem Telegram, Supabase, e-mail, banco, SQLite ou qualquer persistência. Saída em `outbox/` (um `.md` e um `.png` por oferta, mais `index.md` do dia) pela interface `Channel`; WhatsApp depois. Código dessas partes dormente, não apagado.",
+    "credencial_shopee": "NÃO validada: a API real recusa o documento `productOfferV2` com `10010`; D0 provou só envelope e transporte."
+  },
+  "mvp_falta": [
+    {
+      "ordem": 1,
+      "item": "Credencial/documento Shopee",
+      "detalhe": "Aurimar autoriza D1 + D4 (D4 com autorização própria); corrigir `productOfferV2` (T12-FIX); UMA chamada do cliente de produção com ≥ 1 oferta",
+      "tarefa": "T12-D1D4, T12-FIX",
+      "depende": "autorização de Aurimar"
+    },
+    {
+      "ordem": 2,
+      "item": "E2E do CLI com Shopee simulada e criativo real",
+      "detalhe": "`makeRealWiring` contra `startMockShopeeServer` + FileOutbox + render real em pasta temporária; N ofertas → N pares + índice; mesma execução no mesmo minuto não duplica; exit codes",
+      "tarefa": "E2E-1",
+      "depende": "nada (pode começar já)"
+    },
+    {
+      "ordem": 3,
+      "item": "T7-D automações em arquivo de configuração",
+      "detalhe": "Ler arquivo só-leitura, validar limite 5 e filtros, passar ao gerador",
+      "tarefa": "T7-D",
+      "depende": "resposta 1 de Aurimar"
+    },
+    {
+      "ordem": 4,
+      "item": "T8-B Mandar agora no web",
+      "detalhe": "Server action local que invoca o gerador; exige sessão além do demo local",
+      "tarefa": "T8-B",
+      "depende": "resposta 2 de Aurimar (opcional se o web não continuar)"
+    },
+    {
+      "ordem": 5,
+      "item": "README reproduzível do zero",
+      "detalhe": "Clonar, instalar, rodar contra o simulado, ver a pasta",
+      "tarefa": "DOC-1",
+      "depende": "E2E-1"
+    },
+    {
+      "ordem": 6,
+      "item": "Pasta da outbox",
+      "detalhe": "Hoje `outbox/` (gitignored) por padrão; confirmar com Aurimar",
+      "tarefa": "-",
+      "depende": "resposta 3 de Aurimar"
+    },
+    {
+      "ordem": 7,
+      "item": "WhatsApp (depois do MVP)",
+      "detalhe": "Gate: reabrir antirrepetição e limite de ritmo, aprovação do primeiro envio real a grupo com outros membros, decisão do transporte checando termos e risco de banimento",
+      "tarefa": "WA-1",
+      "depende": "resposta 4 de Aurimar"
+    }
+  ]
 }
