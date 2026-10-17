@@ -46,6 +46,8 @@ async function allPages() {
 describe("T8-02/03 segredo nunca sai (rotas autenticadas)", () => {
   beforeAll(() => {
     process.env.ACHADINHOS_DEMO_SESSION = "1";
+    // /conexoes é tela dormente (T8-A): a rota existe, mas só rende com a flag ligada.
+    process.env.ACHADINHOS_CONEXOES = "1";
   });
 
   it("salva Secret e token por action e nenhuma tela/payload contém os valores", async () => {

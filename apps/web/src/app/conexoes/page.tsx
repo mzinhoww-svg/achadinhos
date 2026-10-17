@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { GroupSwitch, ShopeeForm, TelegramForm } from "@/components/connections-forms";
 import { StatusBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -6,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IconPlug } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/table";
+import { conexoesEnabled } from "@/lib/flags";
 import { formatDateTime, formatInt } from "@/lib/format";
 import { isEmptyPreview } from "@/lib/mock";
 import { container, viewSession } from "@/server/context";
@@ -17,8 +19,13 @@ const statusOf = (s: "pending_validation" | "validated" | "invalid" | undefined)
   s === "validated" ? "connected" : s === "invalid" ? "error" : "pending";
 
 export default async function ConexoesPage({ searchParams }: { searchParams: Promise<{ vazio?: string }> }) {
+  // A flag é lida por requisição: `await searchParams` (como as demais telas) mantém a rota dinâmica,
+  // senão o Next pré-renderiza o 404 e a rota fica presa mesmo com a flag ligada.
+  const sp = await searchParams;
+  // Tela dormente (T8-A): preservada, mas atrás da flag `ACHADINHOS_CONEXOES`.
+  if (!conexoesEnabled()) notFound();
   const c = await container();
-  const session = await viewSession(c, isEmptyPreview(await searchParams));
+  const session = await viewSession(c, isEmptyPreview(sp));
   if (!session) {
     return (
       <>

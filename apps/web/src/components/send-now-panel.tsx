@@ -26,7 +26,7 @@ interface Preview {
 
 const imageOf = (o: PublicOffer) => (o.placeholderHue !== undefined ? productPlaceholder(o.placeholderHue, "") : o.imageUrl);
 
-export function SendNowPanel({ groups, affiliateHandle = "achadinhos" }: { groups: GroupOption[]; affiliateHandle?: string }) {
+export function SendNowPanel({ groups, affiliateHandle = "achadinhos", showConexoes = false }: { groups: GroupOption[]; affiliateHandle?: string; showConexoes?: boolean }) {
   const searchId = useId();
   const [q, setQ] = useState("");
   const [qError, setQError] = useState<string | undefined>();
@@ -153,8 +153,14 @@ export function SendNowPanel({ groups, affiliateHandle = "achadinhos" }: { group
 
         <Card title="2. Escolha os grupos" description="Só grupos ativos recebem. Cada envio respeita 1 por canal, 60 s e o teto diário.">
           {groups.length === 0 ? (
-            <EmptyState icon={<IconSend />} title="Nenhum grupo conectado" action={<Button href="/conexoes#telegram" variant="secondary">Ir para Conexões</Button>}>
-              Conecte o bot do Telegram e ative ao menos um grupo para mandar ofertas.
+            <EmptyState
+              icon={<IconSend />}
+              title="Nenhum grupo conectado"
+              action={showConexoes ? <Button href="/conexoes#telegram" variant="secondary">Ir para Conexões</Button> : undefined}
+            >
+              {showConexoes
+                ? "Conecte o bot do Telegram e ative ao menos um grupo para mandar ofertas."
+                : "Os destinos agora são a pasta outbox; o envio por WhatsApp vem depois."}
             </EmptyState>
           ) : (
             <fieldset className="grid gap-2 sm:grid-cols-2">
@@ -179,7 +185,11 @@ export function SendNowPanel({ groups, affiliateHandle = "achadinhos" }: { group
             </ul>
           )}
           {groups.length > 0 && activeGroups.length === 0 && (
-            <p className="mt-3 text-sm text-ink-2">Nenhum grupo ativo. <Link href="/conexoes#telegram" className="font-semibold text-brand-700 underline">Ative um em Conexões</Link>.</p>
+            showConexoes ? (
+              <p className="mt-3 text-sm text-ink-2">Nenhum grupo ativo. <Link href="/conexoes#telegram" className="font-semibold text-brand-700 underline">Ative um em Conexões</Link>.</p>
+            ) : (
+              <p className="mt-3 text-sm text-ink-2">Nenhum grupo ativo. Os destinos agora são a pasta outbox; o envio por WhatsApp vem depois.</p>
+            )
           )}
         </Card>
       </div>
