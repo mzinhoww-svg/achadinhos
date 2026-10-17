@@ -1,3 +1,8 @@
+> **SUSPENSO / DESATUALIZADO (2026-10-16).** O escopo vigente é "sem Supabase, Telegram, e-mail e
+> persistência" (`docs/plans/escopo-sem-supabase-telegram.md`): as ofertas viram arquivos numa pasta
+> local (`outbox/`) via CLI, sem banco. O texto abaixo fica preservado como histórico; o que ele
+> descreve como ativo está dormente e não deve orientar a execução.
+
 # PRD — achadinhos (painel de automação de ofertas Shopee)
 
 ## Objetivo
