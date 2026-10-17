@@ -12,5 +12,7 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T9 | Comissão: conversionReport a cada 6 h idempotente (packages/commission) | Balanço | concluida | PR #9 mergeado |
 | T6 | packages/domain: estimativa, janela/fuso, filtros, antirrepetição (MVP 4–7 parte pura) | Compasso | em_revisao | PR #7 aprovado pelo QA; auditoria Farol |
 | T10 | Alertas por e-mail (MVP 13) | Sentinela | em_revisao | PR #8 aprovado pelo QA; auditoria Farol |
-| T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44; D0 = OK/contagem 1; sem D1 |
+| T7-C | Isolar o código dormente (exclude tsconfig/vitest, filtros pnpm, configs e workflow dormentes, READMEs, avisos) | Vigia | em_revisao | PR #46; worker: 87 ativos + 261 dormentes = 339 (+9 novos); typecheck/test verdes; workflow dormente |
+| T11 | Sonda real da credencial Shopee (MVP 2 e 10): script + 1 chamada somente-leitura | Sextante | em_revisao | PR #41 (main #42/#43/#49 trazida por merge, conflitos resolvidos); 57 testes do pacote ok; sonda real = falha/10010/0 |
+| T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44 (na main via #49); D0 = OK/contagem 1; sem D1 |
 | T8-A | Desacoplar o web: só container em memória; /conexoes e Telegram atrás de flag (sem Supabase/Telegram/Vault ativos) | Vigia | em_revisao | PR #51; build e testes verdes sem env do Supabase |

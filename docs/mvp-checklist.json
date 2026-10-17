@@ -19,15 +19,17 @@
       "titulo": "Conexões: validar e salvar App ID/Secret (Vault)",
       "aceite": "Nenhuma rota ou payload RSC contém o Secret",
       "fase": "F1",
-      "status": "parcial (salvar no Vault na main; validar de verdade não acontece em produção)",
+      "status": "parcial (salvar no Vault na main; validar de verdade não acontece em produção); sonda real de 2026-10-16 (1 chamada somente-leitura productOfferV2) devolveu HTTP 2xx com erro GraphQL 10010 (Parse Error) — credencial ainda NÃO validada; ver docs/decisions/004-endpoint-shopee.md",
       "depende_credencial": true,
       "prova": [
         "Salvar: apps/web/test/conexoes.test.ts e rotas-segredo.test.ts (nenhuma rota/payload RSC contém o Secret); supabase/tests/indexes_vault.sql + rls_isolation.sql; QA em Postgres real: Secret write-only (`web_put_secret` devolve só o id), conta B não usa o segredo da A",
-        "Validar: apps/worker/src/validation (runner + validators) com testes em memória (apps/worker/tests/validation.test.ts)"
+        "Validar: apps/worker/src/validation (runner + validators) com testes em memória (apps/worker/tests/validation.test.ts)",
+        "Sonda real (PR #41): uma chamada assinada somente-leitura contra o endpoint real, com saída allowlisted (resultado/código/contagem) e sem App ID/Secret/assinatura na saída; evidência em docs/decisions/004-endpoint-shopee.md"
       ],
       "falta": [
         "Adaptador SQL do `ValidationStore`: só existe `MemoryValidationStore`; `createSqlBuildDeps` não devolve `validation` (conferido na main c69556e: chaves = alerts, executor, groups, heartbeatStore, now, queue, scheduler), então o status fica `pending_validation` para sempre",
         "Credencial real: App ID e Secret da Shopee Affiliate Open API (docs/ACTIONS.md, pendente) para a primeira chamada assinada real e validação com resposta verdadeira",
+        "Atualização da sonda real: a primeira chamada assinada real já aconteceu (sonda do #41 e degrau D0 do #44, 2026-10-16), mas `productOfferV2` ainda responde 10010 — falta fechar o diagnóstico e ver o cliente de produção devolver ≥ 1 oferta",
         "E2E: painel salva → worker valida → status `validated` visível no painel, sobre Postgres com Shopee simulada; depois uma execução com credencial real"
       ]
     },
@@ -136,7 +138,7 @@
       "titulo": "Mandar agora",
       "aceite": "E2E com Shopee simulada",
       "fase": "F4",
-      "status": "parcial (UI e RPC na main; busca de oferta/link real não existe em produção)",
+      "status": "parcial (UI e RPC na main; busca de oferta/link real não existe em produção); credencial Shopee (item 2) segue não validada pela sonda real",
       "depende_credencial": true,
       "prova": [
         "apps/web/test/mandar-agora.test.ts, mandar-agora-fonte.test.ts e shopee-finder.test.ts (palavra-chave/URL, https, subIds ≤5, aviso de repetição) sobre portas em memória + Shopee simulada",
