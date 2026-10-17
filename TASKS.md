@@ -13,4 +13,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T6 | packages/domain: estimativa, janela/fuso, filtros, antirrepetição (MVP 4–7 parte pura) | Compasso | em_revisao | PR #7 aprovado pelo QA; auditoria Farol |
 | T10 | Alertas por e-mail (MVP 13) | Sentinela | em_revisao | PR #8 aprovado pelo QA; auditoria Farol |
 | T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44; D0 = OK/contagem 1; sem D1 |
-| T8-A | Desacoplar o web: só container em memória; /conexoes e Telegram atrás de flag (sem Supabase/Telegram/Vault ativos) | Vigia | em_revisao | PR #__PR__; build e testes verdes sem env do Supabase |
+| T8-A | Desacoplar o web: só container em memória; /conexoes e Telegram atrás de flag (sem Supabase/Telegram/Vault ativos) | Vigia | em_revisao | PR #51; build e testes verdes sem env do Supabase |
