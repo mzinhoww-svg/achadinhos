@@ -15,6 +15,7 @@ import {
   assertAllowedEndpoint,
   buildDiagBody,
   diagClock,
+  diagRun,
   formatDiagReport,
   readBodyLimited,
   sanitizeDiagCode,
@@ -177,6 +178,128 @@ describe("readBodyLimited (B2: teto de corpo em stream)", () => {
     const read = await readBodyLimited(new Response(stream), 64 * 1024);
     expect(read).toEqual({ tooLarge: true });
     expect(cancelled).toBe(true);
+  });
+});
+
+describe("diagRun: uma chamada, com as proteções do §4.7 testadas", () => {
+  const headers = { "Content-Type": "application/json", Authorization: "SHA256 Credential=x, Signature=y" };
+  const JSON_OK = JSON.stringify({ data: { __typename: "Query" } });
+
+  it("POST sem seguir redirect (redirect: manual) e sem variáveis no corpo", async () => {
+    const chamadas: { url: unknown; init: RequestInit }[] = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      chamadas.push({ url, init: init ?? {} });
+      return new Response(JSON_OK, { status: 200, headers: { Date: "Fri, 16 Oct 2026 20:41:12 GMT" } });
+    };
+
+    const { report, exit } = await diagRun({
+      endpoint: "http://127.0.0.1:4599/graphql",
+      headers,
+      body: buildDiagBody(D0_QUERY),
+      secrets: SECRETS,
+      fetchImpl,
+    });
+
+    expect(exit).toBe(0);
+    expect(report.codigo).toBe(DIAG_OK_CODE);
+    expect(report.contagem).toBe(1);
+    expect(chamadas).toHaveLength(1);
+    expect(chamadas[0]!.init.redirect).toBe("manual");
+    expect(chamadas[0]!.init.method).toBe("POST");
+    expect(JSON.parse(String(chamadas[0]!.init.body))).toEqual({ query: D0_QUERY });
+  });
+
+  it("3xx vira HTTP_3xx sem segunda chamada", async () => {
+    let chamadas = 0;
+    const fetchImpl: typeof fetch = async () => {
+      chamadas += 1;
+      return new Response("", { status: 302, headers: { Location: "http://127.0.0.1:4594/steal" } });
+    };
+
+    const { report, exit } = await diagRun({
+      endpoint: "https://open-api.affiliate.shopee.com.br/graphql",
+      headers,
+      body: buildDiagBody(D0_QUERY),
+      secrets: SECRETS,
+      fetchImpl,
+    });
+
+    expect(exit).toBe(0);
+    expect(report.codigo).toBe("HTTP_302");
+    expect(chamadas).toBe(1);
+  });
+
+  it("timeout na resposta vira TIMEOUT (exit 1)", async () => {
+    const fetchImpl: typeof fetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), {
+          once: true,
+        });
+      });
+
+    const { report, exit } = await diagRun({
+      endpoint: "https://open-api.affiliate.shopee.com.br/graphql",
+      headers,
+      body: buildDiagBody(D0_QUERY),
+      secrets: SECRETS,
+      fetchImpl,
+      timeoutMs: 30,
+    });
+
+    expect(exit).toBe(1);
+    expect(report.codigo).toBe("TIMEOUT");
+    expect(report.mensagem).toBeNull();
+  });
+
+  it("timeout com o corpo estancado também vira TIMEOUT", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start() {
+            // nunca entrega nada
+          },
+        }),
+        { status: 200 },
+      );
+
+    const { report, exit } = await diagRun({
+      endpoint: "https://open-api.affiliate.shopee.com.br/graphql",
+      headers,
+      body: buildDiagBody(D0_QUERY),
+      secrets: SECRETS,
+      fetchImpl,
+      timeoutMs: 30,
+    });
+
+    expect(exit).toBe(1);
+    expect(report.codigo).toBe("TIMEOUT");
+  });
+
+  it("erro de rede vira NETWORK; corpo acima do teto vira BODY_TOO_LARGE", async () => {
+    const semRede: typeof fetch = async () => {
+      throw new TypeError("fetch failed");
+    };
+    const rede = await diagRun({
+      endpoint: "https://open-api.affiliate.shopee.com.br/graphql",
+      headers,
+      body: buildDiagBody(D0_QUERY),
+      secrets: SECRETS,
+      fetchImpl: semRede,
+    });
+    expect(rede.exit).toBe(1);
+    expect(rede.report.codigo).toBe("NETWORK");
+
+    const enorme: typeof fetch = async () =>
+      new Response(new Uint8Array(200 * 1024), { status: 200 });
+    const grande = await diagRun({
+      endpoint: "https://open-api.affiliate.shopee.com.br/graphql",
+      headers,
+      body: buildDiagBody(D0_QUERY),
+      secrets: SECRETS,
+      fetchImpl: enorme,
+    });
+    expect(grande.exit).toBe(0);
+    expect(grande.report.codigo).toBe(BODY_TOO_LARGE_CODE);
   });
 });
 

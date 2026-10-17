@@ -187,15 +187,18 @@ export type DiagBodyRead = { text: string } | { tooLarge: true };
 /**
  * Leitura em stream com teto: cancela o stream ao estourar (mesma técnica do
  * `ShopeeClient.readBodyLimited`), então um servidor que envia lixo sem parar
- * não enche a memória.
+ * não enche a memória. `abort` corta a leitura mesmo que o corpo nunca chegue
+ * (o stream não observa o signal do fetch).
  */
 export async function readBodyLimited(
   response: Response,
   maxBytes: number = MAX_BODY_BYTES,
+  abort?: Promise<never>,
 ): Promise<DiagBodyRead> {
+  const race = <T,>(value: Promise<T>): Promise<T> => (abort ? Promise.race([value, abort]) : value);
   const body = response.body;
   if (!body) {
-    const text = await response.text();
+    const text = await race(response.text());
     return Buffer.byteLength(text) > maxBytes ? { tooLarge: true } : { text };
   }
 
@@ -204,7 +207,7 @@ export async function readBodyLimited(
   let total = 0;
   try {
     for (;;) {
-      const step = await reader.read();
+      const step = await race(reader.read());
       if (step.done) break;
       total += step.value.byteLength;
       if (total > maxBytes) {
@@ -335,4 +338,115 @@ export function formatDiagReport(report: DiagReport): string {
     `date_resposta=${report.date_resposta}`,
     `delta_date_s=${report.delta_date_s ?? UNAVAILABLE}`,
   ].join("\n");
+}
+
+export const DEFAULT_TIMEOUT_MS = 20_000;
+
+/**
+ * Relatório de recusa/falha sem resposta. `degrau` fica em `-` quando nada foi
+ * enviado (recusa local) e no degrau tentado quando a chamada saiu (§4.7).
+ */
+export function refusalReport(
+  codigo: string,
+  startedAtMs: number,
+  degrau: string = DEGRAU_NENHUM,
+): DiagReport {
+  const localMs = Date.now();
+  return {
+    degrau,
+    codigo,
+    contagem: 0,
+    duracao_ms: Math.max(0, Math.round(localMs - startedAtMs)),
+    mensagem: null,
+    ...diagClock(null, localMs),
+  };
+}
+
+export type DiagRunInput = {
+  endpoint: string | URL;
+  headers: Record<string, string>;
+  body: string;
+  secrets: readonly string[];
+  degrau?: string;
+  timeoutMs?: number;
+  maxBodyBytes?: number;
+  fetchImpl?: typeof fetch;
+};
+
+export type DiagRunResult = { report: DiagReport; exit: number };
+
+/**
+ * A chamada inteira, com as proteções do §4.7 em um lugar só (e testável com
+ * `fetchImpl` injetado): POST assinado, `redirect: "manual"`, teto de tempo
+ * cobrindo resposta *e* leitura do corpo, teto de corpo em stream. Uma
+ * invocação = no máximo uma requisição; nada de laço ou retry.
+ *
+ * `exit` 0 = resposta resumida; 1 = sem resposta (transporte/tempo).
+ */
+export async function diagRun(input: DiagRunInput): Promise<DiagRunResult> {
+  const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxBytes = input.maxBodyBytes ?? MAX_BODY_BYTES;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const degrau = input.degrau ?? DEGRAU_D0;
+  const startedAtMs = Date.now();
+
+  const controller = new AbortController();
+  let timedOut = false;
+  let onTimeout!: () => void;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onTimeout = () => {
+      timedOut = true;
+      controller.abort();
+      reject(new Error("diagnostic timeout"));
+    };
+  });
+  aborted.catch(() => undefined);
+  const timer = setTimeout(onTimeout, timeoutMs);
+
+  try {
+    let response: Response;
+    try {
+      response = await Promise.race([
+        fetchImpl(input.endpoint, {
+          method: "POST",
+          headers: input.headers,
+          body: input.body,
+          // Sem seguir redirect: a allowlist de host vale só para o primeiro alvo.
+          redirect: "manual",
+          signal: controller.signal,
+        }),
+        aborted,
+      ]);
+    } catch {
+      return { report: refusalReport(timedOut ? "TIMEOUT" : "NETWORK", startedAtMs, degrau), exit: 1 };
+    }
+
+    // Momento local logo após os cabeçalhos: é o que se compara com o `Date`.
+    const localMs = Date.now();
+    const dateHeader = response.headers.get("date");
+
+    let read: DiagBodyRead;
+    try {
+      read = await readBodyLimited(response, maxBytes, aborted);
+    } catch {
+      return { report: refusalReport(timedOut ? "TIMEOUT" : "NETWORK", startedAtMs, degrau), exit: 1 };
+    }
+
+    return {
+      report: summarizeDiag({
+        degrau,
+        status: response.status,
+        ok: response.ok,
+        bodyText: "text" in read ? read.text : "",
+        bodyTooLarge: "tooLarge" in read,
+        dateHeader,
+        localMs,
+        startedAtMs,
+        secrets: input.secrets,
+      }),
+      exit: 0,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
