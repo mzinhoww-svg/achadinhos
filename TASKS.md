@@ -15,3 +15,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T7-A | packages/channel: interface Channel + adaptador FileOutbox | Cinzel | em_revisao | PR #45; `pnpm test` (75 testes) + `pnpm typecheck` verdes |
 | T7-C | Isolar o código dormente (exclude tsconfig/vitest, filtros pnpm, configs e workflow dormentes, READMEs, avisos) | Vigia | em_revisao | PR #46; worker: 87 ativos + 261 dormentes = 339 (+9 novos); typecheck/test verdes; workflow dormente |
 | T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44; D0 = OK/contagem 1; sem D1 |
+| T7-B | packages/worker: gerador + CLI `pnpm outbox:gerar` (Channel FileOutbox) | Cinzel | em_revisao | PR #50; worker 123 testes (+36) e typecheck verdes; e2e com Shopee simulada |
