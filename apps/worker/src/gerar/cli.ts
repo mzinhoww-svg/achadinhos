@@ -18,7 +18,12 @@ import {
   type GenerateSummary,
   type GenerateTracking,
 } from "./generate.js";
-import { loadAutomationsFile, runAutomations, type AutomationsRunSummary } from "./automacoes.js";
+import {
+  loadAutomationsFile,
+  runAutomations,
+  selectDueAutomations,
+  type AutomationsRunSummary,
+} from "./automacoes.js";
 import type { Channel, ImageFetcher, OfferSource, RenderCreative, ShortLinker } from "./ports.js";
 
 /** Mesma allowlist do worker de produção (`sql/build-deps.ts`). */
@@ -190,7 +195,6 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
     return { exitCode: 2 };
   }
   const maxPages = allowReal ? REAL_PAGES_MAX : MAX_PAGES;
-  if (allowReal) write(`chamadas_max=${maxPages + config.limit}`);
 
   // T7-D: valida o arquivo de automações ANTES de montar adaptadores (falha fechado, sem chamada).
   let automationsList: AutomationInput[] | undefined;
@@ -209,16 +213,18 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
     level: (env["LOG_LEVEL"] as Level | undefined) ?? "info",
     ...(secret ? { secrets: [secret] } : {}),
   });
-
-  const wiring = (options.makeWiring ?? makeRealWiring)(config, env);
   const nowFn = options.now ?? (() => new Date());
-  const deps: GenerateDeps = {
-    source: wiring.source,
-    shortLinker: wiring.shortLinker,
-    fetchImage: wiring.fetchImage,
-    renderCreative: wiring.renderCreative,
-    channel: wiring.channel,
-    logger,
+  // O wiring só é montado depois de decidir quantas automações vencem (guarda de chamadas, R1/B2).
+  const buildDeps = (): GenerateDeps => {
+    const wiring = (options.makeWiring ?? makeRealWiring)(config, env);
+    return {
+      source: wiring.source,
+      shortLinker: wiring.shortLinker,
+      fetchImage: wiring.fetchImage,
+      renderCreative: wiring.renderCreative,
+      channel: wiring.channel,
+      logger,
+    };
   };
 
   // T7-D: modo "agenda sobre o gerador" — roda as automações vencidas do arquivo.
@@ -231,6 +237,16 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
         return { exitCode: 2 };
       }
     }
+    const due = selectDueAutomations(automationsList, reference);
+    if (allowReal) write(`chamadas_max=${due.length * (maxPages + config.limit)}`);
+    if (due.length === 0) {
+      write("nenhuma_automacao_vencida");
+      return {
+        exitCode: 0,
+        automations: { results: [], delivered: 0, failed: 0, unknown: 0, discarded: 0, fetchErrors: 0, errorCodes: [] },
+      };
+    }
+
     const automations = await runAutomations(
       automationsList,
       {
@@ -241,7 +257,7 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
         maxPages,
         tracking: config.tracking,
       },
-      deps,
+      buildDeps(),
     );
     for (const outcome of automations.results) {
       write(
@@ -249,14 +265,17 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
           `${outcome.summary.failed} failed, ${outcome.summary.unknown} unknown`,
       );
     }
+    const codes = automations.errorCodes.length ? ` (${automations.errorCodes.join(",")})` : "";
     write(
       `resumo: ${automations.delivered} delivered, ${automations.failed} failed, ${automations.unknown} unknown, ` +
-        `${automations.discarded} descartadas (${automations.results.length} automacoes)`,
+        `${automations.discarded} descartadas (${automations.results.length} automacoes)${codes}`,
     );
-    const exitCode = automations.failed === 0 && automations.unknown === 0 ? 0 : 1;
+    const exitCode =
+      automations.failed === 0 && automations.unknown === 0 && automations.fetchErrors === 0 ? 0 : 1;
     return { exitCode, automations };
   }
 
+  if (allowReal) write(`chamadas_max=${maxPages + config.limit}`);
   const runStartedAt = nowFn();
   const summary = await generateOutbox(
     {
@@ -269,7 +288,7 @@ export async function runOutboxCli(options: RunCliOptions): Promise<RunCliResult
       ...(config.keyword ? { keyword: config.keyword } : {}),
       tracking: config.tracking,
     },
-    deps,
+    buildDeps(),
   );
 
   write(

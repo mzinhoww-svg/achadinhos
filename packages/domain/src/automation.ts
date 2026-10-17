@@ -198,6 +198,3 @@ export function parseAutomationsConfig(raw: unknown): AutomationsConfigResult {
   }
   return { ok: true, automations };
 }
-
-export const parseAutomationsFile = parseAutomationsConfig;
-export const safeParseAutomationsConfig = parseAutomationsConfig;

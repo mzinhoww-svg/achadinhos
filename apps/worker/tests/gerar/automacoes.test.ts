@@ -8,6 +8,7 @@ import { ShopeeClient } from "@achadinhos/shopee";
 
 import {
   DEFAULT_AUTOMATIONS_FILE,
+  firstKeyword,
   loadAutomationsFile,
   runAutomations,
   selectDueAutomations,
@@ -87,7 +88,42 @@ describe("selectDueAutomations", () => {
   });
 });
 
+describe("firstKeyword (R2)", () => {
+  it("pega a primeira palavra-chave de keywords/keyword/search/q", () => {
+    expect(firstKeyword({ keywords: ["tênis", "corrida"] })).toBe("tênis");
+    expect(firstKeyword({ keyword: "fone bluetooth" })).toBe("fone bluetooth");
+    expect(firstKeyword({ search: "café" })).toBe("café");
+    expect(firstKeyword({ q: "  " })).toBeUndefined();
+    expect(firstKeyword({})).toBeUndefined();
+    expect(firstKeyword(null)).toBeUndefined();
+  });
+});
+
 describe("runAutomations", () => {
+  it("passa a primeira palavra-chave da automação para a busca na Shopee (R2)", async () => {
+    const outbox = await tmpRoot();
+    const { logger } = collectLogger();
+    const seen: Array<string | undefined> = [];
+    await runAutomations(
+      parse([automation({ name: "T", filters: { keywords: ["tênis", "corrida"] } })]),
+      { runStartedAt: NOW, affiliateHandle: "@x", imageHosts: ["img.test"] },
+      {
+        source: {
+          productOfferV2: async (params) => {
+            seen.push(params.keyword);
+            return { nodes: [offerNode(11)], pageInfo: { hasNextPage: false } };
+          },
+        },
+        shortLinker: fakeShortLinker(),
+        fetchImage: fakeImageFetcher(),
+        renderCreative: fakeRenderCreative(),
+        channel: createFileOutbox({ dir: outbox }),
+        logger,
+      },
+    );
+    expect(seen).toEqual(["tênis"]);
+  });
+
   it("roda o gerador só para as automações vencidas (e2e Shopee simulada)", async () => {
     const server = await startOffersServer({ nodes: [offerNode(11)] });
     try {

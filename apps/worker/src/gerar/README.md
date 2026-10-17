@@ -80,13 +80,23 @@ pnpm outbox:gerar -- --automacoes config/automacoes.json
 pnpm outbox:gerar -- --automacoes config/automacoes.json --agora 2026-10-16T18:32:00Z
 ```
 
-- Cada automação vira uma busca com os **filtros** dela; a `--limite` vale por automação.
-- `groupIndex` no nome do arquivo é a posição da automação no arquivo (1..5).
-- **Agendamento sem estado**: roda só as automações cuja janela/dias contêm o instante da execução.
-  Frequência/antirrepetição dependem de persistência e seguem adiadas (§4) — invocações repetidas
-  dentro da janela geram slots novos.
+- Cada automação vira uma busca com os **filtros** dela; a `--limite` vale **por automação** — no
+  pior caso (5 automações) são até 5 × 50 = 250 ofertas por execução.
+- **Palavra-chave**: só a **primeira** de `filters.keywords|keyword|search|q` vai para a busca da
+  Shopee (que aceita uma string); as demais continuam valendo no filtro local.
+- `groupIndex` no nome do arquivo é a posição da automação no arquivo (1..5), estável mesmo com
+  automações não vencidas intercaladas.
+- **Agendamento sem estado**: roda só as automações cuja janela/dias contêm o instante da execução
+  (a janela usa o `timeZone` da automação; a **pasta do dia** é sempre America/Cuiaba, pela regra do
+  `Slot`). Frequência/antirrepetição dependem de persistência e seguem adiadas (§4): **não** ponha
+  isto num cron de minuto — cada execução dentro da janela gera slots novos.
+- `header`, `footer` e `groups` são aceitos no arquivo e **ignorados** hoje (reservados). Chaves
+  desconhecidas de `filters` passam em silêncio (um typo como `minDiscountt` não avisa).
 - **Falha fechado**: arquivo ausente, JSON inválido, automação inválida ou **6ª automação** →
-  exit 2 com código fixo (`automacoes_ausentes`/`automacoes_invalidas`/`automacoes_limite`).
+  exit 2 com código fixo (`automacoes_ausentes`/`automacoes_invalidas`/`automacoes_limite`). Falha da
+  busca em qualquer automação sai com **exit ≠ 0**.
+- Com `--permitir-real`, `chamadas_max = vencidas × (páginas + limite)` é impresso **antes** de
+  qualquer chamada (e `0` quando nenhuma vence).
 
 ## Servidor simulado
 
