@@ -1,7 +1,4 @@
 import "server-only";
-import { cache } from "react";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
 import { MemoryAutomations, MemoryConnections, MemoryVault } from "./memory";
 import type { SendsRepo } from "./envios-ports";
 import { MemorySendNow } from "./memory-sends";
@@ -9,10 +6,7 @@ import type { AutomationsRepo, ConnectionsRepo, SecretVault, TelegramGateway } f
 import type { OfferCandidate, OfferFinder, SendNowRepo, ShortLinkGateway } from "./send-ports";
 import { offers as demoOffers } from "@/lib/mock";
 import { dayWindow } from "@/lib/envios-view";
-import { createTelegramGateway } from "./telegram-gateway";
 import type { Session, SessionProvider } from "./session";
-import { buildSupabaseContainer, unconfiguredAuth, unconfiguredRpc } from "./supabase/container";
-import type { RpcFn } from "./supabase/rpc";
 
 export interface Container {
   connections: ConnectionsRepo;
@@ -89,15 +83,8 @@ const demoLinks: ShortLinkGateway = {
     return `https://s.shopee.com.br/demo${(originUrl.length * 7919).toString(36)}`;
   },
 };
-/** Sem adaptador configurado nenhuma consulta à Shopee acontece (a web não lê o Secret; decisão 003 H1). */
-const offlineFinder: OfferFinder = {
-  async search() { throw new Error("finder_not_configured"); },
-  async byItemId() { throw new Error("finder_not_configured"); },
-  async resolveShortUrl() { throw new Error("finder_not_configured"); },
-};
-const offlineLinks: ShortLinkGateway = { async generate() { throw new Error("links_not_configured"); } };
 
-/** Sessão do modo demo: a conta vem do servidor (nunca do cliente). Fora do demo vale o Supabase Auth. */
+/** Sessão do modo demo: a conta vem do servidor (nunca do cliente). Fora do demo não há sessão (sem persistência). */
 const sessions: SessionProvider = {
   async current(): Promise<Session | null> {
     return DEMO() ? { accountId: DEMO_ACCOUNT, userId: "demo-user" } : null;
@@ -155,8 +142,11 @@ async function seed(c: Container) {
 
 const g = globalThis as { __achadinhos?: Promise<Container> };
 
-/** Memória só no modo demo (QA visual): estado de processo, conta fictícia, nunca em produção (ver DEMO). */
-function demoContainer(): Promise<Container> {
+/**
+ * Único container usado pelo painel (T8-A, §2 do plano): memória de processo, conta fictícia, sem
+ * persistência. O caminho real (Supabase Auth/RLS + Telegram) fica dormente em `./supabase/live.ts`.
+ */
+function memoryContainer(): Promise<Container> {
   g.__achadinhos ??= (async () => {
     const connections = new MemoryConnections();
     const sendNow = new MemorySendNow(connections);
@@ -178,38 +168,12 @@ function demoContainer(): Promise<Container> {
 }
 
 /**
- * Real: Supabase Auth + RLS. Um cliente por requisição, com os cookies do usuário e só a chave pública (anon);
- * a service_role nunca entra no web. Sem configuração: falha fechada (sem sessão, sem dados).
+ * O painel usa **só** o container em memória (T8-A): sem Supabase, sem Telegram real, sem Vault e
+ * sem persistência no caminho ativo. O caminho real continua no repositório, dormente, em
+ * `./supabase/live.ts` (ver docs/plans/escopo-sem-supabase-telegram.md §2).
  */
-async function liveContainer(): Promise<Container> {
-  const rest = { telegram: createTelegramGateway(), finder: offlineFinder, links: offlineLinks };
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return buildSupabaseContainer({ auth: unconfiguredAuth, rpc: unconfiguredRpc }, rest);
-  }
-  const jar = await cookies();
-  const client = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => jar.getAll(),
-      setAll(list) {
-        // Server Components não podem gravar cookie; a renovação do token acontece em actions/route handlers.
-        try {
-          for (const c of list) jar.set(c.name, c.value, c.options);
-        } catch {
-          /* noop */
-        }
-      },
-    },
-  });
-  const rpc: RpcFn = (fn, args) => client.rpc(fn, args);
-  return buildSupabaseContainer({ auth: client.auth, rpc }, rest);
-}
-
-const live = cache(liveContainer);
-
 export function container(): Promise<Container> {
-  return DEMO() ? demoContainer() : live();
+  return memoryContainer();
 }
 
 /** Para telas: sessão da requisição; no demo, `?vazio=1` mostra a conta sem dados (somente leitura de preview). */

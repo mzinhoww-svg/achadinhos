@@ -154,3 +154,47 @@ export const safeValidate = safeValidateAutomation;
 export const automationLimitOk = canCreateAutomation;
 export const enforceLimit = assertAutomationLimit;
 export const checkLimit = checkAutomationLimit;
+
+// ---------------------------------------------------------------------------
+// Automações por arquivo (T7-D): `config/automacoes.json`, só-leitura, editado à mão.
+// ---------------------------------------------------------------------------
+
+/** Códigos fixos de falha do arquivo (viram `failed`/exit 2, nunca mensagem de erro). */
+export const AUTOMATIONS_FILE_CODES = {
+  ausentes: "automacoes_ausentes",
+  invalidas: "automacoes_invalidas",
+  limite: "automacoes_limite",
+} as const;
+
+export type AutomationsFileCode = (typeof AUTOMATIONS_FILE_CODES)[keyof typeof AUTOMATIONS_FILE_CODES];
+
+export type AutomationsConfigResult =
+  | { ok: true; automations: AutomationInput[] }
+  | { ok: false; code: AutomationsFileCode };
+
+/**
+ * Valida o conteúdo JÁ PARSEADO de `config/automacoes.json`. Aceita `{ "automacoes": [...] }`
+ * (formato do arquivo) ou um array cru. Falha fechado: qualquer automação inválida derruba o
+ * arquivo inteiro; a 6ª automação é recusada (limite 5).
+ */
+export function parseAutomationsConfig(raw: unknown): AutomationsConfigResult {
+  let list: unknown;
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw !== null && typeof raw === "object") {
+    const container = raw as Record<string, unknown>;
+    list = container["automacoes"] ?? container["automations"];
+  } else {
+    return { ok: false, code: AUTOMATIONS_FILE_CODES.invalidas };
+  }
+  if (!Array.isArray(list)) return { ok: false, code: AUTOMATIONS_FILE_CODES.invalidas };
+  if (list.length > MAX_AUTOMATIONS_PER_ACCOUNT) return { ok: false, code: AUTOMATIONS_FILE_CODES.limite };
+
+  const automations: AutomationInput[] = [];
+  for (const item of list) {
+    const parsed = automationSchema.safeParse(item);
+    if (!parsed.success) return { ok: false, code: AUTOMATIONS_FILE_CODES.invalidas };
+    automations.push(parsed.data);
+  }
+  return { ok: true, automations };
+}

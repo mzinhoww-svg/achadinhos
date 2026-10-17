@@ -2,24 +2,41 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, type ComponentType, type SVGProps } from "react";
 import { cx } from "@/lib/cx";
 import { IconBolt, IconEye, IconHome, IconPlug, IconSend, IconTag } from "@/components/ui/icons";
 
-const items = [
+type NavItem = {
+  href: string;
+  label: string;
+  short: string;
+  Icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** Tela dormente (T8-A): só aparece com a flag `ACHADINHOS_CONEXOES` ligada. */
+  flag?: "conexoes";
+};
+
+const ITEMS: readonly NavItem[] = [
   { href: "/painel", label: "Painel", short: "Painel", Icon: IconHome },
-  { href: "/conexoes", label: "Conexões", short: "Conexões", Icon: IconPlug },
+  { href: "/conexoes", label: "Conexões", short: "Conexões", Icon: IconPlug, flag: "conexoes" },
   { href: "/automacoes", label: "Automações", short: "Automações", Icon: IconBolt },
   { href: "/ofertas", label: "Ofertas", short: "Ofertas", Icon: IconTag },
   { href: "/envios", label: "Envios", short: "Envios", Icon: IconSend },
 ];
 
-/** "Mandar agora" aparece só na barra lateral; no celular a barra inferior tem 5 abas e o atalho fica em Envios. */
-const sideItems = [
-  ...items.slice(0, 4),
-  { href: "/mandar-agora", label: "Mandar agora", short: "Mandar", Icon: IconBolt },
-  items[4]!,
-];
+/** "Mandar agora" aparece só na barra lateral; no celular a barra inferior tem as abas e o atalho fica em Envios. */
+const MANDAR_AGORA: NavItem = { href: "/mandar-agora", label: "Mandar agora", short: "Mandar", Icon: IconBolt };
+
+/** Conexões/Telegram é tela dormente (T8-A): some do menu sem a flag, mas a rota continua no repositório. */
+function visibleItems(showConexoes: boolean): NavItem[] {
+  return ITEMS.filter((i) => i.flag !== "conexoes" || showConexoes);
+}
+
+function sideItems(showConexoes: boolean): NavItem[] {
+  const base = visibleItems(showConexoes);
+  const envios = base.filter((i) => i.href === "/envios");
+  const rest = base.filter((i) => i.href !== "/envios");
+  return [...rest, MANDAR_AGORA, ...envios];
+}
 
 function useActive() {
   const pathname = usePathname();
@@ -45,11 +62,11 @@ function EmptyToggle() {
   );
 }
 
-export function SideNav() {
+export function SideNav({ showConexoes }: { showConexoes: boolean }) {
   const isActive = useActive();
   return (
     <nav aria-label="Principal" className="flex h-full flex-col gap-1">
-      {sideItems.map(({ href, label, Icon }) => {
+      {sideItems(showConexoes).map(({ href, label, Icon }) => {
         const active = isActive(href);
         return (
           <Link
@@ -75,12 +92,16 @@ export function SideNav() {
   );
 }
 
-export function TabBar() {
+export function TabBar({ showConexoes }: { showConexoes: boolean }) {
   const isActive = useActive();
+  const items = visibleItems(showConexoes);
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 z-[var(--z-nav)] grid grid-cols-5 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
+      className={cx(
+        "fixed inset-x-0 bottom-0 z-[var(--z-nav)] grid border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden",
+        items.length === 5 ? "grid-cols-5" : "grid-cols-4",
+      )}
     >
       {items.map(({ href, short, Icon }) => {
         const active = isActive(href);

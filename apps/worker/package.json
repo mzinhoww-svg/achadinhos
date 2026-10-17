@@ -8,10 +8,12 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-    "start": "node --import tsx src/bin.ts"
+    "start": "node --import tsx src/bin.ts",
+    "outbox:gerar": "tsx src/gerar/cli.ts"
   },
   "dependencies": {
     "@achadinhos/alerts": "workspace:*",
+    "@achadinhos/channel": "workspace:*",
     "@achadinhos/commission": "workspace:*",
     "@achadinhos/creative": "workspace:*",
     "@achadinhos/domain": "workspace:*",

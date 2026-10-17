@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IconAlert, IconArrow, IconBolt, IconCheck, IconClock, IconSend } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { cx } from "@/lib/cx";
+import { conexoesEnabled } from "@/lib/flags";
 import { formatInt, formatTime } from "@/lib/format";
 import { account, isEmptyPreview } from "@/lib/mock";
 import { getConnections } from "@/server/connections";
@@ -21,6 +22,8 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const empty = isEmptyPreview(sp);
   const withVazio = empty ? "?vazio=1" : "";
+  // R1: sem a flag, passos que apontam para /conexoes (404) viram texto, não link.
+  const showConexoes = conexoesEnabled();
   const c = await container();
   const session = await viewSession(c, empty);
   const header = <PageHeader title="Painel" description="Visão do dia: o que já saiu, o que está na fila e o que precisa de atenção." />;
@@ -56,7 +59,7 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
         <Card
           title={complete ? "Tudo pronto para postar" : "Comece por aqui"}
           description={`${doneCount} de ${total} passos concluídos`}
-          action={nextStep && <Button href={`${nextStep.href}`} size="sm" icon={<IconArrow width={16} height={16} />}>Continuar</Button>}
+          action={nextStep && (showConexoes || !nextStep.href.startsWith("/conexoes")) ? <Button href={`${nextStep.href}`} size="sm" icon={<IconArrow width={16} height={16} />}>Continuar</Button> : undefined}
         >
           <div className="h-2 overflow-hidden rounded-full bg-sunken-2" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={doneCount} aria-label="Progresso da configuração">
             <div className="h-full rounded-full bg-brand-600" style={{ width: `${(doneCount / total) * 100}%` }} />
@@ -65,25 +68,34 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
             {steps.map((s, i) => {
               const isNext = s.key === next;
               const label = STATE_LABEL[s.state];
+              const href = `${s.href.split("#")[0]}${withVazio}${s.href.includes("#") ? `#${s.href.split("#")[1]}` : ""}`;
+              const linked = showConexoes || !s.href.startsWith("/conexoes");
+              const row = (
+                <>
+                  <span
+                    className={cx(
+                      "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold",
+                      s.state === "done" ? "bg-ok text-white" : s.state === "error" ? "bg-err text-white" : isNext ? "bg-brand-600 text-white" : "border border-line-strong text-ink-3",
+                    )}
+                  >
+                    {s.state === "done" ? <IconCheck width={14} height={14} strokeWidth={3} /> : s.state === "error" ? "!" : s.state === "pending" ? <IconClock width={14} height={14} /> : i + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={cx("flex flex-wrap items-center gap-2 text-[0.9375rem] font-semibold", s.state === "done" ? "text-ink-3" : "text-ink")}>
+                      {s.title}
+                      {label && <Badge tone={s.state === "error" ? "err" : s.state === "pending" ? "info" : "neutral"}>{label}</Badge>}
+                    </span>
+                    <span className="block text-sm text-ink-2">{s.detail ?? s.text}</span>
+                  </span>
+                </>
+              );
               return (
                 <li key={s.key}>
-                  <a href={`${s.href.split("#")[0]}${withVazio}${s.href.includes("#") ? `#${s.href.split("#")[1]}` : ""}`} className="group -mx-2 flex items-start gap-3 rounded-control px-2 py-3 hover:bg-sunken">
-                    <span
-                      className={cx(
-                        "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold",
-                        s.state === "done" ? "bg-ok text-white" : s.state === "error" ? "bg-err text-white" : isNext ? "bg-brand-600 text-white" : "border border-line-strong text-ink-3",
-                      )}
-                    >
-                      {s.state === "done" ? <IconCheck width={14} height={14} strokeWidth={3} /> : s.state === "error" ? "!" : s.state === "pending" ? <IconClock width={14} height={14} /> : i + 1}
-                    </span>
-                    <span className="min-w-0">
-                      <span className={cx("flex flex-wrap items-center gap-2 text-[0.9375rem] font-semibold", s.state === "done" ? "text-ink-3" : "text-ink")}>
-                        {s.title}
-                        {label && <Badge tone={s.state === "error" ? "err" : s.state === "pending" ? "info" : "neutral"}>{label}</Badge>}
-                      </span>
-                      <span className="block text-sm text-ink-2">{s.detail ?? s.text}</span>
-                    </span>
-                  </a>
+                  {linked ? (
+                    <a href={href} className="group -mx-2 flex items-start gap-3 rounded-control px-2 py-3 hover:bg-sunken">{row}</a>
+                  ) : (
+                    <div className="flex items-start gap-3 py-3">{row}</div>
+                  )}
                 </li>
               );
             })}
