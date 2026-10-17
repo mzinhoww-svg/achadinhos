@@ -1,3 +1,7 @@
+> **SUSPENSO / DESATUALIZADO (2026-10-16).** A hospedagem do worker em VPS está suspensa pelo
+> escopo sem persistência (`docs/plans/escopo-sem-supabase-telegram.md`, §2 e §4). O texto e o
+> parecer abaixo ficam preservados como histórico; nada foi apagado.
+
 # 003 — Hospedagem do worker
 Status: aceita; gasto pendente de estimativa (ver STATUS.md)
 ## Opções

@@ -6,6 +6,31 @@
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "tests"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "tests/image.test.ts",
+    "tests/logger.test.ts",
+    "tests/scheduler/offer-selection.test.ts",
+    "tests/links.test.ts",
+    "tests/paridade.test.ts",
+    "tests/gerar/**/*.test.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/executor.ts",
+    "src/ports.ts",
+    "src/runtime.ts",
+    "src/main.ts",
+    "src/bin.ts",
+    "src/index.ts",
+    "src/heartbeat*.ts",
+    "src/scheduler.ts",
+    "src/memory-store.ts",
+    "src/commission-job.ts",
+    "src/timeouts.ts",
+    "src/config.ts",
+    "src/sql/**",
+    "src/validation/**"
+  ]
 }
