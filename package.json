@@ -4,10 +4,17 @@
   "packageManager": "pnpm@10",
   "engines": { "node": ">=22" },
   "scripts": {
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --if-present test && vitest run -c scripts/vitest.config.ts",
     "test:db": "supabase test db --local",
     "test:db:concurrency": "bash supabase/tests/concurrency/claim_next_send.sh",
-    "typecheck": "pnpm -r --if-present typecheck",
-    "lint": "pnpm -r --if-present lint"
+    "typecheck": "pnpm -r --if-present typecheck && tsc --noEmit -p scripts/tsconfig.json",
+    "lint": "pnpm -r --if-present lint",
+    "shopee:diag": "tsx scripts/shopee-diag.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   }
 }
