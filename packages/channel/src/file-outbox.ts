@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import type { Stats } from "node:fs";
 import { join, resolve, sep } from "node:path";
@@ -148,7 +149,7 @@ async function rebuildIndex(dayDir: string, makeTmp: MakeTmp): Promise<void> {
   });
   const day = dayDir.slice(dayDir.lastIndexOf(sep) + 1);
   const tmp = makeTmp("index");
-  await fs.writeFile(tmp, renderDayIndex(day, rows), { mode: 0o600 });
+  await fs.writeFile(tmp, renderDayIndex(day, rows), { flag: "wx", mode: 0o600 });
   await fs.chmod(tmp, 0o600);
   await fs.rename(tmp, join(dayDir, "index.md"));
 }
@@ -160,15 +161,12 @@ async function rebuildIndex(dayDir: string, makeTmp: MakeTmp): Promise<void> {
 export function createFileOutbox(options: FileOutboxOptions = {}): Channel {
   const env = options.env ?? process.env;
   const root = resolve(options.dir ?? env["OUTBOX_DIR"] ?? join(process.cwd(), "outbox"));
-  let sequence = 0;
   // Serializa a reconstrução do índice; a corrida do `.md` continua decidida pelo `link` (EEXIST).
   let indexChain: Promise<void> = Promise.resolve();
 
-  const makeTmp = (dir: string): MakeTmp => (label) => {
-    sequence += 1;
-    // `<label>.<pid>.<sequência>`: único por tentativa, para duas gravações concorrentes não dividirem o tmp.
-    return join(dir, `.${label}.${process.pid}.${sequence}.tmp`);
-  };
+  const makeTmp = (dir: string): MakeTmp => (label) =>
+    // `randomUUID` não depende de estado por instância: duas instâncias no mesmo processo não dividem tmp.
+    join(dir, `.${label}.${randomUUID()}.tmp`);
 
   const scheduleIndex = (dayDir: string): Promise<void> => {
     indexChain = indexChain.then(() => rebuildIndex(dayDir, makeTmp(dayDir))).catch(() => undefined);
@@ -207,7 +205,7 @@ export function createFileOutbox(options: FileOutboxOptions = {}): Channel {
       await fs.mkdir(dayDir, { recursive: true, mode: 0o700 });
       await fs.chmod(dayDir, 0o700);
       const tmpPng = makeTmp(dayDir)(`${base}.png`);
-      await fs.writeFile(tmpPng, offer.creativePng, { mode: 0o600 });
+      await fs.writeFile(tmpPng, offer.creativePng, { flag: "wx", mode: 0o600 });
       await fs.chmod(tmpPng, 0o600);
       await fs.rename(tmpPng, pngPath);
     } catch {
@@ -219,7 +217,7 @@ export function createFileOutbox(options: FileOutboxOptions = {}): Channel {
     // (b) `.md` por último, publicado com `link` (falha EEXIST se já existir); é o commit.
     try {
       const tmpMd = makeTmp(dayDir)(`${base}.md`);
-      await fs.writeFile(tmpMd, renderOfferMarkdown(offer, slotKey), { mode: 0o600 });
+      await fs.writeFile(tmpMd, renderOfferMarkdown(offer, slotKey), { flag: "wx", mode: 0o600 });
       await fs.chmod(tmpMd, 0o600);
       try {
         await fs.link(tmpMd, mdPath);

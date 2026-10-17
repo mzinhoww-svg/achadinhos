@@ -320,6 +320,31 @@ describe("§1 T7-A FileOutbox", () => {
     expect((await readdir(dayDir)).filter((name) => name.startsWith("."))).toEqual([]);
   });
 
+  it("(11/B2) duas instâncias, 20 entregas concorrentes do mesmo slot → todas delivered", async () => {
+    const root = await tmpRoot();
+    const first = createFileOutbox({ dir: root });
+    const second = createFileOutbox({ dir: root });
+    const channels = [first, second];
+
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        channels[index % channels.length]!.deliver(makeOffer(), { signal: SIGNAL }),
+      ),
+    );
+
+    // Unicidade do tmp não pode depender de estado por instância: nenhuma entrega vira `failed`.
+    for (const result of results) {
+      expect(result).toEqual({ status: "delivered", ref: "20261016/1432-123456789-g1" });
+    }
+    const dayDir = join(root, "20261016");
+    expect((await readdir(dayDir)).sort()).toEqual([
+      "1432-123456789-g1.md",
+      "1432-123456789-g1.png",
+      "index.md",
+    ]);
+    expect((await readdir(dayDir)).filter((name) => name.startsWith("."))).toEqual([]);
+  });
+
   it.each<[string, unknown]>([
     ["priceCurrent", Number.NaN],
     ["priceCurrent", Number.POSITIVE_INFINITY],
