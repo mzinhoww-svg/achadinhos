@@ -15,21 +15,24 @@ export AFFILIATE_HANDLE=@seu_handle
 
 Por segurança, o CLI **só aceita endpoint de loopback** (`127.0.0.1`, `localhost`, `::1`). Endpoint
 fora disso é recusado (exit 2). `--permitir-real` libera um endpoint real, mas **só use com
-autorização de Aurimar e depois de a credencial passar no item 2 do checklist** — hoje o
-`productOfferV2` ainda responde 10010.
+autorização de Aurimar e depois de a credencial passar no item 2 do checklist**; nesse modo o
+`--limite` é obrigatório e a busca consulta **uma página só**.
 
 ## Rodar
 
 ```sh
-pnpm outbox:gerar -- --limite 10 --outbox outbox
+pnpm outbox:gerar --limite 10 --outbox outbox
 ```
 
 - `--limite N`: quantas ofertas no máximo por execução (padrão 10, máximo 50).
 - `--outbox DIR`: onde gravar (padrão `OUTBOX_DIR` ou `./outbox`).
 - `--grupo LABEL` e `--grupo-indice N`: rótulo e posição do grupo (1..99, entra no nome do arquivo).
 - `--keyword TXT`: filtro de busca.
+- `--handle @x`: @ do afiliado (padrão `AFFILIATE_HANDLE`).
+- `--endpoint URL`: endpoint GraphQL (padrão `SHOPEE_ENDPOINT`); exigido.
 
-`--help` mostra todas as flags.
+`--help` mostra todas as flags. Passe as flags direto (sem `--`): `pnpm outbox:gerar --limite 3`
+já repassa ao CLI — com `pnpm outbox:gerar -- --limite 3` o pnpm manda o `--` literal e o CLI recusa.
 
 ## Onde saem os arquivos
 
@@ -79,6 +82,8 @@ corpo com o título, o link curto, o preço e a mensagem pronta para copiar (em 
 
 ## Notas
 
-- O recurso vem do T7-B (`apps/worker/src/gerar/`); este guia acompanha esse PR.
+- O recurso vem do T7-B (`apps/worker/src/gerar/`), já na `main`.
+- Para rodar **várias automações por arquivo** (`config/automacoes.json`), veja `--automacoes` no
+  `apps/worker/src/gerar/README.md`.
 - Segredos ficam só em `.env`/ambiente; nunca aparecem em log nem nos arquivos da outbox.
 - `outbox/` é gitignored.
