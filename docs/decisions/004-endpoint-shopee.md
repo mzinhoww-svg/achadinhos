@@ -39,3 +39,50 @@ Estado geral: **parcialmente confirmado por fonte secundária; confirmação ofi
 1. Aurimar (ou o Dev com a credencial) executa uma chamada real de `productOfferV2` e uma de `generateShortLink` e registra aqui: URL, status HTTP e corpo de um erro de assinatura propositalmente inválido, tolerância de timestamp, tipos reais de preço/comissão, limite de taxa.
 2. Enquanto isso o item 1 do `mvp-checklist.json` fica "aguardando credencial" no teste de integração real; o cliente continua testado contra o servidor simulado.
 3. Pré-condições de segurança antes do worker usar o cliente: R1–R4 da auditoria no PR #1.
+
+## Diagnóstico T12 — degrau D0 (2026-10-16, `feat/shopee-diag-d0`)
+
+Primeira chamada do diagnóstico do 10010 (§3 do plano `docs/plans/shopee-diagnostico-10010.md`),
+autorizada com **uma** chamada. Corpo montado à mão em `scripts/shopee-diag.ts`, só `query`, sem
+`variables` nem `operationName`: `{"query":"{ __typename }"}`.
+
+Saída allowlisted do §4 (oito linhas, nada além disso):
+
+| campo | valor |
+|---|---|
+| degrau | `D0` |
+| codigo | `OK` |
+| contagem | `1` |
+| duracao_ms | `598` |
+| mensagem | `ausente` |
+| hora_local_utc | `2026-10-16T20:48:27.956Z` |
+| date_resposta | `2026-10-16T20:48:28.000Z` |
+| delta_date_s | `0` |
+
+### O que o D0 mostra — e o que ele não prova
+
+- **Transporte, envelope e assinatura sem `variables` foram aceitos.** A API devolveu `data` (2xx, um campo
+  na raiz) para o corpo `{"query":"{ __typename }"}` assinado com o App ID/Secret do `.env`: o header que o
+  cliente monta (`SHA256 Credential=…, Timestamp=…, Signature=…`), a ordem dos campos e o
+  `SHA256(AppID + Timestamp + Payload + Secret)` sobre a mesma string do corpo passam nesse caminho. Não houve
+  `10020`. **Isso não prova a credencial**: um gateway pode responder meta-campo (`__typename`) antes de
+  autenticar, e o D0 não tem nó de produto para provar acesso. Credencial só se prova com `productOfferV2`
+  devolvendo nós (§5 do plano); o degrau D4 (Secret propositalmente inválido) é que separa "credencial aceita"
+  de "gateway aceitou o envelope".
+- **Relógio**: `delta_date_s = 0` — horário local e `Date` da resposta batem no segundo. A tolerância da
+  Shopee segue não delimitada (só se sabe que 0 s de defasagem passa).
+- **A URL** segue confirmada por resposta real (2xx com envelope GraphQL).
+- **Causa do `10010` ainda indeterminada.** O D0 só mostrou que o transporte, com um corpo sem `variables`,
+  funciona. Há uma diferença de corpo que ele não separa: a chamada que devolveu `10010` enviava `variables`
+  (com `limit`) e um documento de 9 variáveis tipadas + 19 campos. Seguem em pé: (a) o documento
+  `productOfferV2` (nome de operação, argumentos, campos) e (b) o uso de `variables` no corpo. O D1
+  (`productOfferV2(limit: 1)` inline, 2 campos) e o D2 (`variables` como no cliente) é que decidem.
+- **Item 2 do checklist**: o critério do §5 (uma chamada `productOfferV2` do cliente de produção devolvendo
+  ≥ 1 oferta) **não** foi cumprido, então o item segue aberto.
+
+### O que continua desconhecido
+Tipos reais de `priceMin`/comissões (o D0 não pediu nó de produto; §4.6 fica para D1+), formato real do erro
+de assinatura (D4 não rodou), limites de taxa, paginação máxima e `generateShortLink`.
+
+**Nenhum degrau seguinte foi executado**: a autorização cobria uma única chamada (D0) e a saída indicou
+sucesso, então a escada para aqui e espera nova autorização.

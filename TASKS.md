@@ -14,3 +14,4 @@ Status: pendente | em_andamento | em_revisao | concluida | bloqueada. Evidência
 | T10 | Alertas por e-mail (MVP 13) | Sentinela | em_revisao | PR #8 aprovado pelo QA; auditoria Farol |
 | T7-A | packages/channel: interface Channel + adaptador FileOutbox | Cinzel | em_revisao | PR #45; `pnpm test` (75 testes) + `pnpm typecheck` verdes |
 | T7-C | Isolar o código dormente (exclude tsconfig/vitest, filtros pnpm, configs e workflow dormentes, READMEs, avisos) | Vigia | em_revisao | PR #46; worker: 87 ativos + 261 dormentes = 339 (+9 novos); typecheck/test verdes; workflow dormente |
+| T12 | Diagnóstico do 10010: modo de diagnóstico em scripts/ + degrau D0 | Sextante | em_revisao | PR #44; D0 = OK/contagem 1; sem D1 |
