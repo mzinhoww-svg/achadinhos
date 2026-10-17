@@ -104,7 +104,8 @@ describe("MVP 14 /painel", () => {
     const { default: Page } = await import("@/app/painel/page");
     const out = renderToStaticMarkup((await Page({ searchParams: sp({ vazio: "1" }) })) as never);
     expect(out).toContain("0 de 4 passos");
-    expect(out).toContain("/conexoes");
+    // R1: sem ACHADINHOS_CONEXOES os passos que apontam para /conexoes viram texto, não link.
+    expect(out).not.toContain('href="/conexoes');
     expect(out).toContain("/automacoes/nova");
     expect(out).toContain("Nada na fila agora");
     expect(out).toContain("Tudo certo");
