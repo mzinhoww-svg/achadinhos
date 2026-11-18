@@ -1,6 +1,6 @@
 import { DOCS_BIBLIA, type ResumoDocBiblia } from "@achadinhos/shared";
-import { FileText } from "lucide-react";
 import Link from "next/link";
+import { IconeDocumento } from "@/components/icones";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { dataHora } from "@/lib/utils";
@@ -44,7 +44,7 @@ export default async function PaginaBiblia() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <FileText className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <IconeDocumento className="mt-0.5 size-4 shrink-0 text-primary" />
                     <div className="min-w-0">
                       <p className="truncate font-medium">{doc.titulo}</p>
                       <p className="text-xs text-muted-foreground">

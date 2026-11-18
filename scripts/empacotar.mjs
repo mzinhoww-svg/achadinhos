@@ -70,5 +70,7 @@ gravarJson(join(dv, "package.json"), {
   dependencies: pkgShared.dependencies,
 });
 writeFileSync(join(dp, ".npmrc"), "fund=false\naudit=false\n");
+// Lockfile: o npm da Vertra instala sem resolver a árvore (menos memória, versões fixas).
+execSync("npm install --package-lock-only --ignore-scripts --no-fund --no-audit", { cwd: dp, stdio: "inherit" });
 
 console.log(`\nPronto:\n  ${dw}\n  ${dp}`);
