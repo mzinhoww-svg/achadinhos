@@ -256,15 +256,43 @@ export const ofertas = achadinhos.table(
   ],
 );
 
-export const imagens = achadinhos.table("imagens", {
-  id: id(),
-  ofertaId: ref("oferta_id")
-    .notNull()
-    .references(() => ofertas.id, { onDelete: "cascade" }),
-  template: text("template").notNull(),
-  fotoOriginalUrl: text("foto_original_url").notNull(),
-  url: text("url"),
-  recorteOk: boolean("recorte_ok"),
+/** Peças da Arte (Prompt 3). Uma linha por formato renderizado. */
+export const imagens = achadinhos.table(
+  "imagens",
+  {
+    id: id(),
+    /** Null na pré-visualização de um produto que ainda não virou oferta. */
+    ofertaId: ref("oferta_id").references(() => ofertas.id, { onDelete: "cascade" }),
+    produtoId: ref("produto_id")
+      .notNull()
+      .references(() => produtos.id, { onDelete: "cascade" }),
+    formato: text("formato").notNull(),
+    /** De onde veio o template: biblia-nicho, biblia-padrao ou padrao. */
+    template: text("template").notNull(),
+    fotoOriginalUrl: text("foto_original_url").notNull(),
+    url: text("url"),
+    mascaraUrl: text("mascara_url"),
+    recorteOk: boolean("recorte_ok"),
+    confianca: numeric("confianca", { precision: 4, scale: 2 }),
+    fallback: boolean("fallback").notNull().default(false),
+    motivoFallback: text("motivo_fallback"),
+    ampliada: boolean("ampliada").notNull().default(false),
+    preco: numeric("preco", { precision: 12, scale: 2 }),
+    precoAntigo: numeric("preco_antigo", { precision: 12, scale: 2 }),
+    descontoPct: numeric("desconto_pct", { precision: 5, scale: 2 }),
+    /** previa = produto sem oferta, desconto anunciado pela loja. */
+    origemPreco: text("origem_preco").notNull().default("oferta"),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("imagens_oferta").on(t.ofertaId), index("imagens_produto").on(t.produtoId, t.criadoEm)],
+);
+
+/** Armazenamento reserva das peças quando o Blob da Vertra não está configurado. */
+export const arquivos = achadinhos.table("arquivos", {
+  caminho: text("caminho").primaryKey(),
+  tipo: text("tipo").notNull(),
+  dadosB64: text("dados_b64").notNull(),
+  tamanho: integer("tamanho").notNull(),
   criadoEm: criadoEm(),
 });
 

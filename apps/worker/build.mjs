@@ -12,11 +12,13 @@ await build({
   target: "node22",
   format: "esm",
   sourcemap: true,
-  // pg-native é opcional no pg e não é usado.
-  external: ["pg-native"],
+  // pg-native é opcional no pg e não é usado. Os pacotes da Arte têm binários nativos: o deploy instala
+  // via npm (veja scripts/empacotar.mjs).
+  external: ["pg-native", "sharp", "satori", "@resvg/resvg-js"],
   banner: {
     js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
   },
   logLevel: "info",
 });
 cpSync("../../packages/db/drizzle", "dist/drizzle", { recursive: true });
+cpSync("../../packages/arte/fontes", "dist/fontes", { recursive: true });

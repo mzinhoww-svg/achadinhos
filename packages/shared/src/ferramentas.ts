@@ -13,13 +13,6 @@ export interface FerramentaPendente {
 export const FERRAMENTAS_PENDENTES: readonly FerramentaPendente[] = [
   {
     metodo: "POST",
-    rota: "/imagem/render",
-    ferramenta: "/imagem/render",
-    quemChama: "Arte",
-    motivo: "Renderização (sharp + Satori) ainda não construída; depende de TEMPLATES-VISUAIS na bíblia.",
-  },
-  {
-    metodo: "POST",
     rota: "/ofertas/:id/copy",
     ferramenta: "/ofertas/:id/copy",
     quemChama: "Copywriter",

@@ -43,6 +43,25 @@ async function chamar<T>(caminho: string, init: RequestInit = {}, semSessao = fa
   return corpo as T;
 }
 
+export interface Renderizacao {
+  chave: string;
+  produto: { id: number; nome: string; url: string; idExterno: string };
+  ofertaId: number | null;
+  origemPreco: "oferta" | "previa";
+  fotoOriginalUrl: string;
+  mascaraUrl: string | null;
+  confianca: number | null;
+  fallback: boolean;
+  motivoFallback: string | null;
+  ampliada: boolean;
+  template: string;
+  preco: number | null;
+  precoAntigo: number | null;
+  descontoPct: number | null;
+  criadoEm: string;
+  pecas: { id: number; formato: string; url: string | null }[];
+}
+
 export const worker = {
   login: (email: string, senha: string) =>
     chamar<{ admin: { id: number; email: string; nome: string } }>(
@@ -66,6 +85,10 @@ export const worker = {
       body: JSON.stringify({ decisao, decididoPor }),
     }),
   listarEventos: (limite = 50) => chamar<{ eventos: Evento[] }>(`/eventos?limite=${limite}`),
+  listarImagens: (limite = 30) =>
+    chamar<{ armazenamento: string; renderizacoes: Renderizacao[] }>(`/imagens?limite=${limite}`),
+  gerarLoteArte: (corpo: { limite: number; forcarFallbackEm: number; nichoId?: number }) =>
+    chamar<{ pedidos: number }>("/imagem/lote", { method: "POST", body: JSON.stringify(corpo) }),
   trocarSenha: (email: string, senhaAtual: string, senhaNova: string) =>
     chamar<{ ok: true }>("/auth/senha", {
       method: "POST",

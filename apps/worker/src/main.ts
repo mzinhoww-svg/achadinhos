@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
 import { criarApp, VERSAO } from "./app.js";
+import { ArmazenamentoBanco, VertraBlob } from "./arte/armazenamento.js";
 import { agendarMonitor } from "./coleta/job.js";
 import { criarMarketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
@@ -67,6 +68,13 @@ const app = criarApp({
   estado: () => ({ fila: estado.fila, listen: ouvinte.conectado, pronto: estado.pronto, erro: estado.erro }),
   marketplaces,
   regras,
+  arte: {
+    armazenamento: config.VERTRA_BLOB_KEY
+      ? new VertraBlob(config.VERTRA_BLOB_KEY, config.VERTRA_BLOB_URL, config.VERTRA_BLOB_PREFIXO)
+      : new ArmazenamentoBanco(db),
+    limiarConfianca: config.ARTE_LIMIAR_CONFIANCA,
+    publicUrl: config.WORKER_PUBLIC_URL,
+  },
 });
 
 /** Migrações, admin inicial, LISTEN e fila. Se o banco falhar, tenta de novo sem derrubar o processo. */

@@ -1,5 +1,6 @@
 // Monta as pastas de deploy da Vertra (runtime Node nativo, sem imagem própria):
-//   deploy/worker: worker.mjs (arquivo único, sem dependências) + migrações. Start: node worker.mjs
+//   deploy/worker: worker.mjs (arquivo único) + migrações + fontes. Só os pacotes nativos da Arte (sharp, satori,
+//                  resvg) ficam de fora do bundle e são instalados pela Vertra com npm. Start: node worker.mjs
 //   deploy/painel: app Next.js autônoma; @achadinhos/shared vai em libs/ como dependência file: (a Vertra remove pastas "vendor" do zip).
 //                  A Vertra instala (npm), roda "npm run build" e depois "npm start".
 // Uso: pnpm empacotar
@@ -26,6 +27,15 @@ gravarJson(join(dw, "package.json"), {
   type: "module",
   engines: { node: ">=22.12" },
   scripts: { start: "node worker.mjs" },
+  dependencies: Object.fromEntries(
+    Object.entries(ler("packages/arte/package.json").dependencies).filter(([n]) =>
+      ["sharp", "satori", "@resvg/resvg-js"].includes(n),
+    ),
+  ),
+});
+execSync("npm install --package-lock-only --ignore-scripts --no-audit --no-fund", {
+  cwd: dw,
+  stdio: "inherit",
 });
 
 // ---------- painel ----------

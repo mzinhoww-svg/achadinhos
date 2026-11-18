@@ -12,6 +12,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
+import { type DepsArte, rotasArte } from "./arte/rotas.js";
 import type { Marketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { rotasColeta } from "./coleta/rotas.js";
@@ -44,6 +45,8 @@ export interface DepsApp {
   /** Coleta, Monitor e ofertas (Prompt 2). Sem isto, as rotas de coleta não são registradas. */
   marketplaces?: Marketplaces;
   regras?: RegrasOferta;
+  /** Arte (Prompt 3). Sem isto, /imagem/render responde 501. */
+  arte?: DepsArte;
 }
 
 const ROTAS_PUBLICAS = new Set(["/health", "/"]);
@@ -79,6 +82,8 @@ export function criarApp(deps: DepsApp): FastifyInstance {
   app.addHook("onRequest", async (req, reply) => {
     const caminho = req.url.split("?")[0] ?? "";
     if (ROTAS_PUBLICAS.has(caminho)) return;
+    // Peças guardadas no banco: públicas para o WhatsApp e o painel abrirem a imagem.
+    if (deps.arte && req.method === "GET" && caminho.startsWith("/arquivos/")) return;
     if (!tokenConfere(req.headers["x-service-token"], deps.serviceToken)) {
       return reply.code(401).send({ erro: "nao_autorizado", mensagem: "Envie o header X-Service-Token." });
     }
@@ -271,6 +276,13 @@ export function criarApp(deps: DepsApp): FastifyInstance {
   }
 
   if (deps.marketplaces) rotasColeta(app, deps.db, deps.marketplaces, deps.regras ?? REGRAS_PADRAO);
+  const arteDesligada = {
+    erro: "nao_implementado",
+    ferramenta: "/imagem/render",
+    motivo: "Arte desligada neste worker.",
+  };
+  if (deps.arte) rotasArte(app, deps.db, deps.arte);
+  else app.post("/imagem/render", async (_req, reply) => reply.code(501).send(arteDesligada));
 
   app.get("/ferramentas", async () => ({
     prontas: [
@@ -297,6 +309,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
             "POST /ofertas",
           ]
         : []),
+      ...(deps.arte ? ["POST /imagem/render", "POST /imagem/lote", "GET /imagens", "GET /arquivos/*"] : []),
     ],
     pendentes: FERRAMENTAS_PENDENTES.map((f) => ({ rota: `${f.metodo} ${f.rota}`, motivo: f.motivo })),
   }));

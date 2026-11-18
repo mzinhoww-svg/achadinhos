@@ -43,6 +43,17 @@ const esquema = z.object({
   /** Histórico mínimo para virar oferta. */
   HISTORICO_MIN_AMOSTRAS: z.coerce.number().int().min(1).max(500).default(4),
   HISTORICO_MIN_DIAS: z.coerce.number().min(0).max(30).default(3),
+  // Arte (Prompt 3)
+  /** Chave da Vertra com blob:write. Sem ela, as peças ficam no banco e saem por GET /arquivos/... */
+  VERTRA_BLOB_KEY: z.string().min(16).optional(),
+  VERTRA_BLOB_URL: z.string().url().default("https://blob.vertracloud.app/v1"),
+  VERTRA_BLOB_PREFIXO: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9/_-]*[a-z0-9]$/, "prefixo só com letras minúsculas, números, / _ -")
+    .default("achadinhos/pecas"),
+  /** URL pública do worker, usada nas URLs das peças guardadas no banco. Sem ela, vem do host da requisição. */
+  WORKER_PUBLIC_URL: z.string().url().optional(),
+  ARTE_LIMIAR_CONFIANCA: z.coerce.number().min(0).max(1).default(0.8),
 });
 
 export type Config = z.infer<typeof esquema>;

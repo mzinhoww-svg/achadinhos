@@ -22,6 +22,13 @@
       "when": 1795023179328,
       "tag": "0002_coleta_precos",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795028623905,
+      "tag": "0003_arte",
+      "breakpoints": true
     }
   ]
 }

@@ -157,9 +157,9 @@ describe.skipIf(!URL_TESTE)("worker com Postgres", () => {
   });
 
   it("ferramentas não construídas respondem 501 com o motivo", async () => {
-    const r = await app.inject({ method: "POST", url: "/imagem/render", headers: H, payload: {} });
+    const r = await app.inject({ method: "POST", url: "/disparo", headers: H, payload: {} });
     expect(r.statusCode).toBe(501);
-    expect(r.json()).toMatchObject({ erro: "nao_implementado", ferramenta: "/imagem/render" });
+    expect(r.json()).toMatchObject({ erro: "nao_implementado", ferramenta: "/disparo" });
     expect(r.json().motivo).toBeTruthy();
     expect((await app.inject({ method: "POST", url: "/ofertas/12/checar", headers: H })).statusCode).toBe(
       501,

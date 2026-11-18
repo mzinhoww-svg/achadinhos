@@ -204,3 +204,23 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   ofertas reais só aparecem depois de 3 dias de histórico.
 - **Nicho piloto:** cadastrado com as regras da bíblia do Coordenador (desconto de 20%, nota 4,5 e 100 vendas). As
   palavras-chave são provisórias; o Coordenador troca pelas do NICHOS.md com `POST /nichos` e o mesmo nome.
+
+## D-013 · 18/11/2026 · Arte (Prompt 3)
+
+- **Recorte sem IA, dentro do worker.** Os modelos de remoção de fundo em Node (ONNX) pedem cerca de 1 GB de memória;
+  o worker tem 256 MB livres. O recorte usa o sharp: estima a cor do fundo pela borda da foto, inunda a partir das
+  bordas e mede a confiança pela uniformidade da borda e pela área que sobra para o produto. Fotos de produto da
+  Shopee têm fundo liso na maioria; as outras caem no fallback, que é o comportamento pedido.
+- **Regra inviolável garantida no código:** o recorte só muda a transparência do fundo e a ampliação é Lanczos. Os
+  testes conferem que o pixel do produto é idêntico ao da foto original.
+- **Mesma área em todas as peças:** o produto ocupa 50% da área reservada (limitado pela largura e altura), com
+  sombra elíptica leve.
+- **Satori + resvg** com a fonte Inter (licença OFL, em `packages/arte/fontes`). Saída em JPEG de qualidade 90.
+- **Preço riscado:** na oferta, o "de" é a mediana real de 30 dias; nunca o preço cheio inventado pela loja. Na
+  prévia de produto (antes de existirem ofertas reais), o "de" é o anunciado pela loja e a peça fica marcada como
+  `previa`.
+- **Armazenamento:** o Blob da Vertra precisa de uma chave com permissão `blob:write`, que só o Aurimar cria no
+  painel. Até lá, as peças ficam no banco e saem por `GET /arquivos/...`, público e com caminho aleatório. Quando a
+  chave entrar em `VERTRA_BLOB_KEY`, as novas peças vão para o Blob sem mudar o código.
+- **Deploy:** sharp, satori e resvg têm binários nativos, então ficam fora do bundle e a Vertra instala com npm.
+- **Uma renderização por vez** no worker, para não estourar a memória.
