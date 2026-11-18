@@ -54,6 +54,22 @@ const esquema = z.object({
   /** URL pública do worker, usada nas URLs das peças guardadas no banco. Sem ela, vem do host da requisição. */
   WORKER_PUBLIC_URL: z.string().url().optional(),
   ARTE_LIMIAR_CONFIANCA: z.coerce.number().min(0).max(1).default(0.8),
+  // Ciclo (Prompt 5)
+  OPENROUTER_API_KEY: z.string().min(10).optional(),
+  OPENROUTER_BASE_URL: z.string().url().optional(),
+  WA_GATEWAY_URL: z.string().url().optional(),
+  WA_GATEWAY_TOKEN: z.string().min(24).optional(),
+  WA_GATEWAY_POOL: z
+    .string()
+    .regex(/^[a-z0-9-]{2,32}$/)
+    .default("achadinhos"),
+  /** Token que o wa-gateway manda na URL do webhook (?t=). */
+  WA_WEBHOOK_TOKEN: z.string().min(24).optional(),
+  /** Onde fica o /r/:codigo (link curto). */
+  PAINEL_PUBLIC_URL: z.string().url().default("https://achadinhos-painel.vertraweb.app"),
+  /** reserva: o worker prepara as ofertas sozinho quando os agentes ficam 30 min calados; sempre; nunca. */
+  CICLO_AUTOMATICO: z.enum(["reserva", "sempre", "nunca"]).default("reserva"),
+  DISPARO_CRON: z.string().default("* * * * *"),
 });
 
 export type Config = z.infer<typeof esquema>;

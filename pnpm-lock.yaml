@@ -87,6 +87,9 @@ importers:
       '@achadinhos/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@achadinhos/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@achadinhos/marketplace':
         specifier: workspace:*
         version: link:../../packages/marketplace

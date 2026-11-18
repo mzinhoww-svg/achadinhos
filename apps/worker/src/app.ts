@@ -13,6 +13,9 @@ import { eq, sql } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import { type DepsArte, rotasArte } from "./arte/rotas.js";
+import type { DepsCiclo } from "./ciclo/disparo.js";
+import { registrarSinalOpenbot } from "./ciclo/job.js";
+import { rotasCiclo } from "./ciclo/rotas.js";
 import type { Marketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { rotasColeta } from "./coleta/rotas.js";
@@ -47,6 +50,8 @@ export interface DepsApp {
   regras?: RegrasOferta;
   /** Arte (Prompt 3). Sem isto, /imagem/render responde 501. */
   arte?: DepsArte;
+  /** Copy, checagem, pausa, disparo, link curto e webhook do wa-gateway (Prompt 5). */
+  ciclo?: { deps: DepsCiclo; webhookToken?: string | undefined };
 }
 
 const ROTAS_PUBLICAS = new Set(["/health", "/"]);
@@ -78,14 +83,21 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     });
   });
 
+  let ultimoSinal = 0;
   // Toda rota, menos /health, exige o token entre serviços.
   app.addHook("onRequest", async (req, reply) => {
     const caminho = req.url.split("?")[0] ?? "";
     if (ROTAS_PUBLICAS.has(caminho)) return;
+    // Webhook do wa-gateway: confere o próprio token (?t=) na rota.
+    if (deps.ciclo && req.method === "POST" && caminho === "/wa/webhook") return;
     // Peças guardadas no banco: públicas para o WhatsApp e o painel abrirem a imagem.
     if (deps.arte && req.method === "GET" && caminho.startsWith("/arquivos/")) return;
     if (!tokenConfere(req.headers["x-service-token"], deps.serviceToken)) {
       return reply.code(401).send({ erro: "nao_autorizado", mensagem: "Envie o header X-Service-Token." });
+    }
+    if (deps.ciclo && req.headers["x-origem"] === "openbot" && Date.now() - ultimoSinal > 60_000) {
+      ultimoSinal = Date.now();
+      registrarSinalOpenbot(deps.ciclo.deps).catch(() => {});
     }
     const e = deps.estado?.();
     if (e && e.pronto === false) {
@@ -281,6 +293,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     ferramenta: "/imagem/render",
     motivo: "Arte desligada neste worker.",
   };
+  if (deps.ciclo) rotasCiclo(app, deps.ciclo.deps, deps.ciclo.webhookToken);
   if (deps.arte) rotasArte(app, deps.db, deps.arte);
   else app.post("/imagem/render", async (_req, reply) => reply.code(501).send(arteDesligada));
 
@@ -310,6 +323,30 @@ export function criarApp(deps: DepsApp): FastifyInstance {
           ]
         : []),
       ...(deps.arte ? ["POST /imagem/render", "POST /imagem/lote", "GET /imagens", "GET /arquivos/*"] : []),
+      ...(deps.ciclo
+        ? [
+            "GET /pausa",
+            "POST /pausa",
+            "POST /ofertas/:id/copy",
+            "POST /ofertas/:id/checar",
+            "POST /ofertas/:id/preparar",
+            "GET /checagens",
+            "POST /disparo",
+            "GET /envios",
+            "GET /travas",
+            "POST /links/:codigo/clique",
+            "GET /grupos",
+            "POST /grupos",
+            "POST /grupos/:id/entrada",
+            "GET /numeros",
+            "POST /numeros",
+            "POST /numeros/:instanceId/pareamento",
+            "POST /numeros/:instanceId/promover",
+            "POST /wa/pool",
+            "POST /ensaio/oferta",
+            "POST /wa/webhook",
+          ]
+        : []),
     ],
     pendentes: FERRAMENTAS_PENDENTES.map((f) => ({ rota: `${f.metodo} ${f.rota}`, motivo: f.motivo })),
   }));

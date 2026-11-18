@@ -5,20 +5,17 @@ import { Kpi } from "@/components/kpi";
 import { StatusDot } from "@/components/status-dot";
 import { Card } from "@/components/ui/card";
 import { ALERTAS, brl, HOJE, usd } from "@/lib/demo";
+import { worker } from "@/lib/worker";
 import { CartaoStatus } from "./pausa";
 
-export default function VisaoGeral() {
+export default async function VisaoGeral() {
+  const pausa = await worker.pausa().catch(() => ({ pausado: false, motivo: null, por: null, em: null }));
   const pctLlm = Math.round((HOJE.llm.hojeUsd / HOJE.llm.tetoUsd) * 100);
   return (
     <div className="flex flex-col gap-5">
       <Cabecalho titulo="Visão geral" descricao="O dia da operação, de relance." />
-      <FaixaDemo motivo="O status real e o PAUSAR chegam com a ferramenta /pausa do worker." />
-
-      <CartaoStatus
-        pausada={HOJE.pausada}
-        desde={HOJE.desde}
-        proxima={`próxima oferta às ${HOJE.proxima.horario} em ${HOJE.proxima.grupo}`}
-      />
+      <CartaoStatus pausa={pausa} proxima={null} />
+      <FaixaDemo motivo="Os números abaixo ainda são de demonstração; entram com dados reais no Prompt 6." />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">Ofertas de hoje</h2>

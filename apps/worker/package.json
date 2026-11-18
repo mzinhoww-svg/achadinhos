@@ -13,6 +13,7 @@
   "dependencies": {
     "@achadinhos/arte": "workspace:*",
     "@achadinhos/db": "workspace:*",
+    "@achadinhos/llm": "workspace:*",
     "@achadinhos/marketplace": "workspace:*",
     "@achadinhos/shared": "workspace:*",
     "drizzle-orm": "0.45.4",

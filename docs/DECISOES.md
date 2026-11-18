@@ -236,3 +236,34 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   - cada `marketplace.erro` traz o `alvo` (palavra ou id) para confirmar se as falhas se repetem nas mesmas palavras.
 - **Próximo passo:** conferir os eventos da próxima rodada. Se as falhas continuarem nas mesmas palavras sem acento,
   a próxima medida é baixar `SHOPEE_POR_MINUTO`.
+
+## D-015 · 18/11/2026 · wa-gateway com vários números (Prompt 4)
+
+- **O repositório `wa-gateway` estava vazio.** O código que roda na Vertra foi baixado da própria app e entrou como
+  primeiro commit ("estado atual em produção"); o Prompt 4 vem em cima, no branch do Claude.
+- **Tudo aditivo:** as rotas `/v1/instances`, `/v1/optin`, `/v1/messages` e a fila original continuam iguais para o
+  Revela. Os 64 testes antigos seguem passando (81 no total).
+- **Pools:** um ativo e reservas por projeto, heartbeat de 60 s, failover para o próximo reserva conectado **e admin
+  dos grupos**, webhook `pool.*` para o projeto. Fila própria por grupo (1 a cada 180 s + 20 a 90 s aleatórios) e
+  aquecimento por número (15, 30, 60 e 150 mensagens por dia).
+- **Número pessoal nunca conecta:** os telefones do dono ficam em `adminPhones`; se um deles for pareado, o gateway
+  desconecta e bloqueia. Só eles recebem alertas e mandam comandos.
+- **Chave por projeto (`EXTRA_API_KEYS`) e token no webhook:** gerados aqui e gravados direto nas variáveis da Vertra,
+  sem passar pelo chat. O Achadinhos não usa a `API_KEY` do Revela.
+- **Pendente do Aurimar:** parear os 3 chips (link de QR no painel), informar o telefone pessoal (`POST /wa/pool`),
+  criar o grupo de teste e o real com os chips como admins.
+
+## D-016 · 18/11/2026 · Copy, checagem, disparo e travas (Prompt 5)
+
+- **Regras na bíblia:** `REGRAS-DE-ENVIO`, `CHECAGEM`, `TOM-DE-VOZ` e `AGENTES` aceitam um bloco ```json; o que faltar
+  usa o padrão da bíblia v1.0 do Coordenador.
+- **Copy:** o LLM gera 2 variações, e um validador determinístico confere cada preço, porcentagem e o nome contra o banco,
+  além de `#publi` e `{{link}}`. Se nenhuma passar, ou sem chave, ou acima do teto de gasto, entra o **modelo fixo**,
+  que sempre passa: o ciclo não para por causa do LLM.
+- **Fallback da arte na checagem:** a peça no fallback usa a foto real, então só é reprovada abaixo de 0,2 de confiança
+  (`fallbackConfiancaMin` em CHECAGEM). Reprovar todo fallback descartaria cerca de 60% das fotos da Shopee.
+- **Preço revalidado no minuto do envio** (Shopee `productOfferV2` por item). Subiu ou acabou: cancela e avisa.
+- **Banimento pausa tudo** (regra da bíblia), mesmo com o failover do gateway; `pausarEmBanimento` desliga isso.
+- **Ciclo reserva já no Prompt 5:** sem sinal dos agentes por 30 min, o worker prepara e agenda sozinho. Isso também
+  permite o ensaio antes de o OpenBot estar ligado.
+- **Oferta de ensaio:** produto `fake` com foto e link de um produto real, desconto forçado, só para grupos de teste.

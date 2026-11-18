@@ -156,14 +156,12 @@ describe.skipIf(!URL_TESTE)("worker com Postgres", () => {
     expect(lista[0]).toMatchObject({ agente: "Monitor", dados: { a: 1 } });
   });
 
-  it("ferramentas não construídas respondem 501 com o motivo", async () => {
-    const r = await app.inject({ method: "POST", url: "/disparo", headers: H, payload: {} });
+  it("sem os módulos opcionais, a arte responde 501 com o motivo e nenhuma ferramenta fica pendente", async () => {
+    const r = await app.inject({ method: "POST", url: "/imagem/render", headers: H, payload: {} });
     expect(r.statusCode).toBe(501);
-    expect(r.json()).toMatchObject({ erro: "nao_implementado", ferramenta: "/disparo" });
+    expect(r.json()).toMatchObject({ erro: "nao_implementado", ferramenta: "/imagem/render" });
     expect(r.json().motivo).toBeTruthy();
-    expect((await app.inject({ method: "POST", url: "/ofertas/12/checar", headers: H })).statusCode).toBe(
-      501,
-    );
+    expect((await app.inject({ url: "/ferramentas", headers: H })).json().pendentes).toEqual([]);
   });
 
   it("troca a senha do admin exigindo a atual", async () => {

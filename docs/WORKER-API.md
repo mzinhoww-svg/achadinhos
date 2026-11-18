@@ -74,8 +74,31 @@ Regras:
 
 Eventos: `arte.renderizada`, `arte.fallback`, `arte.erro` e `arte.lote_concluido`.
 
+## Ciclo: copy, checagem, pausa, disparo e link curto (Prompt 5)
+
+| Método e rota                                                                                                                    | Quem chama            | O que faz                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /pausa` · `POST /pausa {pausado, motivo?, autor?}`                                                                          | Coordenador, painel   | Pausa geral. O disparo confere antes de cada envio; também pausa e retoma por `PAUSAR`/`RETOMAR` no WhatsApp do dono.                                                             |
+| `POST /ofertas/:id/copy`                                                                                                         | Copywriter            | 2 variações pelo LLM (modelo em `AGENTES.md`), validadas contra o banco (preço, desconto, nome, `#publi`, `{{link}}`). Sem chave ou acima do teto de gasto, usa o modelo fixo.    |
+| `POST /ofertas/:id/checar`                                                                                                       | Checagem              | Reprova com o motivo (preço diferente, sem estoque, sem peça, fallback com baixa confiança, repetido, marca/palavra/nicho bloqueado, copy inválida). Aprovada é agendada na hora. |
+| `POST /ofertas/:id/preparar`                                                                                                     | Coordenador           | Arte + copy + checagem + agendamento, numa chamada.                                                                                                                               |
+| `GET /checagens`                                                                                                                 | painel                | Últimas checagens com os motivos.                                                                                                                                                 |
+| `POST /disparo {ofertaId?, executar?}`                                                                                           | Disparador            | Agenda as aprovadas nos horários de `REGRAS-DE-ENVIO.md` (máximo por dia, 20 min entre mensagens, extras acima de 40%). `executar` manda o que já está na hora.                   |
+| `GET /envios[?status=&dias=]` · `GET /travas`                                                                                    | painel                | Envios e estado das travas (pausa, gasto de LLM, reprovação do dia).                                                                                                              |
+| `POST /links/:codigo/clique {ipHash, userAgent}`                                                                                 | painel (`/r/:codigo`) | Registra o clique e devolve o destino.                                                                                                                                            |
+| `GET /grupos` · `POST /grupos` · `POST /grupos/:id/entrada`                                                                      | Coordenador, painel   | Grupos (JID, teste, horários, limite, nichos) e link `wa.me` de entrada.                                                                                                          |
+| `GET /numeros` · `POST /numeros` · `POST /numeros/:id/pareamento` · `POST /numeros/:id/promover` · `POST /wa/pool {adminPhones}` | Coordenador, painel   | Pool de números no wa-gateway (status, QR, troca manual, telefones do dono).                                                                                                      |
+| `POST /ensaio/oferta {nichoId?, descontoPct?, defeito?}`                                                                         | Coordenador           | Oferta falsa (foto e link de um produto real) que roda o ciclo inteiro, só para grupos de teste. `defeito: "preco"` força uma reprovação.                                         |
+| `POST /wa/webhook?t=<token>`                                                                                                     | wa-gateway            | Eventos `pool.*`: confirmação de envio, comandos, banimento, failover, entrada. Público, protegido pelo token.                                                                    |
+
+Jobs: `disparo-tick` (a cada minuto: revalida o preço e envia o que está na hora) e `ciclo-reserva` (a cada 15 min:
+prepara as candidatas quando os agentes ficam 30 min sem chamar o worker com `x-origem: openbot`).
+
+Travas automáticas (pausam e avisam no privado): 3 falhas de envio seguidas, mais de 20% de reprovação no dia (mínimo
+de 5), número banido e pool sem número. O teto de US$ 1/dia e US$ 20/mês de LLM troca a copy pelo modelo fixo.
+
 ## Pendentes (respondem 501 com o motivo)
 
-`POST /ofertas/:id/copy`, `POST /ofertas/:id/checar`, `GET|POST /pausa`, `POST /disparo` e `GET|POST /numeros`.
+Nenhuma desde o Prompt 5.
 
 Resposta: `{ "erro": "nao_implementado", "ferramenta", "quemChama", "motivo" }`.

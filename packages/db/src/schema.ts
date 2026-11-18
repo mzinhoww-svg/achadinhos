@@ -239,11 +239,13 @@ export const ofertas = achadinhos.table(
     /** 0 a 100: desconto real, comissão, vendas e nota (as maiores saem primeiro). */
     pontuacao: numeric("pontuacao", { precision: 5, scale: 2 }),
     status: text("status", {
-      enum: ["candidata", "aprovada", "reprovada", "agendada", "enviada", "expirada"],
+      enum: ["candidata", "aprovada", "reprovada", "agendada", "enviada", "expirada", "cancelada"],
     })
       .notNull()
       .default("candidata"),
     motivoReprovacao: text("motivo_reprovacao"),
+    /** Oferta de ensaio (produto falso): só vai para grupos de teste. */
+    ensaio: boolean("ensaio").notNull().default(false),
     criadoEm: criadoEm(),
   },
   (t) => [
@@ -305,6 +307,10 @@ export const copies = achadinhos.table("copies", {
   agente: text("agente").notNull(),
   validada: boolean("validada").notNull().default(false),
   motivoInvalida: text("motivo_invalida"),
+  variacao: integer("variacao").notNull().default(1),
+  escolhida: boolean("escolhida").notNull().default(false),
+  /** Modelo do LLM, ou "modelo-fixo" quando a copy veio do texto padrão (sem LLM ou teto de gasto). */
+  modelo: text("modelo"),
   criadoEm: criadoEm(),
 });
 
@@ -322,7 +328,7 @@ export const links = achadinhos.table(
     subIds: jsonb("sub_ids").$type<Record<string, string>>().notNull().default({}),
     criadoEm: criadoEm(),
   },
-  (t) => [index("links_oferta").on(t.ofertaId)],
+  (t) => [index("links_oferta").on(t.ofertaId), uniqueIndex("links_oferta_grupo").on(t.ofertaId, t.grupoId)],
 );
 
 export const cliques = achadinhos.table(
@@ -392,7 +398,40 @@ export const envios = achadinhos.table(
     agendadoPara: timestamp("agendado_para", { withTimezone: true }),
     enviadoEm: timestamp("enviado_em", { withTimezone: true }),
     erro: text("erro"),
+    /** Id do envio na fila do wa-gateway e número que enviou. */
+    jobGateway: text("job_gateway"),
+    numeroGateway: text("numero_gateway"),
+    extra: boolean("extra").notNull().default(false),
+    texto: text("texto"),
+    imagemUrl: text("imagem_url"),
     criadoEm: criadoEm(),
   },
-  (t) => [index("envios_grupo_dia").on(t.grupoId, t.criadoEm)],
+  (t) => [
+    index("envios_grupo_dia").on(t.grupoId, t.criadoEm),
+    index("envios_devidos").on(t.status, t.agendadoPara),
+  ],
+);
+
+// ---------- Prompt 5: controle, checagens ----------
+
+/** Estado global: pausa (chave "pausa"), avisos já mandados no dia etc. */
+export const controle = achadinhos.table("controle", {
+  chave: text("chave").primaryKey(),
+  valor: jsonb("valor").$type<Record<string, unknown>>().notNull().default({}),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const checagens = achadinhos.table(
+  "checagens",
+  {
+    id: id(),
+    ofertaId: ref("oferta_id")
+      .notNull()
+      .references(() => ofertas.id, { onDelete: "cascade" }),
+    aprovada: boolean("aprovada").notNull(),
+    motivos: jsonb("motivos").$type<{ codigo: string; detalhe: string }[]>().notNull().default([]),
+    agente: text("agente").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("checagens_dia").on(t.criadoEm), index("checagens_oferta").on(t.ofertaId)],
 );

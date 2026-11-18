@@ -10,55 +10,5 @@ export interface FerramentaPendente {
   motivo: string;
 }
 
-export const FERRAMENTAS_PENDENTES: readonly FerramentaPendente[] = [
-  {
-    metodo: "POST",
-    rota: "/ofertas/:id/copy",
-    ferramenta: "/ofertas/:id/copy",
-    quemChama: "Copywriter",
-    motivo: "Validação da copy contra o banco ainda não construída; depende de ofertas.",
-  },
-  {
-    metodo: "POST",
-    rota: "/ofertas/:id/checar",
-    ferramenta: "/ofertas/:id/checar",
-    quemChama: "Coordenador",
-    motivo: "Checagem automática depende de CHECAGEM na bíblia e das ferramentas de oferta, copy e imagem.",
-  },
-  {
-    metodo: "GET",
-    rota: "/pausa",
-    ferramenta: "/pausa",
-    quemChama: "Coordenador, painel",
-    motivo: "Pausa geral será construída junto com o disparo.",
-  },
-  {
-    metodo: "POST",
-    rota: "/pausa",
-    ferramenta: "/pausa",
-    quemChama: "Coordenador, painel, WhatsApp",
-    motivo: "Pausa geral será construída junto com o disparo.",
-  },
-  {
-    metodo: "POST",
-    rota: "/disparo",
-    ferramenta: "/disparo",
-    quemChama: "Disparador",
-    motivo:
-      "Envio pelo wa-gateway ainda não construído; depende de WA_GATEWAY_TOKEN, da checagem e da pausa.",
-  },
-  {
-    metodo: "GET",
-    rota: "/numeros",
-    ferramenta: "/numeros",
-    quemChama: "Coordenador",
-    motivo: "Pool de números e failover dependem do wa-gateway.",
-  },
-  {
-    metodo: "POST",
-    rota: "/numeros",
-    ferramenta: "/numeros",
-    quemChama: "Coordenador",
-    motivo: "Pool de números e failover dependem do wa-gateway.",
-  },
-];
+/** Todas as ferramentas do contrato existem desde o Prompt 5; a lista fica para as próximas fases. */
+export const FERRAMENTAS_PENDENTES: readonly FerramentaPendente[] = [];

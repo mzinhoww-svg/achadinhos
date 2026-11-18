@@ -4,6 +4,10 @@ import pg from "pg";
 import { PgBoss } from "pg-boss";
 import { criarApp, VERSAO } from "./app.js";
 import { ArmazenamentoBanco, VertraBlob } from "./arte/armazenamento.js";
+import { Alertas } from "./ciclo/controle.js";
+import type { DepsCiclo } from "./ciclo/disparo.js";
+import { Gateway } from "./ciclo/gateway.js";
+import { agendarCiclo } from "./ciclo/job.js";
 import { agendarMonitor } from "./coleta/job.js";
 import { criarMarketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
@@ -60,6 +64,27 @@ const regras: RegrasOferta = {
   minAmostras: config.HISTORICO_MIN_AMOSTRAS,
   minDias: config.HISTORICO_MIN_DIAS,
 };
+const armazenamento = config.VERTRA_BLOB_KEY
+  ? new VertraBlob(config.VERTRA_BLOB_KEY, config.VERTRA_BLOB_URL, config.VERTRA_BLOB_PREFIXO)
+  : new ArmazenamentoBanco(db);
+const gateway =
+  config.WA_GATEWAY_URL && config.WA_GATEWAY_TOKEN
+    ? new Gateway(config.WA_GATEWAY_URL, config.WA_GATEWAY_TOKEN, config.WA_GATEWAY_POOL)
+    : null;
+const ciclo: DepsCiclo = {
+  db,
+  gateway,
+  alertas: new Alertas(db, gateway),
+  marketplace: marketplaces.principal,
+  painelUrl: config.PAINEL_PUBLIC_URL,
+  arte: {
+    armazenamento,
+    baseUrl: config.WORKER_PUBLIC_URL ?? "https://achadinhos-worker.vertraweb.app",
+    limiarConfianca: config.ARTE_LIMIAR_CONFIANCA,
+  },
+  openrouterKey: config.OPENROUTER_API_KEY,
+  openrouterBaseUrl: config.OPENROUTER_BASE_URL,
+};
 const app = criarApp({
   db,
   serviceToken: config.SERVICE_TOKEN,
@@ -69,12 +94,11 @@ const app = criarApp({
   marketplaces,
   regras,
   arte: {
-    armazenamento: config.VERTRA_BLOB_KEY
-      ? new VertraBlob(config.VERTRA_BLOB_KEY, config.VERTRA_BLOB_URL, config.VERTRA_BLOB_PREFIXO)
-      : new ArmazenamentoBanco(db),
+    armazenamento,
     limiarConfianca: config.ARTE_LIMIAR_CONFIANCA,
     publicUrl: config.WORKER_PUBLIC_URL,
   },
+  ciclo: { deps: ciclo, webhookToken: config.WA_WEBHOOK_TOKEN },
 });
 
 /** Migrações, admin inicial, LISTEN e fila. Se o banco falhar, tenta de novo sem derrubar o processo. */
@@ -92,6 +116,13 @@ async function prepararBanco(tentativa = 1): Promise<void> {
       regras,
       log: { info: (o, m) => app.log.info(o, m), warn: (o, m) => app.log.warn(o, m) },
     });
+    await agendarCiclo(boss, ciclo, {
+      cronDisparo: config.DISPARO_CRON,
+      modo: config.CICLO_AUTOMATICO,
+      log: { info: (m) => app.log.info(m), warn: (o, m) => app.log.warn(o, m) },
+    });
+    if (!gateway)
+      app.log.warn("WA_GATEWAY_URL/WA_GATEWAY_TOKEN ausentes: disparo e alertas no WhatsApp desligados");
     if (marketplaces.indisponivel) app.log.warn(marketplaces.indisponivel);
     estado.fila = true;
     estado.pronto = true;

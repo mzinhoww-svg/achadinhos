@@ -43,6 +43,13 @@ async function chamar<T>(caminho: string, init: RequestInit = {}, semSessao = fa
   return corpo as T;
 }
 
+export interface EstadoPausa {
+  pausado: boolean;
+  motivo: string | null;
+  por: string | null;
+  em: string | null;
+}
+
 export interface Renderizacao {
   chave: string;
   produto: { id: number; nome: string; url: string; idExterno: string };
@@ -89,6 +96,16 @@ export const worker = {
     chamar<{ armazenamento: string; renderizacoes: Renderizacao[] }>(`/imagens?limite=${limite}`),
   gerarLoteArte: (corpo: { limite: number; forcarFallbackEm: number; nichoId?: number }) =>
     chamar<{ pedidos: number }>("/imagem/lote", { method: "POST", body: JSON.stringify(corpo) }),
+  pausa: () => chamar<EstadoPausa>("/pausa"),
+  definirPausa: (pausado: boolean, motivo: string, autor: string) =>
+    chamar<EstadoPausa>("/pausa", { method: "POST", body: JSON.stringify({ pausado, motivo, autor }) }),
+  /** Link curto: público (sem sessão), chamado pela rota /r/:codigo. */
+  clique: (codigo: string, ipHash: string | null, userAgent: string | null) =>
+    chamar<{ destino: string }>(
+      `/links/${encodeURIComponent(codigo)}/clique`,
+      { method: "POST", body: JSON.stringify({ ipHash, userAgent }) },
+      true,
+    ),
   trocarSenha: (email: string, senhaAtual: string, senhaNova: string) =>
     chamar<{ ok: true }>("/auth/senha", {
       method: "POST",
