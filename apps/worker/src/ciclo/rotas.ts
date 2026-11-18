@@ -244,13 +244,17 @@ export function rotasCiclo(app: FastifyInstance, d: DepsCiclo, webhookToken: str
     const r = await gateway().adicionarNumero(b.instanceId, b.ordem);
     return reply.code(201).send({
       instanceId: b.instanceId,
-      pareamento: { url: `/parear/${r.pareamento.token}`, expiraEm: r.pareamento.expiraEm },
+      pareamento: {
+        url: gateway().absoluta(`/parear/${r.pareamento.token}`),
+        expiraEm: r.pareamento.expiraEm,
+      },
     });
   });
 
   app.post("/numeros/:instanceId/pareamento", async (req) => {
     const { instanceId } = z.object({ instanceId: z.string().regex(/^[a-z0-9-]{2,32}$/) }).parse(req.params);
-    return gateway().pareamento(instanceId);
+    const r = await gateway().pareamento(instanceId);
+    return { url: gateway().absoluta(r.url), expiraEm: r.expiraEm };
   });
 
   app.post("/numeros/:instanceId/promover", async (req) => {
@@ -262,6 +266,13 @@ export function rotasCiclo(app: FastifyInstance, d: DepsCiclo, webhookToken: str
   app.post("/wa/pool", async (req) => {
     const b = z.object({ adminPhones: z.array(telefone).min(1).max(5) }).parse(req.body);
     return gateway().configurarPool(b.adminPhones);
+  });
+
+  app.get("/grupos/:id/convite", async (req) => {
+    const { id } = idParam.parse(req.params);
+    const [g] = await db.select().from(t.grupos).where(eq(t.grupos.id, id));
+    if (!g?.waJid) throw new ErroNegocio(422, "grupo_sem_jid", "cadastre o JID do grupo antes");
+    return gateway().convite(g.waJid);
   });
 
   app.post("/grupos/:id/entrada", async (req) => {

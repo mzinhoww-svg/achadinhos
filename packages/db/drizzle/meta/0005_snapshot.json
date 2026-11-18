@@ -1,0 +1,2398 @@
+{
+  "id": "26237c44-7bb4-47e5-84f2-bc44330f643e",
+  "prevId": "ff3bbb52-cc55-4f8c-b568-60983cc29b7f",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "achadinhos.admins": {
+      "name": "admins",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "senha_hash": {
+          "name": "senha_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "ultimo_login_em": {
+          "name": "ultimo_login_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "admins_email_unique": {
+          "name": "admins_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.arquivos": {
+      "name": "arquivos",
+      "schema": "achadinhos",
+      "columns": {
+        "caminho": {
+          "name": "caminho",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dados_b64": {
+          "name": "dados_b64",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tamanho": {
+          "name": "tamanho",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.auditoria": {
+      "name": "auditoria",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ator": {
+          "name": "ator",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acao": {
+          "name": "acao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alvo": {
+          "name": "alvo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "detalhes": {
+          "name": "detalhes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.biblia_docs": {
+      "name": "biblia_docs",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "versao": {
+          "name": "versao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titulo": {
+          "name": "titulo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "conteudo": {
+          "name": "conteudo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "autor": {
+          "name": "autor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proposta_id": {
+          "name": "proposta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "biblia_docs_slug_versao": {
+          "name": "biblia_docs_slug_versao",
+          "columns": [
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "versao",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.chamadas_pagas": {
+      "name": "chamadas_pagas",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chave_idempotente": {
+          "name": "chave_idempotente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "servico": {
+          "name": "servico",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agente": {
+          "name": "agente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modelo": {
+          "name": "modelo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokens_entrada": {
+          "name": "tokens_entrada",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokens_saida": {
+          "name": "tokens_saida",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "custo_usd": {
+          "name": "custo_usd",
+          "type": "numeric(12, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sucesso": {
+          "name": "sucesso",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "erro": {
+          "name": "erro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "chamadas_pagas_dia": {
+          "name": "chamadas_pagas_dia",
+          "columns": [
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "chamadas_pagas_chave_idempotente_unique": {
+          "name": "chamadas_pagas_chave_idempotente_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "chave_idempotente"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.checagens": {
+      "name": "checagens",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aprovada": {
+          "name": "aprovada",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivos": {
+          "name": "motivos",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "agente": {
+          "name": "agente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "checagens_dia": {
+          "name": "checagens_dia",
+          "columns": [
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "checagens_oferta": {
+          "name": "checagens_oferta",
+          "columns": [
+            {
+              "expression": "oferta_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "checagens_oferta_id_ofertas_id_fk": {
+          "name": "checagens_oferta_id_ofertas_id_fk",
+          "tableFrom": "checagens",
+          "tableTo": "ofertas",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "oferta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.cliques": {
+      "name": "cliques",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "link_id": {
+          "name": "link_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_hash": {
+          "name": "ip_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cliques_link": {
+          "name": "cliques_link",
+          "columns": [
+            {
+              "expression": "link_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cliques_link_id_links_id_fk": {
+          "name": "cliques_link_id_links_id_fk",
+          "tableFrom": "cliques",
+          "tableTo": "links",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "link_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.controle": {
+      "name": "controle",
+      "schema": "achadinhos",
+      "columns": {
+        "chave": {
+          "name": "chave",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "valor": {
+          "name": "valor",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.conversoes": {
+      "name": "conversoes",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "marketplace": {
+          "name": "marketplace",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pedido_externo": {
+          "name": "pedido_externo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_id": {
+          "name": "link_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sub_ids": {
+          "name": "sub_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "valor": {
+          "name": "valor",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comissao": {
+          "name": "comissao",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dia": {
+          "name": "dia",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "conversoes_pedido": {
+          "name": "conversoes_pedido",
+          "columns": [
+            {
+              "expression": "marketplace",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pedido_externo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "conversoes_link_id_links_id_fk": {
+          "name": "conversoes_link_id_links_id_fk",
+          "tableFrom": "conversoes",
+          "tableTo": "links",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "link_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.copies": {
+      "name": "copies",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "texto": {
+          "name": "texto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agente": {
+          "name": "agente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "validada": {
+          "name": "validada",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "motivo_invalida": {
+          "name": "motivo_invalida",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "variacao": {
+          "name": "variacao",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "escolhida": {
+          "name": "escolhida",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "modelo": {
+          "name": "modelo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "copies_oferta_id_ofertas_id_fk": {
+          "name": "copies_oferta_id_ofertas_id_fk",
+          "tableFrom": "copies",
+          "tableTo": "ofertas",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "oferta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.envios": {
+      "name": "envios",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grupo_id": {
+          "name": "grupo_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "numero_id": {
+          "name": "numero_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_id": {
+          "name": "link_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chave_idempotente": {
+          "name": "chave_idempotente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'agendado'"
+        },
+        "agendado_para": {
+          "name": "agendado_para",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enviado_em": {
+          "name": "enviado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erro": {
+          "name": "erro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "job_gateway": {
+          "name": "job_gateway",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "numero_gateway": {
+          "name": "numero_gateway",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "extra": {
+          "name": "extra",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "texto": {
+          "name": "texto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imagem_url": {
+          "name": "imagem_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "envios_grupo_dia": {
+          "name": "envios_grupo_dia",
+          "columns": [
+            {
+              "expression": "grupo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "envios_devidos": {
+          "name": "envios_devidos",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "agendado_para",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "envios_oferta_id_ofertas_id_fk": {
+          "name": "envios_oferta_id_ofertas_id_fk",
+          "tableFrom": "envios",
+          "tableTo": "ofertas",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "oferta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "envios_grupo_id_grupos_id_fk": {
+          "name": "envios_grupo_id_grupos_id_fk",
+          "tableFrom": "envios",
+          "tableTo": "grupos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "grupo_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "envios_numero_id_numeros_id_fk": {
+          "name": "envios_numero_id_numeros_id_fk",
+          "tableFrom": "envios",
+          "tableTo": "numeros",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "numero_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "envios_link_id_links_id_fk": {
+          "name": "envios_link_id_links_id_fk",
+          "tableFrom": "envios",
+          "tableTo": "links",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "link_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "envios_chave_idempotente_unique": {
+          "name": "envios_chave_idempotente_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "chave_idempotente"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.eventos": {
+      "name": "eventos",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agente": {
+          "name": "agente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dados": {
+          "name": "dados",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "eventos_criado": {
+          "name": "eventos_criado",
+          "columns": [
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "eventos_tipo": {
+          "name": "eventos_tipo",
+          "columns": [
+            {
+              "expression": "tipo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.grupo_nichos": {
+      "name": "grupo_nichos",
+      "schema": "achadinhos",
+      "columns": {
+        "grupo_id": {
+          "name": "grupo_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nicho_id": {
+          "name": "nicho_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "grupo_nichos_grupo_id_grupos_id_fk": {
+          "name": "grupo_nichos_grupo_id_grupos_id_fk",
+          "tableFrom": "grupo_nichos",
+          "tableTo": "grupos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "grupo_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "grupo_nichos_nicho_id_nichos_id_fk": {
+          "name": "grupo_nichos_nicho_id_nichos_id_fk",
+          "tableFrom": "grupo_nichos",
+          "tableTo": "nichos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "nicho_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "grupo_nichos_grupo_id_nicho_id_pk": {
+          "name": "grupo_nichos_grupo_id_nicho_id_pk",
+          "columns": [
+            "grupo_id",
+            "nicho_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.grupos": {
+      "name": "grupos",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wa_jid": {
+          "name": "wa_jid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "promessa": {
+          "name": "promessa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "teste": {
+          "name": "teste",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "max_por_dia": {
+          "name": "max_por_dia",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "horarios": {
+          "name": "horarios",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "link_entrada": {
+          "name": "link_entrada",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "grupos_wa_jid_unique": {
+          "name": "grupos_wa_jid_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "wa_jid"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.historico_precos": {
+      "name": "historico_precos",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "produto_id": {
+          "name": "produto_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "preco": {
+          "name": "preco",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "preco_original": {
+          "name": "preco_original",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "em_estoque": {
+          "name": "em_estoque",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "coletado_em": {
+          "name": "coletado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "historico_precos_produto": {
+          "name": "historico_precos_produto",
+          "columns": [
+            {
+              "expression": "produto_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coletado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "historico_precos_produto_id_produtos_id_fk": {
+          "name": "historico_precos_produto_id_produtos_id_fk",
+          "tableFrom": "historico_precos",
+          "tableTo": "produtos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "produto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.imagens": {
+      "name": "imagens",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "produto_id": {
+          "name": "produto_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "formato": {
+          "name": "formato",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "template": {
+          "name": "template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "foto_original_url": {
+          "name": "foto_original_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mascara_url": {
+          "name": "mascara_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorte_ok": {
+          "name": "recorte_ok",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confianca": {
+          "name": "confianca",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fallback": {
+          "name": "fallback",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "motivo_fallback": {
+          "name": "motivo_fallback",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ampliada": {
+          "name": "ampliada",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "preco": {
+          "name": "preco",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preco_antigo": {
+          "name": "preco_antigo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "desconto_pct": {
+          "name": "desconto_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "origem_preco": {
+          "name": "origem_preco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'oferta'"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "imagens_oferta": {
+          "name": "imagens_oferta",
+          "columns": [
+            {
+              "expression": "oferta_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "imagens_produto": {
+          "name": "imagens_produto",
+          "columns": [
+            {
+              "expression": "produto_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "imagens_oferta_id_ofertas_id_fk": {
+          "name": "imagens_oferta_id_ofertas_id_fk",
+          "tableFrom": "imagens",
+          "tableTo": "ofertas",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "oferta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "imagens_produto_id_produtos_id_fk": {
+          "name": "imagens_produto_id_produtos_id_fk",
+          "tableFrom": "imagens",
+          "tableTo": "produtos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "produto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.links": {
+      "name": "links",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "oferta_id": {
+          "name": "oferta_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grupo_id": {
+          "name": "grupo_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url_afiliado": {
+          "name": "url_afiliado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codigo_curto": {
+          "name": "codigo_curto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sub_ids": {
+          "name": "sub_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "links_oferta": {
+          "name": "links_oferta",
+          "columns": [
+            {
+              "expression": "oferta_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "links_oferta_grupo": {
+          "name": "links_oferta_grupo",
+          "columns": [
+            {
+              "expression": "oferta_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "grupo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "links_oferta_id_ofertas_id_fk": {
+          "name": "links_oferta_id_ofertas_id_fk",
+          "tableFrom": "links",
+          "tableTo": "ofertas",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "oferta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "links_grupo_id_grupos_id_fk": {
+          "name": "links_grupo_id_grupos_id_fk",
+          "tableFrom": "links",
+          "tableTo": "grupos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "grupo_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "links_codigo_curto_unique": {
+          "name": "links_codigo_curto_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "codigo_curto"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.nichos": {
+      "name": "nichos",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "preco_min": {
+          "name": "preco_min",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preco_max": {
+          "name": "preco_max",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketplace": {
+          "name": "marketplace",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'shopee'"
+        },
+        "desconto_min_pct": {
+          "name": "desconto_min_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'15'"
+        },
+        "template": {
+          "name": "template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modelo_llm": {
+          "name": "modelo_llm",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avaliacao_min": {
+          "name": "avaliacao_min",
+          "type": "numeric(3, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'4.5'"
+        },
+        "vendas_min": {
+          "name": "vendas_min",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 50
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nichos_nome_unique": {
+          "name": "nichos_nome_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nome"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.numeros": {
+      "name": "numeros",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "apelido": {
+          "name": "apelido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessao_gateway": {
+          "name": "sessao_gateway",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "papel": {
+          "name": "papel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'reserva'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'desconectado'"
+        },
+        "ultimo_status_em": {
+          "name": "ultimo_status_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "numeros_apelido_unique": {
+          "name": "numeros_apelido_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "apelido"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.ofertas": {
+      "name": "ofertas",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "produto_id": {
+          "name": "produto_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nicho_id": {
+          "name": "nicho_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preco": {
+          "name": "preco",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mediana_preco_30d": {
+          "name": "mediana_preco_30d",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "desconto_pct": {
+          "name": "desconto_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comissao_taxa": {
+          "name": "comissao_taxa",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pontuacao": {
+          "name": "pontuacao",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'candidata'"
+        },
+        "motivo_reprovacao": {
+          "name": "motivo_reprovacao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ensaio": {
+          "name": "ensaio",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ofertas_status": {
+          "name": "ofertas_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ofertas_pontuacao": {
+          "name": "ofertas_pontuacao",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pontuacao",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ofertas_produto_aberta": {
+          "name": "ofertas_produto_aberta",
+          "columns": [
+            {
+              "expression": "produto_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "status in ('candidata', 'aprovada', 'agendada')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ofertas_produto_id_produtos_id_fk": {
+          "name": "ofertas_produto_id_produtos_id_fk",
+          "tableFrom": "ofertas",
+          "tableTo": "produtos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "produto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ofertas_nicho_id_nichos_id_fk": {
+          "name": "ofertas_nicho_id_nichos_id_fk",
+          "tableFrom": "ofertas",
+          "tableTo": "nichos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "nicho_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.palavras_chave": {
+      "name": "palavras_chave",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nicho_id": {
+          "name": "nicho_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "termo": {
+          "name": "termo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "palavras_chave_nicho_termo": {
+          "name": "palavras_chave_nicho_termo",
+          "columns": [
+            {
+              "expression": "nicho_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "termo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "palavras_chave_nicho_id_nichos_id_fk": {
+          "name": "palavras_chave_nicho_id_nichos_id_fk",
+          "tableFrom": "palavras_chave",
+          "tableTo": "nichos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "nicho_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.produtos": {
+      "name": "produtos",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "marketplace": {
+          "name": "marketplace",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_externo": {
+          "name": "id_externo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "loja_id": {
+          "name": "loja_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "loja_nome": {
+          "name": "loja_nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marca": {
+          "name": "marca",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_afiliado": {
+          "name": "link_afiliado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "foto_url": {
+          "name": "foto_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preco_atual": {
+          "name": "preco_atual",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preco_max": {
+          "name": "preco_max",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "desconto_anunciado": {
+          "name": "desconto_anunciado",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avaliacao": {
+          "name": "avaliacao",
+          "type": "numeric(3, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendas": {
+          "name": "vendas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comissao_taxa": {
+          "name": "comissao_taxa",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comissao_valor": {
+          "name": "comissao_valor",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "em_estoque": {
+          "name": "em_estoque",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acompanhado": {
+          "name": "acompanhado",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "nicho_id": {
+          "name": "nicho_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ultima_coleta_em": {
+          "name": "ultima_coleta_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "produtos_marketplace_externo": {
+          "name": "produtos_marketplace_externo",
+          "columns": [
+            {
+              "expression": "marketplace",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id_externo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "produtos_monitor": {
+          "name": "produtos_monitor",
+          "columns": [
+            {
+              "expression": "acompanhado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ultima_coleta_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "produtos_nicho_id_nichos_id_fk": {
+          "name": "produtos_nicho_id_nichos_id_fk",
+          "tableFrom": "produtos",
+          "tableTo": "nichos",
+          "schemaTo": "achadinhos",
+          "columnsFrom": [
+            "nicho_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "achadinhos.propostas": {
+      "name": "propostas",
+      "schema": "achadinhos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "titulo": {
+          "name": "titulo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "autor": {
+          "name": "autor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "doc_slug": {
+          "name": "doc_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conteudo_proposto": {
+          "name": "conteudo_proposto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'aberta'"
+        },
+        "decidido_por": {
+          "name": "decidido_por",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comentario": {
+          "name": "comentario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "decidido_em": {
+          "name": "decidido_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "propostas_status": {
+          "name": "propostas_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criado_em",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "achadinhos": "achadinhos"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

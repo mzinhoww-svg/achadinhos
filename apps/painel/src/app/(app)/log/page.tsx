@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Cabecalho } from "@/components/cabecalho";
 import { worker } from "@/lib/worker";
 import { LogAoVivo } from "./ao-vivo";
@@ -11,6 +12,11 @@ export default async function Log() {
       <Cabecalho
         titulo="Log dos agentes"
         descricao="Tudo o que acontece, em tempo real. Toda ação dos agentes vira evento no worker."
+        acao={
+          <Link href="/log/auditoria" className="text-sm text-primary hover:underline">
+            Auditoria do painel
+          </Link>
+        }
       />
       <LogAoVivo iniciais={eventos} />
     </div>

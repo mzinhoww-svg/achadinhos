@@ -126,6 +126,10 @@ export const nichos = achadinhos.table("nichos", {
     .default("shopee"),
   /** Oferta real: preço pelo menos X% abaixo da mediana de 30 dias (padrão 15). */
   descontoMinPct: numeric("desconto_min_pct", { precision: 5, scale: 2 }).notNull().default("15"),
+  /** Chave do template em TEMPLATES-VISUAIS (padrão: o nome do nicho). */
+  template: text("template"),
+  /** Modelo do LLM para a copy deste nicho (padrão: o de AGENTES.md). */
+  modeloLlm: text("modelo_llm"),
   avaliacaoMin: numeric("avaliacao_min", { precision: 3, scale: 2 }).notNull().default("4.5"),
   vendasMin: integer("vendas_min").notNull().default(50),
   criadoEm: criadoEm(),

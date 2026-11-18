@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { Cabecalho } from "@/components/cabecalho";
-import { FaixaDemo } from "@/components/faixa-demo";
-import { Filtros } from "@/components/filtros";
+import { Kpi } from "@/components/kpi";
 import { Periodo } from "@/components/periodo";
-import { Badge } from "@/components/ui/badge";
 import { Table, TBody, Td, THead, Th, Tr } from "@/components/ui/table";
-import { brl, CONVERSOES, GRUPOS } from "@/lib/demo";
+import { brl, type Conversao } from "@/lib/tipos";
+import { worker } from "@/lib/worker";
+
+export const dynamic = "force-dynamic";
+const DIAS: Record<string, number> = { hoje: 1, "7d": 7, "30d": 30 };
 
 export default async function Conversoes({
   searchParams,
@@ -12,61 +15,59 @@ export default async function Conversoes({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const f = await searchParams;
-  const lista = CONVERSOES.filter(
-    (c) => (!f.grupo || c.grupo === f.grupo) && (!f.status || c.status === f.status),
-  );
-  const total = lista.reduce((s, c) => s + c.comissao, 0);
+  const periodo = f.periodo && DIAS[f.periodo] ? f.periodo : "30d";
+  const { conversoes } = await worker.get<{ conversoes: Conversao[] }>(`/conversoes?dias=${DIAS[periodo]}`);
+  const comissao = conversoes.reduce((a, c) => a + Number(c.comissao ?? 0), 0);
+  const vendas = conversoes.reduce((a, c) => a + Number(c.valor ?? 0), 0);
   return (
     <div className="flex flex-col gap-5">
       <Cabecalho
         titulo="Conversões"
-        descricao={`Pedidos ligados a oferta, grupo e horário pelos subIds. Comissão no filtro: ${brl(total)}.`}
+        descricao="Vendas que vieram dos links, ligadas à oferta e ao grupo pelos subIds. A Shopee manda o relatório uma vez por dia."
       />
-      <FaixaDemo motivo="As conversões reais vêm do relatório da Shopee Afiliados (tabela conversoes)." />
-      <div className="flex flex-wrap items-end gap-3">
-        <Periodo base="/conversoes" atual={f.periodo ?? "7d"} extra={{ grupo: f.grupo, status: f.status }} />
-        <Filtros
-          valores={f}
-          campos={[
-            {
-              nome: "grupo",
-              rotulo: "Grupo",
-              opcoes: GRUPOS.map((g) => ({ valor: g.nome, rotulo: g.nome })),
-            },
-            {
-              nome: "status",
-              rotulo: "Status",
-              opcoes: ["pendente", "aprovada", "cancelada"].map((s) => ({ valor: s, rotulo: s })),
-            },
-          ]}
-        />
+      <Periodo base="/conversoes" atual={periodo} />
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi rotulo="Conversões" valor={conversoes.length} />
+        <Kpi rotulo="Vendas" valor={vendas} formato={(v) => brl(v)} />
+        <Kpi rotulo="Comissão" valor={comissao} formato={(v) => brl(v)} />
       </div>
       <Table>
         <THead>
           <Tr>
-            <Th>Pedido</Th>
+            <Th>Dia</Th>
             <Th>Oferta</Th>
-            <Th>Grupo · hora</Th>
+            <Th>Grupo</Th>
+            <Th>Status</Th>
             <Th className="text-right">Valor</Th>
             <Th className="text-right">Comissão</Th>
-            <Th>Status</Th>
           </Tr>
         </THead>
         <TBody>
-          {lista.map((c) => (
-            <Tr key={c.pedido}>
-              <Td className="whitespace-nowrap font-mono text-xs">{c.pedido}</Td>
-              <Td className="min-w-48">{c.oferta}</Td>
-              <Td className="whitespace-nowrap">
-                {c.grupo} · {c.horario}
+          {conversoes.map((c) => (
+            <Tr key={c.id}>
+              <Td className="text-xs">{c.dia ?? "—"}</Td>
+              <Td className="max-w-64 truncate">
+                {c.ofertaId ? (
+                  <Link href={`/ofertas/${c.ofertaId}`} className="hover:underline">
+                    {c.produto}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">sem link (pedido {c.pedido})</span>
+                )}
               </Td>
+              <Td>{c.grupo ?? "—"}</Td>
+              <Td className="text-xs">{c.status ?? "—"}</Td>
               <Td className="text-right tabular-nums">{brl(c.valor)}</Td>
               <Td className="text-right tabular-nums">{brl(c.comissao)}</Td>
-              <Td>
-                <Badge variant={c.status === "aprovada" ? "default" : "outline"}>{c.status}</Badge>
-              </Td>
             </Tr>
           ))}
+          {conversoes.length === 0 ? (
+            <Tr>
+              <Td colSpan={6} className="text-muted-foreground">
+                Nenhuma conversão no período.
+              </Td>
+            </Tr>
+          ) : null}
         </TBody>
       </Table>
     </div>

@@ -70,6 +70,11 @@ export interface Renderizacao {
 }
 
 export const worker = {
+  /** Leitura genérica (sessão obrigatória). */
+  get: <T>(caminho: string) => chamar<T>(caminho),
+  /** Escrita genérica (sessão obrigatória). */
+  post: <T>(caminho: string, corpo: unknown = {}) =>
+    chamar<T>(caminho, { method: "POST", body: JSON.stringify(corpo) }),
   login: (email: string, senha: string) =>
     chamar<{ admin: { id: number; email: string; nome: string } }>(
       "/auth/login",

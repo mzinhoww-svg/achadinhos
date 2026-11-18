@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { Cabecalho } from "@/components/cabecalho";
-import { FaixaDemo } from "@/components/faixa-demo";
-import { Filtros } from "@/components/filtros";
 import { Periodo } from "@/components/periodo";
+import { Card } from "@/components/ui/card";
 import { Table, TBody, Td, THead, Th, Tr } from "@/components/ui/table";
-import { GRUPOS, LINKS } from "@/lib/demo";
+import { hora, type LinkCurto } from "@/lib/tipos";
+import { worker } from "@/lib/worker";
+
+export const dynamic = "force-dynamic";
+const DIAS: Record<string, number> = { hoje: 1, "7d": 7, "30d": 30 };
 
 export default async function Links({
   searchParams,
@@ -11,47 +15,71 @@ export default async function Links({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const f = await searchParams;
-  const lista = LINKS.filter((l) => !f.grupo || l.grupo === f.grupo).sort((a, b) => b.cliques - a.cliques);
+  const periodo = f.periodo && DIAS[f.periodo] ? f.periodo : "7d";
+  const { links, cliquesPorHora } = await worker.get<{
+    links: LinkCurto[];
+    cliquesPorHora: { hora: string; n: number }[];
+  }>(`/links?dias=${DIAS[periodo]}`);
+  const max = Math.max(1, ...cliquesPorHora.map((h) => h.n));
   return (
     <div className="flex flex-col gap-5">
       <Cabecalho
         titulo="Links e cliques"
-        descricao="Cada link curto leva subIds de grupo, nicho, oferta e horário."
+        descricao="Um link curto por oferta e grupo. Cada clique fica registrado (sem guardar o IP)."
       />
-      <FaixaDemo motivo="Os links reais saem das tabelas links e cliques." />
-      <div className="flex flex-wrap items-end gap-3">
-        <Periodo base="/links" atual={f.periodo ?? "7d"} extra={{ grupo: f.grupo }} />
-        <Filtros
-          valores={f}
-          campos={[
-            {
-              nome: "grupo",
-              rotulo: "Grupo",
-              opcoes: GRUPOS.map((g) => ({ valor: g.nome, rotulo: g.nome })),
-            },
-          ]}
-        />
-      </div>
+      <Periodo base="/links" atual={periodo} />
+      <Card className="flex flex-col gap-2 p-5">
+        <h2 className="text-sm font-medium">Cliques por horário</h2>
+        {cliquesPorHora.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem cliques no período.</p>
+        ) : (
+          <div className="flex h-28 items-end gap-1" role="img" aria-label="Cliques por hora do dia">
+            {Array.from({ length: 24 }, (_, i) => {
+              const h = String(i).padStart(2, "0");
+              const n = cliquesPorHora.find((x) => x.hora === h)?.n ?? 0;
+              return (
+                <div key={h} className="flex flex-1 flex-col items-center gap-1" title={`${h}h: ${n}`}>
+                  <div className="w-full rounded-t bg-primary/80" style={{ height: `${(n / max) * 90}px` }} />
+                  {i % 3 === 0 ? <span className="text-[10px] text-muted-foreground">{h}</span> : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
       <Table>
         <THead>
           <Tr>
-            <Th>Link</Th>
             <Th>Oferta</Th>
             <Th>Grupo</Th>
-            <Th>subIds</Th>
+            <Th>Código</Th>
             <Th className="text-right">Cliques</Th>
+            <Th className="text-right">Únicos</Th>
+            <Th>Criado</Th>
           </Tr>
         </THead>
         <TBody>
-          {lista.map((l) => (
-            <Tr key={l.curto}>
-              <Td className="whitespace-nowrap font-mono text-xs">{l.curto}</Td>
-              <Td className="min-w-48">{l.oferta}</Td>
-              <Td className="whitespace-nowrap">{l.grupo}</Td>
-              <Td className="whitespace-nowrap font-mono text-xs text-muted-foreground">{l.subIds}</Td>
+          {links.map((l) => (
+            <Tr key={l.id}>
+              <Td className="max-w-64 truncate">
+                <Link href={`/ofertas/${l.ofertaId}`} className="hover:underline">
+                  {l.produto}
+                </Link>
+              </Td>
+              <Td>{l.grupo ?? "—"}</Td>
+              <Td className="font-mono text-xs">/r/{l.codigo}</Td>
               <Td className="text-right tabular-nums">{l.cliques}</Td>
+              <Td className="text-right tabular-nums">{l.unicos}</Td>
+              <Td className="text-xs">{hora(l.criadoEm)}</Td>
             </Tr>
           ))}
+          {links.length === 0 ? (
+            <Tr>
+              <Td colSpan={6} className="text-muted-foreground">
+                Nenhum link no período: eles nascem no momento do envio.
+              </Td>
+            </Tr>
+          ) : null}
         </TBody>
       </Table>
     </div>

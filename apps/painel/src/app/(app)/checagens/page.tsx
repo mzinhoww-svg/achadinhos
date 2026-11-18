@@ -1,81 +1,118 @@
 import Link from "next/link";
+import { Abas } from "@/components/abas";
 import { Cabecalho } from "@/components/cabecalho";
-import { Confirmar } from "@/components/confirmar";
-import { FaixaDemo } from "@/components/faixa-demo";
-import { Filtros } from "@/components/filtros";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Table, TBody, Td, THead, Th, Tr } from "@/components/ui/table";
-import { HOJE, NICHOS, OFERTAS } from "@/lib/demo";
+import { type Checagem, type Envio, hora } from "@/lib/tipos";
+import { worker } from "@/lib/worker";
+import { criarEnsaio } from "../acoes";
+
+export const dynamic = "force-dynamic";
 
 export default async function Checagens({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const f = await searchParams;
-  const reprovadas = OFERTAS.filter((o) => o.status === "reprovada");
-  const motivos = [...new Set(reprovadas.map((o) => o.motivo?.split(" (")[0] ?? ""))];
-  const lista = reprovadas.filter(
-    (o) => (!f.nicho || o.nicho === f.nicho) && (!f.motivo || o.motivo?.startsWith(f.motivo)),
+  const { aba = "reprovadas" } = await searchParams;
+  const [{ checagens }, { envios }] = await Promise.all([
+    worker.get<{ checagens: Checagem[] }>("/checagens?limite=100"),
+    worker.get<{ envios: Envio[] }>("/envios?dias=7&limite=100"),
+  ]);
+  const reprovadas = checagens.filter((c) => !c.aprovada);
+  const enviados = envios.filter(
+    (e) => e.status === "enviado" || e.status === "agendado" || e.status === "enviando",
   );
-  const taxa = Math.round((HOJE.reprovadas / HOJE.avaliadas) * 100);
+  const problemas = envios.filter((e) => e.status === "falhou" || e.status === "cancelado");
   return (
     <div className="flex flex-col gap-5">
-      <Cabecalho titulo="Checagens" descricao="Ofertas que a checagem automática reprovou, com o motivo." />
-      <FaixaDemo motivo="As reprovações reais chegam com /ofertas/:id/checar." />
-      <Card className="flex items-center justify-between gap-3 p-4">
-        <div>
-          <p className="text-xs text-muted-foreground">Reprovação hoje</p>
-          <p className="text-2xl font-semibold tabular-nums">{taxa}%</p>
-        </div>
-        <p className={taxa > 20 ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-          {taxa > 20 ? "Acima da trava de 20%: a operação pausa sozinha." : "Abaixo da trava de 20%."}
-        </p>
-      </Card>
-      <Filtros
-        valores={f}
-        campos={[
-          { nome: "motivo", rotulo: "Motivo", opcoes: motivos.map((m) => ({ valor: m, rotulo: m })) },
-          { nome: "nicho", rotulo: "Nicho", opcoes: NICHOS.map((n) => ({ valor: n.nome, rotulo: n.nome })) },
+      <Cabecalho
+        titulo="Checagens"
+        descricao="O que saiu, o que está agendado e o que a checagem automática barrou, com o motivo."
+        acao={
+          <form action={criarEnsaio}>
+            <Button type="submit" variant="outline" size="sm">
+              Rodar oferta de ensaio
+            </Button>
+          </form>
+        }
+      />
+      <Abas
+        ativo={aba}
+        itens={[
+          {
+            valor: "reprovadas",
+            rotulo: `Reprovadas (${reprovadas.length})`,
+            href: "/checagens?aba=reprovadas",
+          },
+          {
+            valor: "enviadas",
+            rotulo: `Enviadas e agendadas (${enviados.length})`,
+            href: "/checagens?aba=enviadas",
+          },
+          {
+            valor: "problemas",
+            rotulo: `Canceladas e falhas (${problemas.length})`,
+            href: "/checagens?aba=problemas",
+          },
         ]}
       />
-      {lista.length === 0 ? (
-        <Card className="p-6 text-sm text-muted-foreground">Nenhuma reprovação com esses filtros.</Card>
-      ) : (
-        <Table>
-          <THead>
-            <Tr>
-              <Th>Oferta</Th>
-              <Th>Motivo</Th>
-              <Th>Agente</Th>
-              <Th>Hora</Th>
-              <Th className="text-right">Ação</Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {lista.map((o) => (
-              <Tr key={o.id}>
-                <Td className="max-w-56">
-                  <Link href={`/ofertas/${o.id}`} className="line-clamp-2 hover:underline">
-                    {o.nome}
+      {aba === "reprovadas" ? (
+        <ul className="flex flex-col gap-2">
+          {reprovadas.map((c) => (
+            <li key={c.id}>
+              <Card className="flex flex-col gap-1 p-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/ofertas/${c.ofertaId}`} className="font-medium hover:underline">
+                    {c.produto}
                   </Link>
-                </Td>
-                <Td className="min-w-48">{o.motivo}</Td>
-                <Td>{o.agente}</Td>
-                <Td>{o.horario}</Td>
-                <Td className="text-right">
-                  <Confirmar
-                    variante="outline"
-                    rotulo="Propor ajuste"
-                    titulo="Propor ajuste de regra"
-                    texto={`Cria uma proposta para CHECAGEM.md com o motivo "${o.motivo}" e esta oferta como exemplo. O Coordenador ou você aprova na Bíblia › Propostas. (Demonstração: nada é criado.)`}
-                    confirmar="Criar proposta"
-                  />
-                </Td>
-              </Tr>
-            ))}
-          </TBody>
-        </Table>
+                  {c.ensaio ? <Badge variant="outline">ensaio</Badge> : null}
+                  <span className="ml-auto text-xs text-muted-foreground">{hora(c.criadoEm)}</span>
+                </div>
+                {c.motivos.map((m) => (
+                  <p key={m.codigo} className="text-muted-foreground">
+                    <Badge variant="aviso">{m.codigo}</Badge> {m.detalhe}
+                  </p>
+                ))}
+              </Card>
+            </li>
+          ))}
+          {reprovadas.length === 0 ? (
+            <Card className="p-6 text-sm text-muted-foreground">Nenhuma reprovação.</Card>
+          ) : null}
+        </ul>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {(aba === "enviadas" ? enviados : problemas).map((e) => (
+            <li key={e.id}>
+              <Card className="flex flex-col gap-1 p-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/ofertas/${e.ofertaId}`} className="font-medium hover:underline">
+                    {e.produto}
+                  </Link>
+                  <Badge
+                    variant={
+                      e.status === "enviado" ? "default" : e.status === "agendado" ? "secondary" : "aviso"
+                    }
+                  >
+                    {e.status}
+                  </Badge>
+                  {e.extra ? <Badge variant="outline">extra</Badge> : null}
+                  {e.ensaio ? <Badge variant="outline">ensaio</Badge> : null}
+                </div>
+                <p className="text-muted-foreground">
+                  {e.grupo} · {hora(e.enviadoEm ?? e.agendadoPara)}
+                  {e.numero ? ` · pelo ${e.numero}` : ""}
+                </p>
+                {e.erro ? <p className="text-muted-foreground">{e.erro}</p> : null}
+              </Card>
+            </li>
+          ))}
+          {(aba === "enviadas" ? enviados : problemas).length === 0 ? (
+            <Card className="p-6 text-sm text-muted-foreground">Nada nos últimos 7 dias.</Card>
+          ) : null}
+        </ul>
       )}
     </div>
   );

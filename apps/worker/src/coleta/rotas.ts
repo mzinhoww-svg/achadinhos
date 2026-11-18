@@ -25,6 +25,8 @@ const nichoEntrada = z.object({
   vendasMin: z.number().int().min(0).optional(),
   ativo: z.boolean().optional(),
   marketplace: z.enum(["shopee", "mercadolivre", "fake"]).optional(),
+  template: z.string().trim().max(80).nullable().optional(),
+  modeloLlm: z.string().trim().max(120).nullable().optional(),
   autor: z.string().trim().min(1).max(80).default("Coordenador"),
 });
 
@@ -106,7 +108,9 @@ export function rotasColeta(app: FastifyInstance, db: Db, mk: Marketplaces, regr
   app.get("/ofertas", async (req) => {
     const q = z
       .object({
-        status: z.enum(["candidata", "aprovada", "reprovada", "agendada", "enviada", "expirada"]).optional(),
+        status: z
+          .enum(["candidata", "aprovada", "reprovada", "agendada", "enviada", "expirada", "cancelada"])
+          .optional(),
         nichoId: z.coerce.number().int().positive().optional(),
         limite: z.coerce.number().int().min(1).max(200).default(50),
       })

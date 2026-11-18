@@ -141,9 +141,10 @@ function extrairVariacoes(texto: string): string[] {
 /** T5.1: gera 2 variações, valida contra o banco e escolhe a primeira válida. */
 export async function gerarCopy(db: Db, ofertaId: number, o: OpcoesCopy, agente = "Copywriter") {
   const [l] = await db
-    .select({ oferta: t.ofertas, produto: t.produtos })
+    .select({ oferta: t.ofertas, produto: t.produtos, modeloNicho: t.nichos.modeloLlm })
     .from(t.ofertas)
     .innerJoin(t.produtos, eq(t.produtos.id, t.ofertas.produtoId))
+    .leftJoin(t.nichos, eq(t.nichos.id, sql`coalesce(${t.ofertas.nichoId}, ${t.produtos.nichoId})`))
     .where(eq(t.ofertas.id, ofertaId));
   if (!l) throw new ErroNegocio(404, "nao_encontrado", `oferta ${ofertaId} não existe`);
   const preco = Number(l.oferta.preco);
@@ -177,7 +178,11 @@ export async function gerarCopy(db: Db, ofertaId: number, o: OpcoesCopy, agente 
     const llm = criarClienteLlm({
       apiKey: o.openrouterKey,
       ...(o.openrouterBaseUrl ? { baseUrl: o.openrouterBaseUrl } : {}),
-      modelos: { copy: modelos.copy },
+      modelos: {
+        copy: l.modeloNicho
+          ? { principal: l.modeloNicho, ...(modelos.copy.reserva ? { reserva: modelos.copy.reserva } : {}) }
+          : modelos.copy,
+      },
       titulo: "Achadinhos",
       ...(o.f ? { fetch: o.f } : {}),
       registrar: async (c: ChamadaRegistrada) => {

@@ -50,11 +50,12 @@ export function eventoParaApi(l: typeof t.eventos.$inferSelect): Evento {
 
 export async function listarEventos(
   db: Db,
-  f: { desde?: number; tipo?: string; limite: number },
+  f: { desde?: number; tipo?: string; agente?: string; limite: number },
 ): Promise<Evento[]> {
   const conds = [];
   if (f.desde !== undefined) conds.push(gt(t.eventos.id, f.desde));
   if (f.tipo) conds.push(eq(t.eventos.tipo, f.tipo));
+  if (f.agente) conds.push(eq(t.eventos.agente, f.agente));
   const linhas = await db
     .select()
     .from(t.eventos)

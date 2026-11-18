@@ -1,13 +1,16 @@
+/* biome-ignore-all lint/performance/noImgElement: fotos vêm da Shopee e são mostradas como estão. */
 import Link from "next/link";
 import { Cabecalho } from "@/components/cabecalho";
-import { FaixaDemo } from "@/components/faixa-demo";
 import { Filtros } from "@/components/filtros";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { brl, desconto, GRUPOS, NICHOS, OFERTAS, type StatusOferta } from "@/lib/demo";
+import { brl, hora, type Nicho, type OfertaLista } from "@/lib/tipos";
+import { worker } from "@/lib/worker";
 
-const STATUS: Record<
-  StatusOferta,
+export const dynamic = "force-dynamic";
+
+export const STATUS_OFERTA: Record<
+  string,
   { rotulo: string; variante: "default" | "secondary" | "outline" | "aviso" }
 > = {
   candidata: { rotulo: "candidata", variante: "outline" },
@@ -15,6 +18,8 @@ const STATUS: Record<
   agendada: { rotulo: "agendada", variante: "secondary" },
   enviada: { rotulo: "enviada", variante: "default" },
   reprovada: { rotulo: "reprovada", variante: "aviso" },
+  cancelada: { rotulo: "cancelada", variante: "aviso" },
+  expirada: { rotulo: "expirada", variante: "outline" },
 };
 
 export default async function Ofertas({
@@ -23,59 +28,76 @@ export default async function Ofertas({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const f = await searchParams;
-  const lista = OFERTAS.filter(
-    (o) =>
-      (!f.status || o.status === f.status) &&
-      (!f.nicho || o.nicho === f.nicho) &&
-      (!f.grupo || o.grupo === f.grupo),
-  );
+  const q = new URLSearchParams({ limite: "100" });
+  if (f.status) q.set("status", f.status);
+  if (f.nicho) q.set("nichoId", f.nicho);
+  const [{ ofertas }, { nichos }] = await Promise.all([
+    worker.get<{ ofertas: OfertaLista[] }>(`/ofertas?${q}`),
+    worker.get<{ nichos: Nicho[] }>("/nichos"),
+  ]);
   return (
     <div className="flex flex-col gap-5">
-      <Cabecalho
-        titulo="Ofertas"
-        descricao="Tudo o que os agentes encontraram hoje. A checagem automática decide o que sai."
-      />
-      <FaixaDemo motivo="As ofertas reais chegam com as ferramentas /coleta/buscar e /ofertas do worker." />
+      <Cabecalho titulo="Ofertas" descricao="Todas as ofertas detectadas, as de maior pontuação primeiro." />
       <Filtros
         valores={f}
         campos={[
           {
             nome: "status",
             rotulo: "Status",
-            opcoes: Object.keys(STATUS).map((s) => ({ valor: s, rotulo: s })),
+            opcoes: Object.keys(STATUS_OFERTA).map((s) => ({ valor: s, rotulo: s })),
           },
-          { nome: "nicho", rotulo: "Nicho", opcoes: NICHOS.map((n) => ({ valor: n.nome, rotulo: n.nome })) },
-          { nome: "grupo", rotulo: "Grupo", opcoes: GRUPOS.map((g) => ({ valor: g.nome, rotulo: g.nome })) },
+          {
+            nome: "nicho",
+            rotulo: "Nicho",
+            opcoes: nichos.map((n) => ({ valor: String(n.id), rotulo: n.nome })),
+          },
         ]}
       />
-      {lista.length === 0 ? (
-        <Card className="p-6 text-sm text-muted-foreground">Nenhuma oferta com esses filtros.</Card>
+      {ofertas.length === 0 ? (
+        <Card className="p-6 text-sm text-muted-foreground">
+          Nenhuma oferta com esses filtros. As primeiras ofertas reais aparecem depois de 3 dias de histórico
+          de preço.
+        </Card>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {lista.map((o) => (
-            <li key={o.id}>
-              <Link
-                href={`/ofertas/${o.id}`}
-                className="flex gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-accent"
-              >
-                {/* biome-ignore lint/performance/noImgElement: imagem de demonstração em data URI. */}
-                <img src={o.foto} alt="" className="size-16 shrink-0 rounded-lg" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <p className="truncate font-medium">{o.nome}</p>
-                  <p className="text-sm">
-                    <span className="font-semibold">{brl(o.preco)}</span>{" "}
-                    <span className="text-muted-foreground">
-                      mediana {brl(o.mediana30d)} · −{desconto(o)}%
-                    </span>
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant={STATUS[o.status].variante}>{STATUS[o.status].rotulo}</Badge>
-                    {o.horario} · {o.grupo}
-                  </div>
-                </div>
-              </Link>
-            </li>
-          ))}
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {ofertas.map((o) => {
+            const s = STATUS_OFERTA[o.status] ?? { rotulo: o.status, variante: "outline" as const };
+            return (
+              <li key={o.id}>
+                <Link href={`/ofertas/${o.id}`} className="block">
+                  <Card className="flex gap-3 p-3 transition-colors hover:bg-accent/40">
+                    {o.produto.fotoUrl ? (
+                      <img
+                        src={o.produto.fotoUrl}
+                        alt=""
+                        className="size-20 shrink-0 rounded-md border object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="size-20 shrink-0 rounded-md border bg-muted" />
+                    )}
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <p className="line-clamp-2 text-sm font-medium">{o.produto.nome}</p>
+                      <p className="text-sm">
+                        <span className="font-semibold">{brl(o.preco)}</span>
+                        {o.mediana30d ? (
+                          <span className="text-muted-foreground"> · mediana {brl(o.mediana30d)}</span>
+                        ) : null}
+                        {o.descontoPct ? (
+                          <span className="text-primary"> · −{Math.round(o.descontoPct)}%</span>
+                        ) : null}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <Badge variant={s.variante}>{s.rotulo}</Badge>
+                        {o.pontuacao != null ? <span>pontuação {o.pontuacao.toFixed(0)}</span> : null}
+                        <span>{hora(o.criadoEm)}</span>
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

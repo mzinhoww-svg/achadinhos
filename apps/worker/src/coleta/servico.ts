@@ -22,6 +22,8 @@ export interface EntradaNicho {
   vendasMin?: number;
   ativo?: boolean;
   marketplace?: "shopee" | "mercadolivre" | "fake";
+  template?: string | null;
+  modeloLlm?: string | null;
 }
 
 /** Cria ou atualiza o nicho pelo nome; as palavras-chave passam a ser exatamente as enviadas. */
@@ -36,6 +38,8 @@ export async function salvarNicho(db: Db, e: EntradaNicho, autor: string) {
       descontoMinPct: String(e.descontoMinPct ?? REGRAS_PADRAO.descontoMinPct),
       avaliacaoMin: String(e.avaliacaoMin ?? REGRAS_PADRAO.avaliacaoMin),
       vendasMin: e.vendasMin ?? REGRAS_PADRAO.vendasMin,
+      template: e.template ?? null,
+      modeloLlm: e.modeloLlm ?? null,
     };
     const [nicho] = await x
       .insert(t.nichos)

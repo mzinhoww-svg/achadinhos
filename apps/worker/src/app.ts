@@ -20,6 +20,7 @@ import type { Marketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { rotasColeta } from "./coleta/rotas.js";
 import type { OuvinteEventos } from "./ouvinte.js";
+import { rotasPainel } from "./painel/rotas.js";
 import { conferirSenha, gerarHashSenha } from "./senha.js";
 import {
   buscarEvento,
@@ -170,6 +171,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
       .object({
         desde: z.coerce.number().int().nonnegative().optional(),
         tipo: z.string().max(80).optional(),
+        agente: z.string().max(80).optional(),
         limite: z.coerce.number().int().min(1).max(500).default(100),
       })
       .parse(req.query);
@@ -293,7 +295,10 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     ferramenta: "/imagem/render",
     motivo: "Arte desligada neste worker.",
   };
-  if (deps.ciclo) rotasCiclo(app, deps.ciclo.deps, deps.ciclo.webhookToken);
+  if (deps.ciclo) {
+    rotasCiclo(app, deps.ciclo.deps, deps.ciclo.webhookToken);
+    rotasPainel(app, deps.db);
+  }
   if (deps.arte) rotasArte(app, deps.db, deps.arte);
   else app.post("/imagem/render", async (_req, reply) => reply.code(501).send(arteDesligada));
 

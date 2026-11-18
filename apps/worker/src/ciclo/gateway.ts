@@ -47,6 +47,11 @@ export class Gateway {
     return json;
   }
 
+  /** URL completa de uma página do gateway (ex.: o link de pareamento /parear/<token>). */
+  absoluta(caminho: string) {
+    return `${this.url.replace(/\/$/, "")}${caminho}`;
+  }
+
   private p(resto = "") {
     return `/v1/pools/${this.pool}${resto}`;
   }

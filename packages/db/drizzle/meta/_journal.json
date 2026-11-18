@@ -36,6 +36,13 @@
       "when": 1795031087411,
       "tag": "0004_ciclo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795031916795,
+      "tag": "0005_painel",
+      "breakpoints": true
     }
   ]
 }

@@ -34,7 +34,11 @@ function emSerie<T>(tarefa: () => Promise<T>): Promise<T> {
 async function dadosDoPedido(db: Db, p: PedidoRender) {
   if (p.ofertaId) {
     const [l] = await db
-      .select({ oferta: t.ofertas, produto: t.produtos, nicho: t.nichos.nome })
+      .select({
+        oferta: t.ofertas,
+        produto: t.produtos,
+        nicho: sql<string | null>`coalesce(${t.nichos.template}, ${t.nichos.nome})`,
+      })
       .from(t.ofertas)
       .innerJoin(t.produtos, eq(t.produtos.id, t.ofertas.produtoId))
       .leftJoin(t.nichos, eq(t.nichos.id, sql`coalesce(${t.ofertas.nichoId}, ${t.produtos.nichoId})`))
@@ -53,7 +57,10 @@ async function dadosDoPedido(db: Db, p: PedidoRender) {
     };
   }
   const [l] = await db
-    .select({ produto: t.produtos, nicho: t.nichos.nome })
+    .select({
+      produto: t.produtos,
+      nicho: sql<string | null>`coalesce(${t.nichos.template}, ${t.nichos.nome})`,
+    })
     .from(t.produtos)
     .leftJoin(t.nichos, eq(t.nichos.id, t.produtos.nichoId))
     .where(eq(t.produtos.id, p.produtoId ?? 0));

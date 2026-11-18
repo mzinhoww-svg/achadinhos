@@ -245,6 +245,35 @@ describe.skipIf(!URL_TESTE)("ciclo completo com gateway falso", () => {
     expect((await executarDevidos(deps)).enviados).toBe(1);
   }, 30_000);
 
+  it("painel: resumo, métricas por grupo, links com cliques, detalhe da oferta e auditoria", async () => {
+    const m = (await app.inject({ url: "/metricas?recorte=grupo&dias=30", headers: H })).json();
+    expect(m.linhas[0]).toMatchObject({ chave: "Teste Achadinhos", cliques: 1, conversoes: 0 });
+    const l = (await app.inject({ url: "/links?dias=30", headers: H })).json();
+    expect(l.links.find((x: { codigo: string }) => x.codigo === codigo)).toMatchObject({
+      cliques: 1,
+      unicos: 1,
+      grupo: "Teste Achadinhos",
+    });
+    const r = (await app.inject({ url: "/painel/resumo", headers: H })).json();
+    expect(r).toHaveProperty("ofertas.avaliadas");
+    expect(r.llm).toMatchObject({ tetoDiario: 1 });
+    const [o] = await db.select().from(t.ofertas).limit(1);
+    const det = (await app.inject({ url: `/ofertas/${o?.id}`, headers: H })).json();
+    expect(det.imagens.length).toBeGreaterThan(0);
+    expect(det.copies.length).toBeGreaterThan(0);
+    expect(det.checagens[0]).toMatchObject({ aprovada: true });
+    const a = await app.inject({
+      method: "POST",
+      url: "/auditoria",
+      headers: H,
+      payload: { ator: "Aurimar (painel)", acao: "nicho.alterado", alvo: "nicho:1" },
+    });
+    expect(a.statusCode).toBe(201);
+    expect((await app.inject({ url: "/auditoria", headers: H })).json().registros[0]).toMatchObject({
+      acao: "nicho.alterado",
+    });
+  });
+
   it("preço que subiu antes do envio cancela e avisa", async () => {
     // oferta real (não ensaio) de um produto do adaptador falso: 9001 custa 59,90 no fake
     const [prod] = await db
@@ -269,15 +298,13 @@ describe.skipIf(!URL_TESTE)("ciclo completo com gateway falso", () => {
         status: "agendada",
       })
       .returning();
-    await db
-      .insert(t.envios)
-      .values({
-        ofertaId: of?.id ?? 0,
-        grupoId,
-        chaveIdempotente: `x:${of?.id}`,
-        status: "agendado",
-        agendadoPara: agora,
-      });
+    await db.insert(t.envios).values({
+      ofertaId: of?.id ?? 0,
+      grupoId,
+      chaveIdempotente: `x:${of?.id}`,
+      status: "agendado",
+      agendadoPara: agora,
+    });
     pedidos.length = 0;
     expect(await executarDevidos(deps)).toMatchObject({ cancelados: 1, enviados: 0 });
     const [o2] = await db
