@@ -25,10 +25,7 @@ const esquema = z.object({
   SERVICE_TOKEN: z.string().min(32, "SERVICE_TOKEN precisa de pelo menos 32 caracteres"),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_NOME: z.string().default("Aurimar"),
-  ADMIN_SENHA_INICIAL: z
-    .string()
-    .min(12, "ADMIN_SENHA_INICIAL precisa de pelo menos 12 caracteres")
-    .optional(),
+  ADMIN_SENHA_INICIAL: z.string().min(8, "ADMIN_SENHA_INICIAL precisa de pelo menos 8 caracteres").optional(),
   /** Pasta das migrações; no deploy fica ao lado do worker.mjs. */
   MIGRACOES_DIR: z.string().optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

@@ -16,7 +16,7 @@ import type { Marketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { rotasColeta } from "./coleta/rotas.js";
 import type { OuvinteEventos } from "./ouvinte.js";
-import { conferirSenha } from "./senha.js";
+import { conferirSenha, gerarHashSenha } from "./senha.js";
 import {
   buscarEvento,
   criarProposta,
@@ -225,6 +225,34 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     await deps.db.update(t.admins).set({ ultimoLoginEm: new Date() }).where(eq(t.admins.id, admin.id));
     await deps.db.insert(t.auditoria).values({ ator: email, acao: "login.ok", alvo: "painel" });
     return { admin: { id: admin.id, email: admin.email, nome: admin.nome } };
+  });
+
+  /** Troca de senha do admin pelo painel: exige a senha atual. */
+  app.post("/auth/senha", async (req, reply) => {
+    const b = z
+      .object({
+        email: z.string().trim().toLowerCase().email(),
+        senhaAtual: z.string().min(1).max(256),
+        senhaNova: z.string().min(12, "a senha nova precisa de pelo menos 12 caracteres").max(256),
+      })
+      .parse(req.body);
+    const [admin] = await deps.db.select().from(t.admins).where(eq(t.admins.email, b.email));
+    const ok = await conferirSenha(b.senhaAtual, admin?.ativo ? admin.senhaHash : null);
+    if (!ok || !admin) {
+      await deps.db.insert(t.auditoria).values({ ator: b.email, acao: "senha.recusada", alvo: "painel" });
+      return reply.code(401).send({ erro: "credenciais_invalidas", mensagem: "Senha atual incorreta." });
+    }
+    if (b.senhaNova === b.senhaAtual) {
+      return reply
+        .code(400)
+        .send({ erro: "entrada_invalida", mensagem: "A senha nova precisa ser diferente da atual." });
+    }
+    await deps.db
+      .update(t.admins)
+      .set({ senhaHash: await gerarHashSenha(b.senhaNova) })
+      .where(eq(t.admins.id, admin.id));
+    await deps.db.insert(t.auditoria).values({ ator: b.email, acao: "senha.trocada", alvo: "painel" });
+    return { ok: true };
   });
 
   // ---------- ferramentas ainda não construídas ----------

@@ -66,4 +66,9 @@ export const worker = {
       body: JSON.stringify({ decisao, decididoPor }),
     }),
   listarEventos: (limite = 50) => chamar<{ eventos: Evento[] }>(`/eventos?limite=${limite}`),
+  trocarSenha: (email: string, senhaAtual: string, senhaNova: string) =>
+    chamar<{ ok: true }>("/auth/senha", {
+      method: "POST",
+      body: JSON.stringify({ email, senhaAtual, senhaNova }),
+    }),
 };

@@ -166,6 +166,45 @@ describe.skipIf(!URL_TESTE)("worker com Postgres", () => {
     );
   });
 
+  it("troca a senha do admin exigindo a atual", async () => {
+    const errada = await app.inject({
+      method: "POST",
+      url: "/auth/senha",
+      headers: H,
+      payload: { email: "admin@exemplo.com", senhaAtual: "nao-e-essa", senhaNova: "outra-senha-forte-1" },
+    });
+    expect(errada.statusCode).toBe(401);
+    const curta = await app.inject({
+      method: "POST",
+      url: "/auth/senha",
+      headers: H,
+      payload: { email: "admin@exemplo.com", senhaAtual: "senha-forte-123", senhaNova: "curta" },
+    });
+    expect(curta.statusCode).toBe(400);
+    const ok = await app.inject({
+      method: "POST",
+      url: "/auth/senha",
+      headers: H,
+      payload: {
+        email: "admin@exemplo.com",
+        senhaAtual: "senha-forte-123",
+        senhaNova: "outra-senha-forte-1",
+      },
+    });
+    expect(ok.statusCode).toBe(200);
+    const volta = await app.inject({
+      method: "POST",
+      url: "/auth/senha",
+      headers: H,
+      payload: {
+        email: "admin@exemplo.com",
+        senhaAtual: "outra-senha-forte-1",
+        senhaNova: "senha-forte-123",
+      },
+    });
+    expect(volta.statusCode).toBe(200);
+  });
+
   it("login do painel confere a senha e limita tentativas", async () => {
     const ok = await app.inject({
       method: "POST",

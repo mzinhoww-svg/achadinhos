@@ -18,6 +18,7 @@ export const TELAS = [
   { href: "/conversoes", rotulo: "Conversões" },
   { href: "/biblia", rotulo: "Bíblia" },
   { href: "/log", rotulo: "Log dos agentes" },
+  { href: "/conta", rotulo: "Minha conta" },
 ] as const;
 
 function ativa(caminho: string, href: string) {
