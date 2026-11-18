@@ -10,6 +10,7 @@ import {
   historicoPrecos,
   listarNichos,
   listarOfertas,
+  listarProdutos,
   rodarMonitor,
   salvarNicho,
 } from "./servico.js";
@@ -79,6 +80,17 @@ export function rotasColeta(app: FastifyInstance, db: Db, mk: Marketplaces, regr
       regras,
       ...(b.maxDetalhes !== undefined ? { maxDetalhes: b.maxDetalhes } : {}),
     });
+  });
+
+  app.get("/produtos", async (req) => {
+    const q = z
+      .object({
+        nichoId: z.coerce.number().int().positive().optional(),
+        limite: z.coerce.number().int().min(1).max(200).default(50),
+        pagina: z.coerce.number().int().min(1).default(1),
+      })
+      .parse(req.query);
+    return listarProdutos(db, q);
   });
 
   app.get("/precos/historico", async (req) => {

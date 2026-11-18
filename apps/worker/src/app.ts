@@ -290,6 +290,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
             "GET /nichos",
             "POST /nichos",
             "POST /coleta/buscar",
+            "GET /produtos",
             "POST /monitor/rodar",
             "GET /precos/historico",
             "GET /ofertas",

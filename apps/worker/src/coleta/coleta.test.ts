@@ -103,6 +103,8 @@ describe.skipIf(!URL_TESTE)("coleta, Monitor e ofertas (adaptador fake)", () => 
       acompanhado: true,
       nichoId,
     });
+    const lista = (await app.inject({ url: `/produtos?nichoId=${nichoId}`, headers: H })).json();
+    expect(lista).toMatchObject({ total: 6, comLinkAfiliado: 6, acompanhados: 6 });
   });
 
   it("produto sem histórico suficiente não vira oferta", async () => {

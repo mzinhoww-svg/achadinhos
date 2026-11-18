@@ -515,3 +515,44 @@ export async function rodarMonitor(
   await registrarEvento(db, { tipo: "monitor.concluido", agente, dados: { ...r } });
   return r;
 }
+
+export async function listarProdutos(db: Db, f: { nichoId?: number; limite: number; pagina: number }) {
+  const cond = f.nichoId ? eq(t.produtos.nichoId, f.nichoId) : undefined;
+  const [tot] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      comLink: sql<number>`count(${t.produtos.linkAfiliado})::int`,
+      acompanhados: sql<number>`count(*) filter (where ${t.produtos.acompanhado})::int`,
+    })
+    .from(t.produtos)
+    .where(cond);
+  const linhas = await db
+    .select()
+    .from(t.produtos)
+    .where(cond)
+    .orderBy(desc(t.produtos.vendas), asc(t.produtos.id))
+    .limit(f.limite)
+    .offset((f.pagina - 1) * f.limite);
+  return {
+    total: tot?.total ?? 0,
+    comLinkAfiliado: tot?.comLink ?? 0,
+    acompanhados: tot?.acompanhados ?? 0,
+    produtos: linhas.map((p) => ({
+      id: p.id,
+      marketplace: p.marketplace,
+      idExterno: p.idExterno,
+      nome: p.nome,
+      lojaNome: p.lojaNome,
+      preco: n(p.precoAtual),
+      avaliacao: n(p.avaliacao),
+      vendas: p.vendas,
+      comissaoTaxa: n(p.comissaoTaxa),
+      linkAfiliado: p.linkAfiliado,
+      url: p.url,
+      fotoUrl: p.fotoUrl,
+      acompanhado: p.acompanhado,
+      nichoId: p.nichoId,
+      ultimaColetaEm: p.ultimaColetaEm?.toISOString() ?? null,
+    })),
+  };
+}
