@@ -1,10 +1,13 @@
-/** Cliente do wa-gateway (pool do Achadinhos). */
-export class ErroGateway extends Error {
+import { ErroNegocio } from "../servicos.js";
+
+/** Cliente do wa-gateway (pool do Achadinhos). Erros viram ErroNegocio: o painel recebe o motivo, não um 500. */
+export class ErroGateway extends ErroNegocio {
   constructor(
     message: string,
-    readonly status: number,
+    status: number,
+    readonly codigoGateway: string | null = null,
   ) {
-    super(message);
+    super(status >= 500 ? 502 : status, "gateway", message);
     this.name = "ErroGateway";
   }
 }
@@ -43,8 +46,24 @@ export class Gateway {
       throw new ErroGateway("o wa-gateway não respondeu", 503);
     }
     const json = (await res.json().catch(() => ({}))) as T & { error?: string };
-    if (!res.ok) throw new ErroGateway(`wa-gateway: ${json.error ?? `HTTP ${res.status}`}`, res.status);
+    if (!res.ok)
+      throw new ErroGateway(
+        `wa-gateway: ${json.error ?? `HTTP ${res.status}`}`,
+        res.status,
+        json.error ?? null,
+      );
     return json;
+  }
+
+  /** Cria o pool (sem telefones) se ainda não existir, e repete a chamada. Não sobrescreve um pool existente. */
+  private async comPool<T>(fazer: () => Promise<T>): Promise<T> {
+    try {
+      return await fazer();
+    } catch (e) {
+      if (!(e instanceof ErroGateway) || e.codigoGateway !== "POOL_NOT_FOUND") throw e;
+      await this.chamar("PUT", this.p(), { project: "achadinhos", adminPhones: [] });
+      return fazer();
+    }
   }
 
   /** URL completa de uma página do gateway (ex.: o link de pareamento /parear/<token>). */
@@ -60,16 +79,18 @@ export class Gateway {
     return this.chamar<{ ok: true }>("PUT", this.p(), { project: "achadinhos", adminPhones });
   }
   adicionarNumero(instanceId: string, ordem: number) {
-    return this.chamar<{ pareamento: { token: string; expiraEm: string } }>("POST", this.p("/numeros"), {
-      instanceId,
-      ordem,
-    });
+    return this.comPool(() =>
+      this.chamar<{ pareamento: { token: string; expiraEm: string } }>("POST", this.p("/numeros"), {
+        instanceId,
+        ordem,
+      }),
+    );
   }
   pareamento(instanceId: string) {
     return this.chamar<{ url: string; expiraEm: string }>("POST", `/v1/instances/${instanceId}/pareamento`);
   }
   numeros() {
-    return this.chamar<{ numeros: NumeroGateway[] }>("GET", this.p("/numeros"));
+    return this.comPool(() => this.chamar<{ numeros: NumeroGateway[] }>("GET", this.p("/numeros")));
   }
   promover(instanceId: string) {
     return this.chamar<{ ok: true }>("POST", this.p(`/numeros/${instanceId}/promover`));
