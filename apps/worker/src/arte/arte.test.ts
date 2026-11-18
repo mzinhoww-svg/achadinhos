@@ -152,3 +152,13 @@ describe.skipIf(!URL_TESTE)("rotas da Arte", () => {
     expect((await app.inject({ url: "/arquivos/nao-existe.jpg" })).statusCode).toBe(404);
   });
 });
+
+describe("lote variado", () => {
+  it("anúncios do mesmo produto em tamanhos diferentes caem na mesma família", async () => {
+    const { familiaDoNome } = await import("./servico.js");
+    expect(familiaDoNome("Pote Hermético tampa de Bambu 200ML Kit 3/6")).toBe(
+      familiaDoNome("Pote Hermético tampa de Bambu 210ML Kit 3/6 Potes"),
+    );
+    expect(familiaDoNome("Pote Hermético tampa")).not.toBe(familiaDoNome("Organizador de gaveta"));
+  });
+});

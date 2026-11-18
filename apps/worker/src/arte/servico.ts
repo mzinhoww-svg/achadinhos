@@ -200,22 +200,39 @@ export async function escolherLote(db: Db, nichoId: number | undefined, limite: 
     .limit(limite);
   const usados = new Set(ofertas.map((x) => x.produtoId));
   const faltam = limite - ofertas.length;
-  const produtos =
+  const candidatos =
     faltam > 0
       ? await db
-          .select({ produtoId: t.produtos.id })
+          .select({ produtoId: t.produtos.id, nome: t.produtos.nome })
           .from(t.produtos)
           .where(and(isNotNull(t.produtos.fotoUrl), isNotNull(t.produtos.precoAtual), filtroNicho))
           .orderBy(sql`${t.produtos.descontoAnunciado} desc nulls last`, desc(t.produtos.vendas))
-          .limit(limite + usados.size)
+          .limit((limite + usados.size) * 8)
       : [];
-  return [
-    ...ofertas.map((x) => ({ ofertaId: x.ofertaId })),
-    ...produtos
-      .filter((x) => !usados.has(x.produtoId))
-      .slice(0, Math.max(0, faltam))
-      .map((x) => ({ produtoId: x.produtoId })),
-  ];
+  // Lojas repetem o mesmo anúncio com outro tamanho: um por "família" de nome deixa o lote variado.
+  const familias = new Set<string>();
+  const escolhidos: { produtoId: number }[] = [];
+  for (const c of candidatos) {
+    if (escolhidos.length >= faltam) break;
+    const familia = familiaDoNome(c.nome);
+    if (usados.has(c.produtoId) || familias.has(familia)) continue;
+    familias.add(familia);
+    escolhidos.push({ produtoId: c.produtoId });
+  }
+  return [...ofertas.map((x) => ({ ofertaId: x.ofertaId })), ...escolhidos];
+}
+
+/** As três primeiras palavras do nome, sem acento, números e unidades. */
+export function familiaDoNome(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter((p) => p.length > 2 && !["kit", "com", "para", "ml", "unidades"].includes(p))
+    .slice(0, 3)
+    .join(" ");
 }
 
 /** Peças para a página de conferência: agrupadas por renderização (mesma foto e mesmo instante). */
