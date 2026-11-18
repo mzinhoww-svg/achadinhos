@@ -1,5 +1,6 @@
 import "server-only";
 import type { DocBiblia, Evento, Proposta, ResumoDocBiblia } from "@achadinhos/shared";
+import { exigirSessao } from "./auth";
 import { env } from "./env";
 
 /** Cliente do worker, só no servidor: o SERVICE_TOKEN nunca vai para o navegador. */
@@ -19,7 +20,12 @@ export function configWorker() {
   return { url: url.replace(/\/+$/, ""), token };
 }
 
-async function chamar<T>(caminho: string, init: RequestInit = {}): Promise<T> {
+/**
+ * Toda chamada exige a sessão do admin (o login é a exceção). No App Router, a página roda em paralelo
+ * com o layout que confere a sessão; sem esta checagem, uma visita sem login chegaria a consultar o worker.
+ */
+async function chamar<T>(caminho: string, init: RequestInit = {}, semSessao = false): Promise<T> {
+  if (!semSessao) await exigirSessao();
   const { url, token } = configWorker();
   let res: Response;
   try {
@@ -39,10 +45,14 @@ async function chamar<T>(caminho: string, init: RequestInit = {}): Promise<T> {
 
 export const worker = {
   login: (email: string, senha: string) =>
-    chamar<{ admin: { id: number; email: string; nome: string } }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, senha }),
-    }),
+    chamar<{ admin: { id: number; email: string; nome: string } }>(
+      "/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, senha }),
+      },
+      true,
+    ),
   listarBiblia: () => chamar<{ documentos: ResumoDocBiblia[] }>("/biblia"),
   lerDoc: (slug: string, versao?: number) =>
     chamar<DocBiblia>(`/biblia/${encodeURIComponent(slug)}${versao ? `?versao=${versao}` : ""}`),

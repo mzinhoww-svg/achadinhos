@@ -115,6 +115,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - A chave da API da Vertra usada no deploy está como segredo de rede do ambiente cloud `achadinhos`, nunca em arquivo.
 
 ## D-010 · 18/11/2026 · Painel: entrevista (Parte 1C) e esqueleto navegável
+
 - Respostas do Aurimar e mapa de telas em `docs/PAINEL.md`, aprovado.
   - Visão geral com PAUSAR, ofertas, cliques e conversões, alertas e custos.
   - Ofertas só para consulta. Checagens com proposta de ajuste de regra.
