@@ -184,3 +184,23 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - **Nichos:** a rota `POST /nichos` não está no contrato original; foi criada porque a coleta precisa de nichos
   cadastrados (o Coordenador cadastra a partir de NICHOS.md). As rotas novas estão documentadas em
   `docs/WORKER-API.md`.
+
+## D-012 · 18/11/2026 · Produção no ar e aceite real do Prompt 2
+
+- **Banco:** a conexão exigiu três coisas.
+  1. A CA da Vertra, agora embutida como padrão no worker. É pública; foi conferida com `openssl verify`.
+  2. O certificado de cliente (mTLS), gravado nas variáveis do worker direto do arquivo, sem passar pelo chat.
+  3. O usuário `achadinhos`, criado pelo Aurimar no console SQL. A senha com `@` e `!` precisa ir codificada na URL.
+- **Login do painel funcionando** em produção. A troca de senha fica em "Minha conta", com mínimo de 12 caracteres;
+  a senha inicial aceita 8.
+- **Busca real na Shopee** (nicho "Casa e cozinha até R$ 50", 8 palavras): 159 produtos únicos, todos com link de
+  afiliado (`s.shopee.com.br`), em cerca de 50 s. **O erro `10010` do projeto antigo não voltou**, o que confirma que a
+  causa eram as variáveis tipadas no documento GraphQL.
+- **Limites reais observados:**
+  - a Shopee devolve `10000` (erro do sistema) de vez em quando; o retry resolveu em quase todos os casos;
+  - no Monitor, 1 de 8 buscas falhou depois das tentativas e foi para os eventos;
+  - nenhum `10030` (limite de taxa) apareceu com 30 chamadas por minuto.
+- **Monitor real:** 7 buscas atualizaram 140 produtos e 19 foram consultados um a um, em cerca de 45 s. As primeiras
+  ofertas reais só aparecem depois de 3 dias de histórico.
+- **Nicho piloto:** cadastrado com as regras da bíblia do Coordenador (desconto de 20%, nota 4,5 e 100 vendas). As
+  palavras-chave são provisórias; o Coordenador troca pelas do NICHOS.md com `POST /nichos` e o mesmo nome.
