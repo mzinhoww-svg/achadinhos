@@ -36,8 +36,8 @@ export interface DepsApp {
   serviceToken: string;
   ouvinte?: OuvinteEventos;
   logLevel?: string;
-  /** Pg-boss e LISTEN entram no /health quando existem. */
-  estado?: () => { fila: boolean; listen: boolean };
+  /** Pg-boss, LISTEN e a preparação do banco entram no /health. `pronto: false` responde 503 nas rotas. */
+  estado?: () => { fila: boolean; listen: boolean; pronto?: boolean; erro?: string | null };
 }
 
 const ROTAS_PUBLICAS = new Set(["/health", "/"]);
@@ -76,6 +76,12 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     if (!tokenConfere(req.headers["x-service-token"], deps.serviceToken)) {
       return reply.code(401).send({ erro: "nao_autorizado", mensagem: "Envie o header X-Service-Token." });
     }
+    const e = deps.estado?.();
+    if (e && e.pronto === false) {
+      return reply
+        .code(503)
+        .send({ erro: "iniciando", mensagem: e.erro ?? "O worker ainda está preparando o banco." });
+    }
   });
 
   app.get("/", async () => ({ servico: "achadinhos-worker", versao: VERSAO, saude: "/health" }));
@@ -89,7 +95,9 @@ export function criarApp(deps: DepsApp): FastifyInstance {
       banco = false;
     }
     const extra = deps.estado?.() ?? { fila: false, listen: false };
-    return reply.code(banco ? 200 : 503).send({ ok: banco, versao: VERSAO, banco, ...extra });
+    const ok = banco && extra.pronto !== false;
+    // Sempre 200, com ok e o motivo no corpo: a borda da Vertra esconde o corpo de respostas 5xx.
+    return reply.code(200).send({ ok, versao: VERSAO, banco, ...extra });
   });
 
   // ---------- bíblia ----------

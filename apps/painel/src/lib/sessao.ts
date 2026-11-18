@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { env } from "./env";
 
 /**
  * Sessão do admin num cookie assinado (HMAC-SHA256 com AUTH_SECRET). O painel não guarda estado:
@@ -16,7 +17,7 @@ export const COOKIE_SESSAO = "achadinhos_sessao";
 export const DURACAO_SESSAO_MS = 12 * 60 * 60 * 1000;
 
 function segredo(s?: string): string {
-  const v = s ?? process.env.AUTH_SECRET;
+  const v = s ?? env("AUTH_SECRET");
   if (!v || v.length < 32) throw new Error("AUTH_SECRET ausente ou curto (mínimo 32 caracteres).");
   return v;
 }

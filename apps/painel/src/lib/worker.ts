@@ -1,5 +1,6 @@
 import "server-only";
 import type { DocBiblia, ResumoDocBiblia } from "@achadinhos/shared";
+import { env } from "./env";
 
 /** Cliente do worker, só no servidor: o SERVICE_TOKEN nunca vai para o navegador. */
 export class ErroWorker extends Error {
@@ -12,8 +13,8 @@ export class ErroWorker extends Error {
 }
 
 function config() {
-  const url = process.env.WORKER_URL;
-  const token = process.env.SERVICE_TOKEN;
+  const url = env("WORKER_URL");
+  const token = env("SERVICE_TOKEN");
   if (!url || !token) throw new ErroWorker("WORKER_URL ou SERVICE_TOKEN não configurados no painel.", 500);
   return { url: url.replace(/\/+$/, ""), token };
 }

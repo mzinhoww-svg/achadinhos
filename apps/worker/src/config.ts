@@ -1,13 +1,26 @@
+import type { ConnectionOptions } from "node:tls";
 import { z } from "zod";
+
+const pemBase64 = z
+  .string()
+  .transform((s) => Buffer.from(s.trim(), "base64").toString("utf8"))
+  .refine((s) => s.includes("-----BEGIN "), "não é um PEM em base64")
+  .optional();
 
 const esquema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(80),
   HOST: z.string().default("0.0.0.0"),
   DATABASE_URL: z.string().url({ message: "DATABASE_URL ausente ou inválida" }),
-  /** verificar (padrão): TLS verificando o certificado; sem-verificacao: TLS sem verificar; desligado: sem TLS (só local). */
-  DATABASE_SSL: z.enum(["verificar", "sem-verificacao", "desligado"]).default("verificar"),
-  /** Certificado da CA do banco (PEM), quando o provedor usa CA própria. */
-  DATABASE_CA: z.string().optional(),
+  /**
+   * verify-ca (padrão): TLS conferindo a CA, sem conferir o nome do host (o certificado do Postgres da
+   * Vertra é emitido para "postgres"). verify-full: confere também o nome. no-verify: TLS sem conferir.
+   * off: sem TLS (só para o banco local de testes).
+   */
+  DB_SSL_MODO: z.enum(["verify-ca", "verify-full", "no-verify", "off"]).default("verify-ca"),
+  /** CA, certificado e chave de cliente (mTLS) em PEM codificado em base64, como nas outras apps da Vertra. */
+  DB_SSL_CA_B64: pemBase64,
+  DB_SSL_CERT_B64: pemBase64,
+  DB_SSL_KEY_B64: pemBase64,
   SERVICE_TOKEN: z.string().min(32, "SERVICE_TOKEN precisa de pelo menos 32 caracteres"),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_NOME: z.string().default("Aurimar"),
@@ -22,17 +35,49 @@ const esquema = z.object({
 
 export type Config = z.infer<typeof esquema>;
 
+export const VALOR_PENDENTE = "PENDENTE";
+
 export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const r = esquema.safeParse(Object.fromEntries(Object.entries(env).filter(([, v]) => v !== "")));
+  // "PENDENTE" é o marcador das variáveis criadas na Vertra à espera do valor (ela não aceita vazio).
+  const limpo = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== "" && v !== VALOR_PENDENTE));
+  const r = esquema.safeParse(limpo);
   if (!r.success) {
-    const faltas = r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    // Só o nome da variável e o problema: nunca o valor.
+    const faltas = r.error.issues
+      .map((i) => {
+        const nome = i.path.join(".");
+        return `${nome}: ${limpo[nome] === undefined ? "ausente" : i.message}`;
+      })
+      .join("; ");
     throw new Error(`Configuração inválida: ${faltas}`);
   }
   return r.data;
 }
 
-export function opcoesSsl(c: Pick<Config, "DATABASE_SSL" | "DATABASE_CA">) {
-  if (c.DATABASE_SSL === "desligado") return false;
-  if (c.DATABASE_SSL === "sem-verificacao") return { rejectUnauthorized: false };
-  return c.DATABASE_CA ? { rejectUnauthorized: true, ca: c.DATABASE_CA } : { rejectUnauthorized: true };
+type ConfigSsl = Pick<Config, "DB_SSL_MODO" | "DB_SSL_CA_B64" | "DB_SSL_CERT_B64" | "DB_SSL_KEY_B64">;
+
+export function opcoesSsl(c: ConfigSsl): ConnectionOptions | false {
+  if (c.DB_SSL_MODO === "off") return false;
+  const cliente =
+    c.DB_SSL_CERT_B64 && c.DB_SSL_KEY_B64 ? { cert: c.DB_SSL_CERT_B64, key: c.DB_SSL_KEY_B64 } : {};
+  if (c.DB_SSL_MODO === "no-verify") return { rejectUnauthorized: false, ...cliente };
+  const base: ConnectionOptions = {
+    rejectUnauthorized: true,
+    ...cliente,
+    ...(c.DB_SSL_CA_B64 ? { ca: c.DB_SSL_CA_B64 } : {}),
+  };
+  // verify-ca: a cadeia é conferida contra a CA, o nome do host não.
+  return c.DB_SSL_MODO === "verify-ca" ? { ...base, checkServerIdentity: () => undefined } : base;
+}
+
+/**
+ * Tira da URL os parâmetros de TLS (sslmode, sslrootcert...). No `pg`, eles sobrescrevem a opção `ssl`
+ * passada no código; aqui quem manda é DB_SSL_MODO.
+ */
+export function urlSemSsl(url: string): string {
+  const u = new URL(url);
+  for (const p of ["sslmode", "ssl", "sslcert", "sslkey", "sslrootcert", "sslpassword", "uselibpqcompat"]) {
+    u.searchParams.delete(p);
+  }
+  return u.toString();
 }

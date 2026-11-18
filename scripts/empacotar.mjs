@@ -1,6 +1,6 @@
 // Monta as pastas de deploy da Vertra (runtime Node nativo, sem imagem própria):
 //   deploy/worker: worker.mjs (arquivo único, sem dependências) + migrações. Start: node worker.mjs
-//   deploy/painel: app Next.js autônoma; @achadinhos/shared vai em vendor/ como dependência file:.
+//   deploy/painel: app Next.js autônoma; @achadinhos/shared vai em libs/ como dependência file: (a Vertra remove pastas "vendor" do zip).
 //                  A Vertra instala (npm), roda "npm run build" e depois "npm start".
 // Uso: pnpm empacotar
 import { execSync } from "node:child_process";
@@ -40,7 +40,7 @@ execSync(`find ${JSON.stringify(join(dp, "src"))} -name '*.test.ts' -delete`);
 
 const pkgPainel = ler("apps/painel/package.json");
 pkgPainel.name = "achadinhos-painel";
-pkgPainel.dependencies["@achadinhos/shared"] = "file:./vendor/shared";
+pkgPainel.dependencies["@achadinhos/shared"] = "file:./libs/shared";
 pkgPainel.devDependencies = Object.fromEntries(
   Object.entries(pkgPainel.devDependencies).filter(([n]) => n !== "vitest"),
 );
@@ -56,7 +56,7 @@ tsPainel.compilerOptions = { ...base, ...tsPainel.compilerOptions };
 gravarJson(join(dp, "tsconfig.json"), tsPainel);
 
 // Pacote compartilhado, como fonte TypeScript (o Next transpila: transpilePackages).
-const dv = join(dp, "vendor/shared");
+const dv = join(dp, "libs/shared");
 mkdirSync(dv, { recursive: true });
 cpSync(join(raiz, "packages/shared/src"), join(dv, "src"), { recursive: true });
 execSync(`find ${JSON.stringify(join(dv, "src"))} -name '*.test.ts' -delete`);

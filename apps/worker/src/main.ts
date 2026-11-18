@@ -1,16 +1,38 @@
 import { criarDb, migrar, PASTA_MIGRACOES } from "@achadinhos/db";
+import Fastify from "fastify";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
-import { criarApp } from "./app.js";
-import { lerConfig, opcoesSsl } from "./config.js";
+import { criarApp, VERSAO } from "./app.js";
+import { type Config, lerConfig, opcoesSsl, urlSemSsl } from "./config.js";
 import { OuvinteEventos } from "./ouvinte.js";
 import { semearAdmin } from "./seed.js";
 
-const config = lerConfig();
-const ssl = opcoesSsl(config);
-const conexao = { connectionString: config.DATABASE_URL, ssl };
+const porta = Number(process.env.PORT || 80);
+const host = process.env.HOST || "0.0.0.0";
 
+let config: Config;
+try {
+  config = lerConfig();
+} catch (e) {
+  // Sem variáveis (ex.: logo depois do deploy): sobe mesmo assim e diz o que falta, sem crash loop.
+  const motivo = e instanceof Error ? e.message : String(e);
+  const degradado = Fastify({ logger: true });
+  // /health responde 200 com ok:false: a borda da Vertra troca respostas 5xx pela página de erro dela.
+  degradado.all("/*", async (req, reply) =>
+    reply
+      .code(req.url.split("?")[0] === "/health" ? 200 : 503)
+      .send({ ok: false, versao: VERSAO, erro: "configuracao_incompleta", mensagem: motivo }),
+  );
+  degradado.log.error(motivo);
+  await degradado.listen({ port: porta, host });
+  await new Promise(() => {}); // fica no ar até a Vertra reiniciar com as variáveis
+  throw new Error("inalcançável");
+}
+
+const ssl = opcoesSsl(config);
+const conexao = { connectionString: urlSemSsl(config.DATABASE_URL), ssl };
 const pool = new pg.Pool({ ...conexao, max: 10, application_name: "achadinhos-worker" });
+pool.on("error", (e) => app.log.error({ err: e }, "erro numa conexão ociosa do pool"));
 const db = criarDb(pool);
 
 // No deploy, as migrações ficam em ./drizzle ao lado do worker.mjs; no desenvolvimento, no pacote db.
@@ -25,31 +47,38 @@ const ouvinte = new OuvinteEventos(conexao, {
   warn: (o, m) => app.log.warn(o, m),
 });
 // Fila no próprio Postgres, num schema separado.
-const boss = new PgBoss({
-  connectionString: config.DATABASE_URL,
-  ssl,
-  schema: "achadinhos_fila",
-  application_name: "achadinhos-fila",
-});
-let filaOk = false;
+const boss = new PgBoss({ ...conexao, schema: "achadinhos_fila", application_name: "achadinhos-fila" });
 
+const estado = { pronto: false, fila: false, erro: null as string | null };
 const app = criarApp({
   db,
   serviceToken: config.SERVICE_TOKEN,
   ouvinte,
   logLevel: config.LOG_LEVEL,
-  estado: () => ({ fila: filaOk, listen: ouvinte.conectado }),
+  estado: () => ({ fila: estado.fila, listen: ouvinte.conectado, pronto: estado.pronto, erro: estado.erro }),
 });
 
-async function iniciar() {
-  app.log.info({ pastaMigracoes }, "aplicando migrações");
-  await migrar(db, pastaMigracoes);
-  await semearAdmin(db, config, { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) });
-  await ouvinte.iniciar();
-  boss.on("error", (e) => app.log.error({ err: e }, "pg-boss"));
-  await boss.start();
-  filaOk = true;
-  await app.listen({ port: config.PORT, host: config.HOST });
+/** Migrações, admin inicial, LISTEN e fila. Se o banco falhar, tenta de novo sem derrubar o processo. */
+async function prepararBanco(tentativa = 1): Promise<void> {
+  try {
+    app.log.info({ pastaMigracoes }, "aplicando migrações");
+    await migrar(db, pastaMigracoes);
+    await semearAdmin(db, config, { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) });
+    await ouvinte.iniciar();
+    boss.on("error", (e) => app.log.error({ err: e }, "pg-boss"));
+    await boss.start();
+    estado.fila = true;
+    estado.pronto = true;
+    estado.erro = null;
+    app.log.info("worker pronto");
+  } catch (e) {
+    // O drizzle embrulha o erro do driver ("Failed query"); a causa diz o que houve (ex.: ECONNREFUSED).
+    const causa = e instanceof Error && e.cause instanceof Error ? e.cause : e;
+    estado.erro = `banco: ${causa instanceof Error ? causa.message : String(causa)}`;
+    const espera = Math.min(15_000 * tentativa, 120_000);
+    app.log.error({ err: e, esperaMs: espera }, "banco indisponível; nova tentativa em breve");
+    setTimeout(() => void prepararBanco(tentativa + 1), espera).unref();
+  }
 }
 
 let encerrando = false;
@@ -66,7 +95,5 @@ async function encerrar(sinal: string) {
 process.on("SIGTERM", () => void encerrar("SIGTERM"));
 process.on("SIGINT", () => void encerrar("SIGINT"));
 
-iniciar().catch((e) => {
-  app.log.fatal({ err: e }, "falha ao iniciar o worker");
-  process.exit(1);
-});
+await app.listen({ port: config.PORT, host: config.HOST });
+void prepararBanco();
