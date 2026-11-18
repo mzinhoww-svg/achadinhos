@@ -65,6 +65,15 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     logger: {
       level: deps.logLevel ?? "info",
       redact: ["req.headers.x-service-token", "req.headers.authorization", "body.senha"],
+      // O token de agente pode vir na URL (/mcp/ach_…): nunca vai para o log.
+      serializers: {
+        req: (req: { method: string; url: string; hostname?: string; ip?: string }) => ({
+          method: req.method,
+          url: req.url.replace(/\/mcp\/[^/?#]+/, "/mcp/[oculto]"),
+          host: req.hostname,
+          remoteAddress: req.ip,
+        }),
+      },
     },
     bodyLimit: 1_048_576,
     trustProxy: true,
@@ -93,7 +102,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     const caminho = req.url.split("?")[0] ?? "";
     if (ROTAS_PUBLICAS.has(caminho)) return;
     // MCP dos agentes: token próprio de cada agente (Authorization: Bearer).
-    if (deps.ciclo && caminho === "/mcp") return;
+    if (deps.ciclo && (caminho === "/mcp" || caminho.startsWith("/mcp/"))) return;
     // Webhook do wa-gateway: confere o próprio token (?t=) na rota.
     if (deps.ciclo && req.method === "POST" && caminho === "/wa/webhook") return;
     // Peças guardadas no banco: públicas para o WhatsApp e o painel abrirem a imagem.

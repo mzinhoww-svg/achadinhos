@@ -44,11 +44,26 @@ export function rotasMcp(app: FastifyInstance, serviceToken: string, publicUrl: 
     reply.code(405).header("allow", "POST").send({ erro: "use POST (MCP Streamable HTTP)" }),
   );
 
-  app.post("/mcp", async (req, reply) => {
-    const agente = agenteDoToken(serviceToken, req.headers.authorization);
+  // Token na URL (/mcp/ach_…): para clientes que não deixam o agente gravar cabeçalhos (ex.: OpenBot).
+  app.get("/mcp/:token", async (_req, reply) =>
+    reply.code(405).header("allow", "POST").send({ erro: "use POST (MCP Streamable HTTP)" }),
+  );
+  app.post("/mcp/:token", async (req, reply) => {
+    const { token } = req.params as { token: string };
+    return atender(req.body, `Bearer ${token}`, reply);
+  });
+
+  app.post("/mcp", async (req, reply) => atender(req.body, req.headers.authorization, reply));
+
+  async function atender(
+    body: unknown,
+    cabecalho: string | undefined,
+    reply: import("fastify").FastifyReply,
+  ) {
+    const agente = agenteDoToken(serviceToken, cabecalho);
     if (!agente)
       return reply.code(401).header("www-authenticate", "Bearer").send({ erro: "token de agente inválido" });
-    const corpo = req.body as Rpc | Rpc[];
+    const corpo = body as Rpc | Rpc[];
     const lote = Array.isArray(corpo) ? corpo : [corpo];
     const respostas = [];
     for (const m of lote) {
@@ -59,7 +74,7 @@ export function rotasMcp(app: FastifyInstance, serviceToken: string, publicUrl: 
     return reply
       .header("content-type", "application/json")
       .send(Array.isArray(corpo) ? respostas : respostas[0]);
-  });
+  }
 }
 
 async function tratar(app: FastifyInstance, serviceToken: string, agente: Agente, m: Rpc) {

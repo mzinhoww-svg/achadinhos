@@ -359,6 +359,22 @@ describe.skipIf(!URL_TESTE)("ciclo completo com gateway falso", () => {
     });
     const biblia = (await rpc("Copywriter", "tools/call", { name: "ler_biblia", arguments: {} })).json();
     expect(JSON.parse(biblia.result.content[0].text)).toHaveProperty("documentos");
+    // Token na URL, para clientes que não gravam cabeçalho
+    const viaUrl = await app.inject({
+      method: "POST",
+      url: `/mcp/${tokenAgente(TOKEN, "Monitor")}`,
+      payload: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+    });
+    expect(viaUrl.json().result.tools.map((x: { name: string }) => x.name)).toContain("rodar_monitor");
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/mcp/ach_errado",
+          payload: { jsonrpc: "2.0", id: 3, method: "tools/list" },
+        })
+      ).statusCode,
+    ).toBe(401);
     const ag = (await app.inject({ url: "/agentes", headers: H })).json();
     expect(ag.agentes).toHaveLength(6);
     expect(ag.mcpUrl).toBe("https://w.test/mcp");
