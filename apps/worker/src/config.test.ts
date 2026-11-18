@@ -32,6 +32,11 @@ describe("config", () => {
     expect(opcoesSsl({ ...c, DB_SSL_MODO: "off" })).toBe(false);
     expect(opcoesSsl({ ...c, DB_SSL_MODO: "verify-full" })).not.toHaveProperty("checkServerIdentity");
   });
+  it("usa a CA da Vertra quando DB_SSL_CA_B64 não vem", () => {
+    const ssl = opcoesSsl(lerConfig(base));
+    if (!ssl) throw new Error("sem ssl");
+    expect(String(ssl.ca)).toContain("BEGIN CERTIFICATE");
+  });
   it("recusa PEM inválido", () => {
     expect(() => lerConfig({ ...base, DB_SSL_CA_B64: Buffer.from("nada").toString("base64") })).toThrow(
       /DB_SSL_CA_B64/,

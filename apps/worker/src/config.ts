@@ -1,5 +1,6 @@
 import type { ConnectionOptions } from "node:tls";
 import { z } from "zod";
+import { CA_VERTRA_AGENCIA_DB } from "./ca-vertra.js";
 
 const pemBase64 = z
   .string()
@@ -78,7 +79,7 @@ export function opcoesSsl(c: ConfigSsl): ConnectionOptions | false {
   const base: ConnectionOptions = {
     rejectUnauthorized: true,
     ...cliente,
-    ...(c.DB_SSL_CA_B64 ? { ca: c.DB_SSL_CA_B64 } : {}),
+    ca: c.DB_SSL_CA_B64 ?? CA_VERTRA_AGENCIA_DB,
   };
   // verify-ca: a cadeia é conferida contra a CA, o nome do host não.
   return c.DB_SSL_MODO === "verify-ca" ? { ...base, checkServerIdentity: () => undefined } : base;
