@@ -6,7 +6,7 @@ Sem segredos neste arquivo. Atualizado: 2026-11-18 (UTC).
 
 | Recurso | ID | Estado |
 | --- | --- | --- |
-| Imagem `openbot-vertra` | `62332720-1b88-45ee-b559-a5233bace468` | build `success`, 3.021.030.578 bytes descompactada, `auto_update_apps: false` |
+| Imagem `openbot-vertra` | `62332720-1b88-45ee-b559-a5233bace468` | v2 (com gateway) build `success` 13:41 UTC, 3.192.168.780 bytes, porta 8080, `auto_update_apps: false` |
 | App `openbot-vertra-hml` (worker, `web: false`, 1536 MB) | `11e7b75e-0c0f-4c47-9922-5b532c23dafd` | ver "Progresso" |
 
 Nenhuma aplicação existente foi alterada (revela-face-engine, wa-gateway, agencia-worker, agencia-web, agencia-db).
@@ -25,8 +25,14 @@ Nenhuma aplicação existente foi alterada (revela-face-engine, wa-gateway, agen
    `unshare --user --map-root-user true` (requisito OBRIGATÓRIO; sem isso ele encerra). `/dev/shm` ≥ 1 GiB é
    otimização (abaixo disso usa `/tmp` com `--disable-dev-shm-usage`). Estado em `$HOME` (upstream `/data`).
 5. Imagem derivada criada com sucesso (FROM digest oficial; HOME=/app; wrapper de claim). Sem `--no-sandbox`.
-6. App de homologação criada; ficou em `building` / `installing: true` por mais de 26 minutos sem log
-   (ver relatório final).
+6. App de homologação criada às 13:03 UTC como worker. Às 13:42 UTC continuava em `building` /
+   `installing: true`, sem logs e sem release. `stop`, `restart` e `publish` respondem `409 APP_BUILDING`;
+   a única ação aceita é excluir, e a chave usada não tem `apps:delete`.
+7. Pedido novo: interface web com e-mail e senha de admin + acesso por outro chat. Gateway em `gateway/`
+   (Node built-ins, MCP + REST com token, admin com scrypt). Testado localmente contra mocks do socket de
+   controle e da Local scripts API (login, CSRF, rate limit, MCP, REST, UI no Chromium). Imagem v2 construída.
+8. Próximo passo: excluir a app presa (painel ou chave com `apps:delete`) e criar `openbot-vertra` web,
+   porta 8080, 1536 MB, com as variáveis OBG_* geradas por `tools/make-credentials.mjs`.
 
 ## Retomar
 

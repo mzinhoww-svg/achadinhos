@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>OpenBot Vertra</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <strong>OpenBot · Vertra</strong>
+  <button id="logout" class="ghost" hidden>Sair</button>
+</header>
+
+<main>
+  <section id="login-view" class="card narrow" hidden>
+    <h1>Entrar</h1>
+    <form id="login-form">
+      <label>E-mail do admin<input name="email" type="email" autocomplete="username" required></label>
+      <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit">Entrar</button>
+      <p class="error" id="login-error"></p>
+    </form>
+  </section>
+
+  <div id="app-view" hidden>
+    <nav class="tabs">
+      <button data-tab="server" class="active">Servidor</button>
+      <button data-tab="agents">Agentes</button>
+      <button data-tab="access">Acesso por outro chat</button>
+    </nav>
+
+    <section id="tab-server" class="card">
+      <div class="row between"><h2>Estado do servidor</h2><button id="refresh-status" class="ghost">Atualizar</button></div>
+      <dl id="status" class="kv"></dl>
+
+      <div id="signin-box">
+        <h3>Vincular à conta OpenBot</h3>
+        <p class="muted">O OpenBot manda um código para o e-mail da conta OpenBot.</p>
+        <form id="signin-start" class="row wrap">
+          <input name="email" type="email" placeholder="e-mail da conta OpenBot" required>
+          <input name="name" placeholder="nome do servidor" value="OpenBot-Vertra" minlength="6" maxlength="32">
+          <button type="submit">Enviar código</button>
+        </form>
+        <form id="signin-verify" class="row wrap" hidden>
+          <input name="code" placeholder="código recebido" autocomplete="one-time-code" required>
+          <button type="submit">Confirmar</button>
+        </form>
+        <details>
+          <summary>Tenho um claim do app</summary>
+          <form id="signin-claim" class="row wrap">
+            <input name="claim" type="password" placeholder="claim (vale 15 min, uso único)" required>
+            <button type="submit">Usar claim</button>
+          </form>
+        </details>
+        <p class="error" id="signin-msg"></p>
+      </div>
+
+      <h3>Celular</h3>
+      <button id="mobile-connect" class="ghost">Gerar QR do Mobile Connect</button>
+      <pre id="qr" class="qr" hidden></pre>
+      <p class="muted">Uso pela web: <a href="https://openbot.run/app" target="_blank" rel="noopener">openbot.run/app</a> com a mesma conta OpenBot.</p>
+    </section>
+
+    <section id="tab-agents" class="card" hidden>
+      <div class="row between"><h2>Agentes</h2><button id="refresh-agents" class="ghost">Atualizar</button></div>
+      <p class="muted">Aparecem só os agentes com <em>Permissões › Local scripts</em> ligado (configure em openbot.run/app).</p>
+      <p class="error" id="agents-msg"></p>
+      <div class="agents-layout">
+        <ul id="agent-list" class="list"></ul>
+        <div id="chat" hidden>
+          <div class="row between"><h3 id="chat-title"></h3><button id="new-chat" class="ghost">Nova conversa</button></div>
+          <div id="messages" class="messages"></div>
+          <form id="chat-form" class="row">
+            <textarea name="text" rows="3" placeholder="Mensagem para o agente" required></textarea>
+            <button type="submit">Enviar</button>
+          </form>
+          <h4>Pendências</h4>
+          <div id="pending" class="muted">Nada pendente.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-access" class="card" hidden>
+      <h2>Acesso por outro chat</h2>
+      <p>Outro chat (Claude Code, Claude Desktop, scripts ou bots) usa o token da API, que fica guardado fora do servidor: ele não aparece aqui.</p>
+      <h3>MCP (Streamable HTTP)</h3>
+      <pre id="mcp-example"></pre>
+      <h3>REST</h3>
+      <pre id="rest-example"></pre>
+      <p class="muted">Ferramentas MCP: list_agents, send_message, get_delivery, get_pending, answer_question, new_chat, server_status. Aprovações de comandos ficam só nesta interface de admin.</p>
+    </section>
+  </div>
+</main>
+</body>
+</html>
