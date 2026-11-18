@@ -224,3 +224,15 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   chave entrar em `VERTRA_BLOB_KEY`, as novas peças vão para o Blob sem mudar o código.
 - **Deploy:** sharp, satori e resvg têm binários nativos, então ficam fora do bundle e a Vertra instala com npm.
 - **Uma renderização por vez** no worker, para não estourar a memória.
+
+## D-014 · 18/11/2026 · Erros `ERRO_SISTEMA` da Shopee
+
+- **Sintoma:** na rodada do Monitor das 16h, 4 buscas falharam com `10000` mesmo depois de 3 tentativas com cerca de
+  1,5 s de espera.
+- **Mudanças:**
+  - palavras-chave com acento vão escapadas (`á`) no GraphQL, e o corpo assinado fica só com ASCII. A
+    suspeita é de que essas buscas falham sempre, e não por acaso;
+  - `ERRO_SISTEMA` tem 4 tentativas com espera de 3 s, 6 s e 12 s;
+  - cada `marketplace.erro` traz o `alvo` (palavra ou id) para confirmar se as falhas se repetem nas mesmas palavras.
+- **Próximo passo:** conferir os eventos da próxima rodada. Se as falhas continuarem nas mesmas palavras sem acento,
+  a próxima medida é baixar `SHOPEE_POR_MINUTO`.

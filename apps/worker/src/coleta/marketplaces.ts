@@ -43,7 +43,7 @@ export function criarMarketplaces(db: Db, c: Config, fake?: FakeAdapter): Market
     ...(c.SHOPEE_ENDPOINT ? { endpoint: c.SHOPEE_ENDPOINT } : {}),
   });
   return {
-    principal: comLimite(shopee, { porMinuto: c.SHOPEE_POR_MINUTO, tentativas: 3, aoErro }),
+    principal: comLimite(shopee, { porMinuto: c.SHOPEE_POR_MINUTO, tentativas: 4, aoErro }),
     indisponivel: null,
     mercadolivre: ml,
   };

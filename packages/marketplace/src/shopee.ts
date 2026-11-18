@@ -20,6 +20,17 @@ import {
 
 export const SHOPEE_ENDPOINT = "https://open-api.affiliate.shopee.com.br/graphql";
 
+/**
+ * String literal GraphQL só com ASCII: acentos viram \uXXXX (válido no GraphQL). Mantém o corpo da chamada
+ * idêntico byte a byte ao que entra na assinatura, sem depender de como a Shopee decodifica UTF-8.
+ */
+export function literalGraphql(s: string): string {
+  return JSON.stringify(s).replace(
+    /[\u007f-\uffff]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
 /** sortType do productOfferV2: 1 relevância, 2 mais vendidos, 3 maior preço, 4 menor preço, 5 maior comissão. */
 export type OrdemShopee = 1 | 2 | 3 | 4 | 5;
 
@@ -153,7 +164,7 @@ export class ShopeeAdapter implements MarketplaceAdapter {
   async buscar(palavra: string, f: FiltrosBusca = {}): Promise<ProdutoMarketplace[]> {
     const pagina = Math.max(1, Math.trunc(f.pagina ?? 1));
     const limite = Math.min(50, Math.max(1, Math.trunc(f.limite ?? 50)));
-    const q = `{ productOfferV2(keyword: ${JSON.stringify(palavra)}, sortType: ${this.#ordem}, page: ${pagina}, limit: ${limite}) { nodes { ${CAMPOS_PRODUTO} } pageInfo { page limit hasNextPage } } }`;
+    const q = `{ productOfferV2(keyword: ${literalGraphql(palavra)}, sortType: ${this.#ordem}, page: ${pagina}, limit: ${limite}) { nodes { ${CAMPOS_PRODUTO} } pageInfo { page limit hasNextPage } } }`;
     const dados = (await this.#consultar(q)) as { productOfferV2?: { nodes?: NoShopee[] } };
     const nos = dados.productOfferV2?.nodes ?? [];
     return filtrarPorPreco(
@@ -186,7 +197,7 @@ export class ShopeeAdapter implements MarketplaceAdapter {
     if (subIds.length > 5) throw new ErroMarketplace("no máximo 5 subIds", "ENTRADA", false);
     // A Shopee aceita subId alfanumérico (sem espaço nem símbolo).
     const limpos = subIds.map((s) => s.replace(/[^A-Za-z0-9]/g, "").slice(0, 50));
-    const q = `mutation { generateShortLink(input: { originUrl: ${JSON.stringify(url)}, subIds: ${JSON.stringify(limpos)} }) { shortLink } }`;
+    const q = `mutation { generateShortLink(input: { originUrl: ${literalGraphql(url)}, subIds: ${JSON.stringify(limpos)} }) { shortLink } }`;
     const dados = (await this.#consultar(q)) as { generateShortLink?: { shortLink?: unknown } };
     const link = dados.generateShortLink?.shortLink;
     if (typeof link !== "string" || !link.startsWith("https://")) {

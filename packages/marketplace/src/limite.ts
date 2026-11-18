@@ -14,6 +14,8 @@ export interface FalhaMarketplace {
   mensagem: string;
   vaiTentarDeNovo: boolean;
   esperaMs: number;
+  /** Palavra-chave ou id do produto, para achar padrões nas falhas. */
+  alvo?: string;
 }
 
 export interface OpcoesLimite {
@@ -60,7 +62,11 @@ export function comLimite<A extends MarketplaceAdapter>(adapter: A, o: OpcoesLim
     return vez;
   }
 
-  async function executar<T>(metodo: FalhaMarketplace["metodo"], chamada: () => Promise<T>): Promise<T> {
+  async function executar<T>(
+    metodo: FalhaMarketplace["metodo"],
+    chamada: () => Promise<T>,
+    alvo?: string,
+  ): Promise<T> {
     for (let n = 1; ; n++) {
       await pegarFicha();
       try {
@@ -71,8 +77,10 @@ export function comLimite<A extends MarketplaceAdapter>(adapter: A, o: OpcoesLim
             ? e
             : new ErroMarketplace(e instanceof Error ? e.message : String(e), "DESCONHECIDO", false);
         const repetir = erro.recuperavel && n < tentativas;
-        // Limite de taxa espera mais; jitter evita que várias chamadas voltem juntas.
-        const fator = erro.codigo === "LIMITE_TAXA" || erro.status === 429 ? 5 : 1;
+        // Limite de taxa espera mais; erro do sistema da Shopee também (ela se recupera em segundos).
+        // O jitter evita que várias chamadas voltem juntas.
+        const fator =
+          erro.codigo === "LIMITE_TAXA" || erro.status === 429 ? 5 : erro.codigo === "ERRO_SISTEMA" ? 3 : 1;
         const espera = repetir ? Math.min(teto, base * fator * 2 ** (n - 1) * (0.75 + aleatorio() * 0.5)) : 0;
         await o.aoErro?.({
           marketplace: adapter.nome,
@@ -82,6 +90,7 @@ export function comLimite<A extends MarketplaceAdapter>(adapter: A, o: OpcoesLim
           mensagem: erro.message,
           vaiTentarDeNovo: repetir,
           esperaMs: Math.round(espera),
+          ...(alvo ? { alvo: alvo.slice(0, 80) } : {}),
         });
         if (!repetir) throw erro;
         await dormir(espera);
@@ -90,10 +99,13 @@ export function comLimite<A extends MarketplaceAdapter>(adapter: A, o: OpcoesLim
   }
 
   const envolvido = Object.create(adapter) as A;
-  envolvido.buscar = (palavra, filtros) => executar("buscar", () => adapter.buscar(palavra, filtros));
+  envolvido.buscar = (palavra, filtros) =>
+    executar("buscar", () => adapter.buscar(palavra, filtros), palavra);
   envolvido.detalhe = ((id: string, ...resto: unknown[]) =>
-    executar("detalhe", () =>
-      (adapter.detalhe as (id: string, ...r: unknown[]) => ReturnType<A["detalhe"]>)(id, ...resto),
+    executar(
+      "detalhe",
+      () => (adapter.detalhe as (id: string, ...r: unknown[]) => ReturnType<A["detalhe"]>)(id, ...resto),
+      id,
     )) as A["detalhe"];
   envolvido.gerarLinkAfiliado = (url, subIds) =>
     executar("gerarLinkAfiliado", () => adapter.gerarLinkAfiliado(url, subIds));

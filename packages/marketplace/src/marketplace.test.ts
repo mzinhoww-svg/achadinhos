@@ -52,7 +52,7 @@ describe("ShopeeAdapter", () => {
     const corpo = String(p.init.body);
     expect(JSON.parse(corpo)).not.toHaveProperty("variables");
     expect(JSON.parse(corpo).query).toContain(
-      'keyword: "pote \\"hermético\\"", sortType: 1, page: 2, limit: 20',
+      'keyword: "pote \\"herm\\u00e9tico\\"", sortType: 1, page: 2, limit: 20',
     );
     const h = (p.init.headers as Record<string, string>).authorization;
     expect(h).toBe(
@@ -214,5 +214,15 @@ describe("FakeAdapter e Mercado Livre", () => {
       status: 501,
       codigo: "NAO_IMPLEMENTADO",
     });
+  });
+});
+
+describe("literal GraphQL", () => {
+  it("escapa acentos como \\uXXXX e o GraphQL lê de volta o mesmo texto", async () => {
+    const { literalGraphql } = await import("./shopee.ts");
+    const l = literalGraphql('luminária "led"');
+    expect(l).toBe('"lumin\\u00e1ria \\"led\\""');
+    expect(/^[\x20-\x7e]*$/.test(l)).toBe(true);
+    expect(JSON.parse(l)).toBe('luminária "led"');
   });
 });
