@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vertracloud-local": {
+      "command": "npx",
+      "args": ["-y", "@vertracloud/mcp@0.3.6"],
+      "env": { "VERTRA_API_KEY": "${VERTRA_API_KEY}" }
+    }
+  }
+}
