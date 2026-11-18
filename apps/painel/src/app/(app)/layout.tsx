@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BarraLateral, MenuCelular } from "@/components/navegacao";
 import { Button } from "@/components/ui/button";
 import { exigirSessao } from "@/lib/auth";
 import { sair } from "../login/acoes";
@@ -9,16 +10,14 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   const sessao = await exigirSessao();
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
-          <nav className="flex items-center gap-4">
-            <Link href="/biblia" className="font-semibold text-primary">
+      <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
+        <div className="flex h-14 items-center justify-between gap-3 px-4">
+          <div className="flex items-center gap-2">
+            <MenuCelular />
+            <Link href="/" className="font-semibold text-primary">
               Achadinhos
             </Link>
-            <Link href="/biblia" className="text-sm text-muted-foreground hover:text-foreground">
-              Bíblia
-            </Link>
-          </nav>
+          </div>
           <form action={sair} className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">{sessao.nome}</span>
             <Button type="submit" variant="ghost" size="sm">
@@ -27,7 +26,10 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           </form>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <div className="flex">
+        <BarraLateral />
+        <main className="mx-auto w-full max-w-5xl min-w-0 px-4 py-6">{children}</main>
+      </div>
     </div>
   );
 }

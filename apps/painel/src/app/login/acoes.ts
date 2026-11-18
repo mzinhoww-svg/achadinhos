@@ -29,7 +29,7 @@ export async function entrar(_anterior: EstadoLogin, form: FormData): Promise<Es
     if (e instanceof ErroWorker && (e.status === 401 || e.status === 429)) return { erro: e.message, email };
     return { erro: e instanceof Error ? e.message : "Não foi possível entrar.", email };
   }
-  redirect("/biblia");
+  redirect("/");
 }
 
 export async function sair() {

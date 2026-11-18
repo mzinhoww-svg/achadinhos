@@ -1,5 +1,5 @@
 import "server-only";
-import type { DocBiblia, ResumoDocBiblia } from "@achadinhos/shared";
+import type { DocBiblia, Evento, Proposta, ResumoDocBiblia } from "@achadinhos/shared";
 import { env } from "./env";
 
 /** Cliente do worker, só no servidor: o SERVICE_TOKEN nunca vai para o navegador. */
@@ -12,7 +12,7 @@ export class ErroWorker extends Error {
   }
 }
 
-function config() {
+export function configWorker() {
   const url = env("WORKER_URL");
   const token = env("SERVICE_TOKEN");
   if (!url || !token) throw new ErroWorker("WORKER_URL ou SERVICE_TOKEN não configurados no painel.", 500);
@@ -20,7 +20,7 @@ function config() {
 }
 
 async function chamar<T>(caminho: string, init: RequestInit = {}): Promise<T> {
-  const { url, token } = config();
+  const { url, token } = configWorker();
   let res: Response;
   try {
     res = await fetch(`${url}${caminho}`, {
@@ -48,4 +48,12 @@ export const worker = {
     chamar<DocBiblia>(`/biblia/${encodeURIComponent(slug)}${versao ? `?versao=${versao}` : ""}`),
   versoes: (slug: string) =>
     chamar<{ versoes: Omit<DocBiblia, "conteudo">[] }>(`/biblia/${encodeURIComponent(slug)}/versoes`),
+  listarPropostas: (status?: Proposta["status"]) =>
+    chamar<{ propostas: Proposta[] }>(`/propostas${status ? `?status=${status}` : ""}`),
+  decidirProposta: (id: number, decisao: "aprovada" | "rejeitada", decididoPor: string) =>
+    chamar<{ proposta: Proposta; doc: DocBiblia | null }>(`/propostas/${id}/decidir`, {
+      method: "POST",
+      body: JSON.stringify({ decisao, decididoPor }),
+    }),
+  listarEventos: (limite = 50) => chamar<{ eventos: Evento[] }>(`/eventos?limite=${limite}`),
 };

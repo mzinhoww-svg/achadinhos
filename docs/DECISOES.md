@@ -3,11 +3,13 @@
 Cada decisão com data, o que foi decidido e por quê. A mais nova fica no fim.
 
 ## D-001 · 18/11/2026 · Recomeçar o repositório do zero
+
 O repositório tinha um monorepo anterior (apps/web, apps/worker, Supabase, Telegram). Questionado, o Aurimar escolheu
 "começar do zero". O código antigo foi removido e continua no histórico do git (último estado: `main` em `4a06e99`).
 O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servidor-docker/`.
 
 ## D-002 · Monorepo pnpm + Turborepo, TypeScript estrito, Biome
+
 - `apps/painel` (Next.js 16, App Router), `apps/worker` (Fastify 5 + pg-boss 12), `packages/db` (Drizzle),
   `packages/shared` (tipos e zod), `packages/llm`, mais as pastas `openbot/`, `pacote/` e `docs/`.
 - Lint e formatação com Biome: uma dependência só, rápido, e cobre os dois. O CI roda lint, typecheck, testes (com
@@ -15,6 +17,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - Node 22 (a Vertra oferece 22.23.5). Versões das dependências fixadas, sem `^`.
 
 ## D-003 · Banco: schema `achadinhos` no Postgres `agencia-db`
+
 - Todas as tabelas de `pacote/CONTRATO.md` ficam no schema `achadinhos`. Foram incluídas três a mais: `admins` (login do
   painel), `chamadas_pagas` (capacidade 7: custo e chave idempotente de toda chamada paga) e `__migracoes` (controle
   das migrações).
@@ -29,6 +32,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   removido, porque no `pg` ele sobrescreve a opção TLS do código.
 
 ## D-004 · Worker
+
 - Rotas prontas: `/health`, `/biblia`, `/propostas`, `/eventos` e `/eventos/stream` (SSE via LISTEN/NOTIFY; o gatilho
   manda só o id do evento). As demais ferramentas do contrato respondem 501 com o motivo (capacidade 9). Detalhes em
   `docs/WORKER-API.md`.
@@ -42,6 +46,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - O deploy é um único `worker.mjs` (esbuild) mais as migrações. Não há `node_modules` nem instalação na Vertra.
 
 ## D-005 · Painel
+
 - O painel não acessa o banco: tudo passa pelo worker, com o `SERVICE_TOKEN` só no servidor do Next.
 - Login: o worker confere a senha (scrypt, limite de 5 tentativas a cada 15 min por e-mail). O painel guarda a sessão
   num cookie assinado com HMAC-SHA256 (`AUTH_SECRET`), HttpOnly, com 12 h de validade.
@@ -51,6 +56,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   bíblia é renderizado com `markdown-it` com HTML desligado: é seguro e mais leve que o react-markdown.
 
 ## D-006 · Deploy na Vertra (runtime Node nativo, sem imagem própria)
+
 - Apps: `achadinhos-worker` (512 MB, `https://achadinhos-worker.vertraweb.app`) e `achadinhos-painel` (768 MB,
   `https://achadinhos-painel.vertraweb.app`). Os nomes levam o prefixo para não confundir com `agencia-worker`.
 - O painel precisou de 768 MB: com 512 MB, o `npm install` da Vertra estourava a memória (`INSTALL_OUT_OF_MEMORY`).
@@ -65,6 +71,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   pastas.
 
 ## D-007 · OpenBot no computador do Aurimar (a Vertra recusa o container)
+
 - A Vertra recusa user namespaces e não oferece seccomp próprio, então o container oficial não sobe. A evidência está em
   `openbot/servidor-docker/CONTINGENCIA.md`. O OpenBot roda no aplicativo do Mac do Aurimar, que precisa ficar ligado
   nos horários de envio.
@@ -75,6 +82,7 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   revise a licença.
 
 ## D-008 · Como o OpenBot funciona (estudado no README e em `docs/` do nightly-labs/openbot, versão 0.73.0)
+
 - **Agentes:** são criados conversando com um agente (`openbot.create_agent`: nome, instruções, primeira tarefa e,
   opcionalmente, provedor, modelo e esforço) e editados com `openbot.update_profile`. Cada um tem workspace próprio,
   fila de mensagens, memória e conversa com os outros agentes.
@@ -83,8 +91,8 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   2. O **terminal** do agente no workspace (HTTP com `curl`).
   3. **Skills/plugins** em pastas como `.agents/skills`.
   4. **ACP**, para agentes próprios.
-  Por ora, os agentes chamam o worker por HTTP com o header `X-Service-Token`. Próximo passo sugerido: o worker expor
-  `/mcp`, para as ferramentas aparecerem nativas.
+     Por ora, os agentes chamam o worker por HTTP com o header `X-Service-Token`. Próximo passo sugerido: o worker expor
+     `/mcp`, para as ferramentas aparecerem nativas.
 - **Credenciais:** ficam no cofre do OpenBot (chaves que o agente pede com `request_api_key`). O `SERVICE_TOKEN` vai lá,
   nunca na bíblia nem no chat.
 - **OpenRouter:** isto corrige o pacote. Na versão atual, o OpenRouter **é provedor nativo**, só com chave (pelo
@@ -99,8 +107,22 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
   - No mesmo computador também existe a "Local scripts API" (127.0.0.1), por agente.
 
 ## D-009 · Segurança
+
 - Nenhum segredo no git: `.env*` estão no `.gitignore`, e `.env.example` só tem os nomes.
 - Ao consultar o banco pelo conector da Vertra (`get_connection_info`), a resposta trouxe também a chave privada do
   certificado de cliente do Postgres. Ela não foi gravada em nenhum arquivo. Esse certificado é o mesmo das apps da
   agência; rotacioná-lo (`reset_certificate`) exigiria atualizar as variáveis delas. **Decisão do Aurimar.**
 - A chave da API da Vertra usada no deploy está como segredo de rede do ambiente cloud `achadinhos`, nunca em arquivo.
+
+## D-010 · 18/11/2026 · Painel: entrevista (Parte 1C) e esqueleto navegável
+- Respostas do Aurimar e mapa de telas em `docs/PAINEL.md`, aprovado.
+  - Visão geral com PAUSAR, ofertas, cliques e conversões, alertas e custos.
+  - Ofertas só para consulta. Checagens com proposta de ajuste de regra.
+  - Nichos e grupos com edição direta. Chips com troca do ativo, QR e histórico de quedas.
+  - Números com 7 dias por padrão e recortes por nicho, grupo, horário e oferta. Log em tempo real.
+  - Visual limpo e neutro, com menu lateral no celular.
+- As 11 telas estão publicadas. As que dependem de ferramentas ainda não construídas usam dados falsos de
+  `apps/painel/src/lib/demo.ts` e mostram a faixa "Demonstração".
+- Já são reais: a Bíblia (documentos e a nova aba Propostas, com aprovar e recusar) e o Log dos agentes. O Log usa o
+  fluxo `/eventos/stream` do worker, repassado pelo painel em `/api/eventos/stream`, para o token não ir ao navegador.
+- O menu do celular abre num portal no `body`: o `backdrop-blur` do cabeçalho prendia a gaveta `fixed` dentro dele.

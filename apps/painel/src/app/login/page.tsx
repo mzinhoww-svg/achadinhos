@@ -5,7 +5,7 @@ import { FormLogin } from "./form";
 export const dynamic = "force-dynamic";
 
 export default async function PaginaLogin() {
-  if (await sessaoAtual()) redirect("/biblia");
+  if (await sessaoAtual()) redirect("/");
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-5">
       <div>

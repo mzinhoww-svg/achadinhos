@@ -1,10 +1,10 @@
 # Deploy na Vertra
 
-| App | URL | Memória | Como sobe |
-| --- | --- | --- | --- |
-| `achadinhos-worker` | https://achadinhos-worker.vertraweb.app | 512 MB | `node worker.mjs` (arquivo único, sem instalação) |
-| `achadinhos-painel` | https://achadinhos-painel.vertraweb.app | 768 MB | `npm install` → `npm run build` → `npm start` |
-| `wa-gateway` (já existia) | https://wa-gateway-revela.vertraweb.app | 512 MB | — |
+| App                       | URL                                     | Memória | Como sobe                                         |
+| ------------------------- | --------------------------------------- | ------- | ------------------------------------------------- |
+| `achadinhos-worker`       | https://achadinhos-worker.vertraweb.app | 512 MB  | `node worker.mjs` (arquivo único, sem instalação) |
+| `achadinhos-painel`       | https://achadinhos-painel.vertraweb.app | 768 MB  | `npm install` → `npm run build` → `npm start`     |
+| `wa-gateway` (já existia) | https://wa-gateway-revela.vertraweb.app | 512 MB  | —                                                 |
 
 Saúde: `GET /health` (worker) e `GET /api/health` (painel). Os dois respondem 200, com `ok` e o motivo no corpo.
 
@@ -14,6 +14,7 @@ As variáveis já existem nas apps com o valor `PENDENTE`. Troque pelo valor rea
 Variáveis) e reinicie a app.
 
 ### Gere dois segredos no seu computador
+
 No Terminal do Mac:
 
 ```sh
@@ -23,26 +24,26 @@ openssl rand -hex 32   # AUTH_SECRET    (só no painel)
 
 ### `achadinhos-worker`
 
-| Variável | Valor |
-| --- | --- |
-| `DATABASE_URL` | `postgresql://USUARIO:SENHA@38496aaf14b145da9f2eb78e85297dec.db.usa1.vertraweb.app:51775/vertracloud` (veja o passo 2) |
-| `DB_SSL_CA_B64`, `DB_SSL_CERT_B64`, `DB_SSL_KEY_B64` | Os mesmos valores das variáveis de mesmo nome da app `agencia-worker` (certificados do banco) |
-| `DB_SSL_MODO` | já preenchida: `verify-ca` |
-| `SERVICE_TOKEN` | o primeiro valor gerado acima |
-| `ADMIN_EMAIL` | o seu e-mail de login no painel |
-| `ADMIN_SENHA_INICIAL` | uma senha de 12 ou mais caracteres. **Apague depois do primeiro login.** |
-| `OPENROUTER_API_KEY` | a chave do OpenRouter, com limite mensal de gasto |
-| `SHOPEE_APP_ID`, `SHOPEE_SECRET` | credenciais da Open API de Afiliados da Shopee |
-| `WA_GATEWAY_TOKEN` | o token de acesso do wa-gateway |
-| `WA_GATEWAY_URL` | já preenchida |
+| Variável                                             | Valor                                                                                                                  |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                       | `postgresql://USUARIO:SENHA@38496aaf14b145da9f2eb78e85297dec.db.usa1.vertraweb.app:51775/vertracloud` (veja o passo 2) |
+| `DB_SSL_CA_B64`, `DB_SSL_CERT_B64`, `DB_SSL_KEY_B64` | Os mesmos valores das variáveis de mesmo nome da app `agencia-worker` (certificados do banco)                          |
+| `DB_SSL_MODO`                                        | já preenchida: `verify-ca`                                                                                             |
+| `SERVICE_TOKEN`                                      | o primeiro valor gerado acima                                                                                          |
+| `ADMIN_EMAIL`                                        | o seu e-mail de login no painel                                                                                        |
+| `ADMIN_SENHA_INICIAL`                                | uma senha de 12 ou mais caracteres. **Apague depois do primeiro login.**                                               |
+| `OPENROUTER_API_KEY`                                 | a chave do OpenRouter, com limite mensal de gasto                                                                      |
+| `SHOPEE_APP_ID`, `SHOPEE_SECRET`                     | credenciais da Open API de Afiliados da Shopee                                                                         |
+| `WA_GATEWAY_TOKEN`                                   | o token de acesso do wa-gateway                                                                                        |
+| `WA_GATEWAY_URL`                                     | já preenchida                                                                                                          |
 
 ### `achadinhos-painel`
 
-| Variável | Valor |
-| --- | --- |
-| `SERVICE_TOKEN` | o mesmo do worker |
-| `AUTH_SECRET` | o segundo valor gerado acima |
-| `WORKER_URL` | já preenchida |
+| Variável        | Valor                        |
+| --------------- | ---------------------------- |
+| `SERVICE_TOKEN` | o mesmo do worker            |
+| `AUTH_SECRET`   | o segundo valor gerado acima |
+| `WORKER_URL`    | já preenchida                |
 
 ## 2 · Usuário do banco (recomendado)
 

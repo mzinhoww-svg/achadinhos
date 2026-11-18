@@ -5,11 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { dataHora } from "@/lib/utils";
 import { worker } from "@/lib/worker";
+import { AbasBiblia } from "./abas";
 
 export const dynamic = "force-dynamic";
 
 export default async function PaginaBiblia() {
-  const { documentos } = await worker.listarBiblia();
+  const [{ documentos }, { propostas }] = await Promise.all([
+    worker.listarBiblia(),
+    worker.listarPropostas("aberta").catch(() => ({ propostas: [] })),
+  ]);
   const porSlug = new Map(documentos.map((d) => [d.slug, d]));
   // Os 11 do pacote primeiro, na ordem do pacote; depois qualquer outro que o Coordenador criar.
   const extras = documentos.filter((d) => !(DOCS_BIBLIA as readonly string[]).includes(d.slug));
@@ -27,6 +31,8 @@ export default async function PaginaBiblia() {
           {escritos} de {DOCS_BIBLIA.length} documentos escritos. Quem escreve é o Coordenador, no OpenBot.
         </p>
       </div>
+
+      <AbasBiblia ativo="docs" abertas={propostas.length} />
 
       {escritos === 0 ? (
         <Card className="p-6 text-sm text-muted-foreground">

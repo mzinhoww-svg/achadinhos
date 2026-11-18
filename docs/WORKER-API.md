@@ -6,20 +6,20 @@ Entrada inválida responde 400 com `detalhes`. A lista viva fica em `GET /ferram
 
 ## Prontas
 
-| Método e rota | Quem chama | O que faz |
-| --- | --- | --- |
-| `GET /health` | todos | `{ ok, banco, fila, listen, pronto, erro }`, sempre 200 |
-| `GET /biblia` | todos | Última versão de cada documento (sem o conteúdo) |
-| `GET /biblia/:slug[?versao=N]` | todos | Um documento (atual ou versão N) |
-| `GET /biblia/:slug/versoes` | todos | Histórico de versões |
-| `POST /biblia` | Coordenador | Nova versão: `{ slug, titulo?, conteudo, autor, motivo? }` → 201 |
-| `GET /propostas[?status=aberta]` | todos | Propostas |
-| `POST /propostas` | todos | `{ titulo, descricao, autor, docSlug?, conteudoProposto? }` → 201 |
-| `POST /propostas/:id/decidir` | Coordenador, Aurimar | `{ decisao: "aprovada"\|"rejeitada", decididoPor, comentario? }`. Aprovada com documento grava a nova versão da bíblia. |
-| `POST /eventos` | todos | `{ tipo: "oferta.criada", agente, dados?, ofertaId? }` → 201 |
-| `GET /eventos[?desde=ID&tipo=&limite=]` | todos | Eventos (com `desde`, em ordem crescente) |
-| `GET /eventos/stream[?desde=ID]` | painel, agentes | Fluxo SSE em tempo real (LISTEN/NOTIFY) |
-| `POST /auth/login` | painel | Confere a senha do admin |
+| Método e rota                           | Quem chama           | O que faz                                                                                                               |
+| --------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                           | todos                | `{ ok, banco, fila, listen, pronto, erro }`, sempre 200                                                                 |
+| `GET /biblia`                           | todos                | Última versão de cada documento (sem o conteúdo)                                                                        |
+| `GET /biblia/:slug[?versao=N]`          | todos                | Um documento (atual ou versão N)                                                                                        |
+| `GET /biblia/:slug/versoes`             | todos                | Histórico de versões                                                                                                    |
+| `POST /biblia`                          | Coordenador          | Nova versão: `{ slug, titulo?, conteudo, autor, motivo? }` → 201                                                        |
+| `GET /propostas[?status=aberta]`        | todos                | Propostas                                                                                                               |
+| `POST /propostas`                       | todos                | `{ titulo, descricao, autor, docSlug?, conteudoProposto? }` → 201                                                       |
+| `POST /propostas/:id/decidir`           | Coordenador, Aurimar | `{ decisao: "aprovada"\|"rejeitada", decididoPor, comentario? }`. Aprovada com documento grava a nova versão da bíblia. |
+| `POST /eventos`                         | todos                | `{ tipo: "oferta.criada", agente, dados?, ofertaId? }` → 201                                                            |
+| `GET /eventos[?desde=ID&tipo=&limite=]` | todos                | Eventos (com `desde`, em ordem crescente)                                                                               |
+| `GET /eventos/stream[?desde=ID]`        | painel, agentes      | Fluxo SSE em tempo real (LISTEN/NOTIFY)                                                                                 |
+| `POST /auth/login`                      | painel               | Confere a senha do admin                                                                                                |
 
 O slug aceita `TOM-DE-VOZ` ou `tom-de-voz.md`. Os 11 documentos esperados estão em `packages/shared/src/biblia.ts`.
 
