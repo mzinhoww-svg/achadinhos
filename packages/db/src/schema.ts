@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
@@ -120,9 +121,13 @@ export const nichos = achadinhos.table("nichos", {
   ativo: boolean("ativo").notNull().default(true),
   precoMin: numeric("preco_min", { precision: 12, scale: 2 }),
   precoMax: numeric("preco_max", { precision: 12, scale: 2 }),
-  marketplace: text("marketplace", { enum: ["shopee", "mercadolivre"] })
+  marketplace: text("marketplace", { enum: ["shopee", "mercadolivre", "fake"] })
     .notNull()
     .default("shopee"),
+  /** Oferta real: preço pelo menos X% abaixo da mediana de 30 dias (padrão 15). */
+  descontoMinPct: numeric("desconto_min_pct", { precision: 5, scale: 2 }).notNull().default("15"),
+  avaliacaoMin: numeric("avaliacao_min", { precision: 3, scale: 2 }).notNull().default("4.5"),
+  vendasMin: integer("vendas_min").notNull().default(50),
   criadoEm: criadoEm(),
 });
 
@@ -173,20 +178,35 @@ export const produtos = achadinhos.table(
   "produtos",
   {
     id: id(),
-    marketplace: text("marketplace", { enum: ["shopee", "mercadolivre"] }).notNull(),
+    marketplace: text("marketplace", { enum: ["shopee", "mercadolivre", "fake"] }).notNull(),
     idExterno: text("id_externo").notNull(),
     lojaId: text("loja_id"),
+    lojaNome: text("loja_nome"),
     nome: text("nome").notNull(),
     marca: text("marca"),
     url: text("url").notNull(),
+    /** Link de afiliado devolvido na busca (Shopee: offerLink). O link curto com subIds é gerado no envio. */
+    linkAfiliado: text("link_afiliado"),
     fotoUrl: text("foto_url"),
+    precoAtual: numeric("preco_atual", { precision: 12, scale: 2 }),
+    precoMax: numeric("preco_max", { precision: 12, scale: 2 }),
+    descontoAnunciado: numeric("desconto_anunciado", { precision: 5, scale: 4 }),
     avaliacao: numeric("avaliacao", { precision: 3, scale: 2 }),
     vendas: integer("vendas"),
+    comissaoTaxa: numeric("comissao_taxa", { precision: 6, scale: 4 }),
+    comissaoValor: numeric("comissao_valor", { precision: 12, scale: 2 }),
+    emEstoque: boolean("em_estoque"),
+    /** O Monitor só atualiza os acompanhados. */
+    acompanhado: boolean("acompanhado").notNull().default(true),
     nichoId: ref("nicho_id").references(() => nichos.id),
+    ultimaColetaEm: timestamp("ultima_coleta_em", { withTimezone: true }),
     criadoEm: criadoEm(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("produtos_marketplace_externo").on(t.marketplace, t.idExterno)],
+  (t) => [
+    uniqueIndex("produtos_marketplace_externo").on(t.marketplace, t.idExterno),
+    index("produtos_monitor").on(t.acompanhado, t.ultimaColetaEm),
+  ],
 );
 
 export const historicoPrecos = achadinhos.table(
@@ -215,6 +235,9 @@ export const ofertas = achadinhos.table(
     preco: numeric("preco", { precision: 12, scale: 2 }).notNull(),
     medianaPreco30d: numeric("mediana_preco_30d", { precision: 12, scale: 2 }),
     descontoPct: numeric("desconto_pct", { precision: 5, scale: 2 }),
+    comissaoTaxa: numeric("comissao_taxa", { precision: 6, scale: 4 }),
+    /** 0 a 100: desconto real, comissão, vendas e nota (as maiores saem primeiro). */
+    pontuacao: numeric("pontuacao", { precision: 5, scale: 2 }),
     status: text("status", {
       enum: ["candidata", "aprovada", "reprovada", "agendada", "enviada", "expirada"],
     })
@@ -223,7 +246,14 @@ export const ofertas = achadinhos.table(
     motivoReprovacao: text("motivo_reprovacao"),
     criadoEm: criadoEm(),
   },
-  (t) => [index("ofertas_status").on(t.status, t.criadoEm)],
+  (t) => [
+    index("ofertas_status").on(t.status, t.criadoEm),
+    index("ofertas_pontuacao").on(t.status, t.pontuacao),
+    // No máximo uma oferta aberta por produto.
+    uniqueIndex("ofertas_produto_aberta")
+      .on(t.produtoId)
+      .where(sql`status in ('candidata', 'aprovada', 'agendada')`),
+  ],
 );
 
 export const imagens = achadinhos.table("imagens", {
@@ -285,7 +315,7 @@ export const conversoes = achadinhos.table(
   "conversoes",
   {
     id: id(),
-    marketplace: text("marketplace", { enum: ["shopee", "mercadolivre"] }).notNull(),
+    marketplace: text("marketplace", { enum: ["shopee", "mercadolivre", "fake"] }).notNull(),
     pedidoExterno: text("pedido_externo").notNull(),
     linkId: ref("link_id").references(() => links.id),
     subIds: jsonb("sub_ids").$type<Record<string, string>>().notNull().default({}),

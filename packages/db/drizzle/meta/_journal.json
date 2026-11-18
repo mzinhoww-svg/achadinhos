@@ -15,6 +15,13 @@
       "when": 1795016801523,
       "tag": "0001_eventos_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795023179328,
+      "tag": "0002_coleta_precos",
+      "breakpoints": true
     }
   ]
 }

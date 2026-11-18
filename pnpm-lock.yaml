@@ -84,6 +84,9 @@ importers:
       '@achadinhos/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@achadinhos/marketplace':
+        specifier: workspace:*
+        version: link:../../packages/marketplace
       '@achadinhos/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -133,6 +136,12 @@ importers:
         version: 0.31.11
 
   packages/llm:
+    devDependencies:
+      vitest:
+        specifier: 5.1.1
+        version: 5.1.1(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(vite@8.3.8(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/marketplace:
     devDependencies:
       vitest:
         specifier: 5.1.1

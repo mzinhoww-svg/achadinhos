@@ -127,3 +127,60 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - Já são reais: a Bíblia (documentos e a nova aba Propostas, com aprovar e recusar) e o Log dos agentes. O Log usa o
   fluxo `/eventos/stream` do worker, repassado pelo painel em `/api/eventos/stream`, para o token não ir ao navegador.
 - O menu do celular abre num portal no `body`: o `backdrop-blur` do cabeçalho prendia a gaveta `fixed` dentro dele.
+
+## D-011 · 18/11/2026 · Coleta (Garimpeiro) e preços (Monitor), Prompt 2
+
+- **Adaptadores** (`packages/marketplace`): uma interface `MarketplaceAdapter` com `buscar`, `detalhe` e
+  `gerarLinkAfiliado`. Implementações:
+  - `shopee`: Open API de Afiliados, GraphQL;
+  - `mercadolivre`: stub que responde 501 (fase 2);
+  - `fake`: dados fixos, com `definirPreco` para simular quedas.
+- **Shopee, documento GraphQL:** argumentos inline e corpo só com `query`, sem `variables`. O projeto anterior usava
+  variáveis tipadas (`$itemId: Int`) e recebia `10010` (parse) da API real; o `itemId` da Shopee passa de 32 bits.
+  Strings vão escapadas com `JSON.stringify`. Isso ainda precisa ser confirmado na API real, com as chaves do Aurimar.
+- **Shopee, segurança:**
+  - assinatura `SHA256 Credential=<appId>, Timestamp=<s>, Signature=sha256(appId+ts+corpo+secret)`;
+  - endpoint conferido antes de assinar (só `*.shopee.com.br`, ou loopback para o servidor simulado);
+  - `redirect: "manual"`;
+  - timeout e teto de 2 MB na resposta;
+  - o Secret nunca aparece em log nem em JSON.
+- **Erros da Shopee:**
+  - recuperáveis: `10030` (limite de taxa), `10000` (sistema), 429 e 5xx;
+  - definitivos: `10020` (assinatura), `10010` (consulta), `10035` (sem acesso à Open API).
+- **Limite e retry (T2.5):** balde de fichas por adaptador; padrão de 30 chamadas por minuto (`SHOPEE_POR_MINUTO`).
+  O limite real da Shopee não está publicado; 30/min dá 1800/h, abaixo dos 2000/h que circulam como referência.
+  - São até 3 tentativas, com espera crescente e jitter; limite de taxa espera 5 vezes mais.
+  - Toda falha vira o evento `marketplace.erro`.
+- **Link de afiliado:**
+  - a coleta guarda o `offerLink` que a Shopee já devolve na busca, sem chamada extra;
+  - o link curto com subIds (grupo, nicho, oferta, horário: capacidade 13) vem de `generateShortLink` na hora do
+    envio, porque depende do grupo;
+  - a Shopee aceita até 5 subIds, só alfanuméricos.
+- **Monitor (T2.3):** job no pg-boss, fila `monitor-precos` (`singleton`), cron `0 */2 * * *` no fuso de São Paulo.
+  Para gastar menos chamadas, ele:
+  1. refaz as buscas dos nichos (uma chamada atualiza até 50 produtos);
+  2. consulta um a um, até 100 por rodada, só os que a busca não trouxe;
+  3. para de acompanhar o produto que sumiu do marketplace.
+
+  Repetir o mesmo preço em menos de 60 minutos não gera nova linha no histórico.
+- **Oferta real (T2.4):** preço atual pelo menos X% abaixo da mediana dos últimos 30 dias.
+  - X é do nicho, padrão 15.
+  - A observação atual fica fora da mediana, para a própria queda não puxar a referência.
+  - Avaliação mínima é 4,5 e vendas mínimas são 50, por nicho.
+  - "Histórico suficiente" significa 4 observações anteriores e a mais antiga com 3 dias ou mais
+    (`HISTORICO_MIN_AMOSTRAS` e `HISTORICO_MIN_DIAS`). Logo, um produto novo leva cerca de 3 dias para poder virar
+    oferta.
+  - No máximo uma oferta aberta por produto, garantida por índice único parcial no banco.
+- **Pontuação (T2.7), de 0 a 100:**
+
+  | Componente          | Peso | Cheio quando |
+  | ------------------- | ---- | ------------ |
+  | Desconto real       | 45   | 50%          |
+  | Comissão            | 25   | 15%          |
+  | Vendas (escala log) | 15   | 10 mil       |
+  | Nota                | 15   | de 4,0 a 5,0 |
+
+  `GET /ofertas` ordena pela pontuação.
+- **Nichos:** a rota `POST /nichos` não está no contrato original; foi criada porque a coleta precisa de nichos
+  cadastrados (o Coordenador cadastra a partir de NICHOS.md). As rotas novas estão documentadas em
+  `docs/WORKER-API.md`.

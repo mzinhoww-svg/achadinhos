@@ -12,6 +12,9 @@ import {
 import { eq, sql } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
+import type { Marketplaces } from "./coleta/marketplaces.js";
+import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
+import { rotasColeta } from "./coleta/rotas.js";
 import type { OuvinteEventos } from "./ouvinte.js";
 import { conferirSenha } from "./senha.js";
 import {
@@ -38,6 +41,9 @@ export interface DepsApp {
   logLevel?: string;
   /** Pg-boss, LISTEN e a preparação do banco entram no /health. `pronto: false` responde 503 nas rotas. */
   estado?: () => { fila: boolean; listen: boolean; pronto?: boolean; erro?: string | null };
+  /** Coleta, Monitor e ofertas (Prompt 2). Sem isto, as rotas de coleta não são registradas. */
+  marketplaces?: Marketplaces;
+  regras?: RegrasOferta;
 }
 
 const ROTAS_PUBLICAS = new Set(["/health", "/"]);
@@ -236,6 +242,8 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     });
   }
 
+  if (deps.marketplaces) rotasColeta(app, deps.db, deps.marketplaces, deps.regras ?? REGRAS_PADRAO);
+
   app.get("/ferramentas", async () => ({
     prontas: [
       "GET /health",
@@ -249,6 +257,17 @@ export function criarApp(deps: DepsApp): FastifyInstance {
       "GET /eventos",
       "POST /eventos",
       "GET /eventos/stream",
+      ...(deps.marketplaces
+        ? [
+            "GET /nichos",
+            "POST /nichos",
+            "POST /coleta/buscar",
+            "POST /monitor/rodar",
+            "GET /precos/historico",
+            "GET /ofertas",
+            "POST /ofertas",
+          ]
+        : []),
     ],
     pendentes: FERRAMENTAS_PENDENTES.map((f) => ({ rota: `${f.metodo} ${f.rota}`, motivo: f.motivo })),
   }));

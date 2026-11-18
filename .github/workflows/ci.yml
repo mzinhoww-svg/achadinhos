@@ -21,7 +21,7 @@ jobs:
           POSTGRES_DB: achadinhos_teste
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U teste" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U teste -d achadinhos_teste" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL_TESTE: postgres://teste:teste@localhost:5432/achadinhos_teste
     steps:

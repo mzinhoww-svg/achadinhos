@@ -31,9 +31,32 @@ curl -X POST https://achadinhos-worker.vertraweb.app/biblia \
   -d '{"slug":"NICHOS","titulo":"Nichos","conteudo":"# Nichos\n\nVersão 1 · 18/11/2026\n...","autor":"Coordenador"}'
 ```
 
+## Coleta, preços e ofertas (Prompt 2)
+
+| Método e rota                              | Quem chama  | O que faz                                                                                                                                                                                                |
+| ------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /nichos`                              | todos       | Nichos com palavras-chave e regras de oferta                                                                                                                                                             |
+| `POST /nichos`                             | Coordenador | Cria ou atualiza pelo nome: `{ nome, palavras[], precoMin?, precoMax?, descontoMinPct? (15), avaliacaoMin? (4.5), vendasMin? (50), ativo?, autor? }`                                                     |
+| `POST /coleta/buscar`                      | Garimpeiro  | `{ nichoId \| nicho, paginas? (1-5), limite? (≤50) }`. Roda as palavras na Shopee, normaliza e grava (dedupe por marketplace + id). Devolve `{ produtos, novos, atualizados, observacoes, palavras[] }`. |
+| `POST /monitor/rodar`                      | Monitor     | Rodada sob demanda (o job roda sozinho a cada 2 h): atualiza preço e estoque, grava o histórico e cria as candidatas.                                                                                    |
+| `GET /precos/historico?produtoId=&dias=30` | Monitor     | Série de preços e mediana do período                                                                                                                                                                     |
+| `GET /ofertas[?status=&nichoId=&limite=]`  | todos       | Ofertas, as de maior pontuação primeiro                                                                                                                                                                  |
+| `POST /ofertas`                            | Monitor     | `{ produtoId }`. 201 se for oferta real; 422 `nao_e_oferta` com o motivo (`historico_insuficiente`, `desconto_insuficiente`, `avaliacao_baixa`, `vendas_baixas`); 409 se já houver oferta aberta.        |
+
+Eventos gravados:
+
+- `coleta.concluida`;
+- `monitor.concluido`;
+- `oferta_detectada`, com `ofertaId`, desconto, mediana e pontuação;
+- `marketplace.erro`, com cada falha da Shopee (código, tentativa e se vai repetir);
+- `nicho.salvo`.
+
+Sem `SHOPEE_APP_ID` e `SHOPEE_SECRET`, a coleta e o Monitor respondem 503 com o motivo. Um nicho de Mercado Livre
+responde 501 (fase 2).
+
 ## Pendentes (respondem 501 com o motivo)
 
-`POST /coleta/buscar`, `GET /precos/historico`, `GET|POST /ofertas`, `POST /imagem/render`,
+`POST /imagem/render`,
 `POST /ofertas/:id/copy`, `POST /ofertas/:id/checar`, `GET|POST /pausa`, `POST /disparo` e `GET|POST /numeros`.
 
 Resposta: `{ "erro": "nao_implementado", "ferramenta", "quemChama", "motivo" }`.

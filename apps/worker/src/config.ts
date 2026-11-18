@@ -31,6 +31,20 @@ const esquema = z.object({
   /** Pasta das migrações; no deploy fica ao lado do worker.mjs. */
   MIGRACOES_DIR: z.string().optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  /** shopee (piloto) ou fake (ensaio e testes, sem a API real). */
+  MARKETPLACE: z.enum(["shopee", "fake"]).default("shopee"),
+  SHOPEE_APP_ID: z.string().regex(/^\d+$/, "SHOPEE_APP_ID tem só dígitos").optional(),
+  SHOPEE_SECRET: z.string().min(8).optional(),
+  /** Só para apontar a um servidor simulado; a validação aceita *.shopee.com.br e loopback. */
+  SHOPEE_ENDPOINT: z.string().url().optional(),
+  /** Chamadas por minuto à Open API (limite real não publicado; 30/min = 1800/h fica abaixo de 2000/h). */
+  SHOPEE_POR_MINUTO: z.coerce.number().int().min(1).max(600).default(30),
+  /** Agenda do Monitor (cron, fuso de São Paulo). Padrão: a cada 2 horas. */
+  MONITOR_CRON: z.string().default("0 */2 * * *"),
+  MONITOR_MAX_DETALHES: z.coerce.number().int().min(0).max(2000).default(100),
+  /** Histórico mínimo para virar oferta. */
+  HISTORICO_MIN_AMOSTRAS: z.coerce.number().int().min(1).max(500).default(4),
+  HISTORICO_MIN_DIAS: z.coerce.number().min(0).max(30).default(3),
 });
 
 export type Config = z.infer<typeof esquema>;

@@ -13,35 +13,6 @@ export interface FerramentaPendente {
 export const FERRAMENTAS_PENDENTES: readonly FerramentaPendente[] = [
   {
     metodo: "POST",
-    rota: "/coleta/buscar",
-    ferramenta: "/coleta/buscar",
-    quemChama: "Garimpeiro",
-    motivo:
-      "Cliente da Open API da Shopee ainda não construído; depende de SHOPEE_APP_ID e SHOPEE_SECRET validados.",
-  },
-  {
-    metodo: "GET",
-    rota: "/precos/historico",
-    ferramenta: "/precos/historico",
-    quemChama: "Monitor",
-    motivo: "Histórico de preço depende da coleta (/coleta/buscar).",
-  },
-  {
-    metodo: "GET",
-    rota: "/ofertas",
-    ferramenta: "/ofertas",
-    quemChama: "Monitor",
-    motivo: "Ofertas dependem da coleta e do histórico de preço.",
-  },
-  {
-    metodo: "POST",
-    rota: "/ofertas",
-    ferramenta: "/ofertas",
-    quemChama: "Monitor",
-    motivo: "Criação de oferta exige desconto real contra a mediana de 30 dias, que depende do histórico.",
-  },
-  {
-    metodo: "POST",
     rota: "/imagem/render",
     ferramenta: "/imagem/render",
     quemChama: "Arte",

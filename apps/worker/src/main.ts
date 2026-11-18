@@ -3,6 +3,9 @@ import Fastify from "fastify";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
 import { criarApp, VERSAO } from "./app.js";
+import { agendarMonitor } from "./coleta/job.js";
+import { criarMarketplaces } from "./coleta/marketplaces.js";
+import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { type Config, lerConfig, opcoesSsl, urlSemSsl } from "./config.js";
 import { OuvinteEventos } from "./ouvinte.js";
 import { semearAdmin } from "./seed.js";
@@ -50,12 +53,20 @@ const ouvinte = new OuvinteEventos(conexao, {
 const boss = new PgBoss({ ...conexao, schema: "achadinhos_fila", application_name: "achadinhos-fila" });
 
 const estado = { pronto: false, fila: false, erro: null as string | null };
+const marketplaces = criarMarketplaces(db, config);
+const regras: RegrasOferta = {
+  ...REGRAS_PADRAO,
+  minAmostras: config.HISTORICO_MIN_AMOSTRAS,
+  minDias: config.HISTORICO_MIN_DIAS,
+};
 const app = criarApp({
   db,
   serviceToken: config.SERVICE_TOKEN,
   ouvinte,
   logLevel: config.LOG_LEVEL,
   estado: () => ({ fila: estado.fila, listen: ouvinte.conectado, pronto: estado.pronto, erro: estado.erro }),
+  marketplaces,
+  regras,
 });
 
 /** Migrações, admin inicial, LISTEN e fila. Se o banco falhar, tenta de novo sem derrubar o processo. */
@@ -67,6 +78,13 @@ async function prepararBanco(tentativa = 1): Promise<void> {
     await ouvinte.iniciar();
     boss.on("error", (e) => app.log.error({ err: e }, "pg-boss"));
     await boss.start();
+    await agendarMonitor(boss, db, marketplaces, {
+      cron: config.MONITOR_CRON,
+      maxDetalhes: config.MONITOR_MAX_DETALHES,
+      regras,
+      log: { info: (o, m) => app.log.info(o, m), warn: (o, m) => app.log.warn(o, m) },
+    });
+    if (marketplaces.indisponivel) app.log.warn(marketplaces.indisponivel);
     estado.fila = true;
     estado.pronto = true;
     estado.erro = null;
