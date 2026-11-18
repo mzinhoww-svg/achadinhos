@@ -6,8 +6,8 @@ Sem segredos neste arquivo. Atualizado: 2026-11-18 (UTC).
 
 | Recurso | ID | Estado |
 | --- | --- | --- |
-| Imagem `openbot-vertra` | `62332720-1b88-45ee-b559-a5233bace468` | v2 (com gateway) build `success` 13:41 UTC, 3.192.168.780 bytes, porta 8080, `auto_update_apps: false` |
-| App `openbot-vertra-hml` (worker, `web: false`, 1536 MB) | `11e7b75e-0c0f-4c47-9922-5b532c23dafd` | **parada** (crash loop: userns recusado) |
+| ~~Imagem `openbot-vertra`~~ (excluída) | `62332720-1b88-45ee-b559-a5233bace468` | v2 (com gateway) build `success` 13:41 UTC, 3.192.168.780 bytes, porta 8080, `auto_update_apps: false` |
+| ~~App `openbot-vertra-hml`~~ (excluída) | `11e7b75e-0c0f-4c47-9922-5b532c23dafd` | **parada** (crash loop: userns recusado) |
 
 Nenhuma aplicação existente foi alterada (revela-face-engine, wa-gateway, agencia-worker, agencia-web, agencia-db).
 
@@ -35,6 +35,9 @@ Nenhuma aplicação existente foi alterada (revela-face-engine, wa-gateway, agen
    da mensagem oficial do OpenBot e de 3 reinícios. App parada às 13:48 UTC.
    **Resultado: Vertra incompatível (sandbox do Electron). NÃO HOMOLOGADA.** Ver `CONTINGENCIA.md`.
 9. Contingência pronta em `vps/` (mesma imagem e mesmo gateway, seccomp oficial, Caddy). Nada contratado.
+10. 18/11, pedido do usuário: limpeza na Vertra. Imagem `openbot-vertra` excluída junto com a app `openbot-vertra-hml`
+    (a Vertra tira um snapshot de segurança). Conta de volta a 2560/4096 MB, 0/2 imagens, as 4 apps e o banco originais intactos.
+    O usuário vai buscar outra alternativa de hospedagem.
 
 ## Retomar
 
