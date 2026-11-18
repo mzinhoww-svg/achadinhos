@@ -1,0 +1,4 @@
+{$OPENBOT_DOMAIN} {
+	encode gzip
+	reverse_proxy openbot:8080
+}

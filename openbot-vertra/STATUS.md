@@ -7,7 +7,7 @@ Sem segredos neste arquivo. Atualizado: 2026-11-18 (UTC).
 | Recurso | ID | Estado |
 | --- | --- | --- |
 | Imagem `openbot-vertra` | `62332720-1b88-45ee-b559-a5233bace468` | v2 (com gateway) build `success` 13:41 UTC, 3.192.168.780 bytes, porta 8080, `auto_update_apps: false` |
-| App `openbot-vertra-hml` (worker, `web: false`, 1536 MB) | `11e7b75e-0c0f-4c47-9922-5b532c23dafd` | ver "Progresso" |
+| App `openbot-vertra-hml` (worker, `web: false`, 1536 MB) | `11e7b75e-0c0f-4c47-9922-5b532c23dafd` | **parada** (crash loop: userns recusado) |
 
 Nenhuma aplicação existente foi alterada (revela-face-engine, wa-gateway, agencia-worker, agencia-web, agencia-db).
 
@@ -31,8 +31,10 @@ Nenhuma aplicação existente foi alterada (revela-face-engine, wa-gateway, agen
 7. Pedido novo: interface web com e-mail e senha de admin + acesso por outro chat. Gateway em `gateway/`
    (Node built-ins, MCP + REST com token, admin com scrypt). Testado localmente contra mocks do socket de
    controle e da Local scripts API (login, CSRF, rate limit, MCP, REST, UI no Chromium). Imagem v2 construída.
-8. Próximo passo: excluir a app presa (painel ou chave com `apps:delete`) e criar `openbot-vertra` web,
-   porta 8080, 1536 MB, com as variáveis OBG_* geradas por `tools/make-credentials.mjs`.
+8. 13:46 UTC: a app saiu de `building` e iniciou (imagem v1). Log: `user namespaces REFUSED by the runtime`, seguido
+   da mensagem oficial do OpenBot e de 3 reinícios. App parada às 13:48 UTC.
+   **Resultado: Vertra incompatível (sandbox do Electron). NÃO HOMOLOGADA.** Ver `CONTINGENCIA.md`.
+9. Contingência pronta em `vps/` (mesma imagem e mesmo gateway, seccomp oficial, Caddy). Nada contratado.
 
 ## Retomar
 

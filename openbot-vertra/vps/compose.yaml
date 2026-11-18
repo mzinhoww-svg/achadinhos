@@ -1,0 +1,42 @@
+# OpenBot + gateway on a Linux VPS with Docker (the contingency of CONTINGENCIA.md).
+# Same image as the Vertra attempt (../Dockerfile), with the runtime options that OpenBot requires
+# and Vertra cannot give: the official seccomp profile (user namespaces for the Electron sandbox)
+# and 1 GiB of /dev/shm. Caddy terminates TLS for the gateway (automatic Let's Encrypt).
+#
+#   curl -fsSLo seccomp.json https://raw.githubusercontent.com/nightly-labs/openbot/v0.72.0/docker/seccomp.json
+#   cp gateway.env.example gateway.env   # paste the 3 OBG_* lines from tools/make-credentials.mjs
+#   echo OPENBOT_DOMAIN=openbot.example.com > .env
+#   docker compose up -d --build
+services:
+  openbot:
+    build: ..
+    image: openbot-vertra:0.72.0
+    restart: unless-stopped
+    security_opt:
+      - seccomp=./seccomp.json
+      - no-new-privileges:true
+    shm_size: 1g
+    stop_grace_period: 60s
+    env_file: ./gateway.env
+    volumes:
+      - openbot-data:/app        # HOME=/app in this image: the /data of the official image
+    expose:
+      - "8080"                   # gateway, reached only by Caddy
+
+  caddy:
+    image: caddy:2.8.4
+    restart: unless-stopped
+    environment:
+      OPENBOT_DOMAIN: ${OPENBOT_DOMAIN:?set OPENBOT_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - openbot
+
+volumes:
+  openbot-data:
+  caddy-data:
