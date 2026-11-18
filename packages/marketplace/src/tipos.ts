@@ -42,6 +42,19 @@ export interface MarketplaceAdapter {
   detalhe(idExterno: string): Promise<ProdutoMarketplace | null>;
   /** Link curto de afiliado com subIds (grupo, nicho, oferta, horário: capacidade 13). */
   gerarLinkAfiliado(url: string, subIds?: string[]): Promise<string>;
+  /** Relatório de conversões (pedidos atribuídos aos links de afiliado) entre duas datas. */
+  conversoes?(desde: Date, ate: Date): Promise<ConversaoMarketplace[]>;
+}
+
+/** Uma conversão (um pedido) com os subIds do link que a trouxe. */
+export interface ConversaoMarketplace {
+  /** Id único do pedido no marketplace (Shopee: conversionId:orderId). */
+  pedido: string;
+  subIds: string[];
+  valor: number;
+  comissao: number;
+  status: string;
+  compradoEm: Date;
 }
 
 /**

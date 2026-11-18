@@ -1,4 +1,5 @@
 import {
+  type ConversaoMarketplace,
   type FiltrosBusca,
   filtrarPorPreco,
   type MarketplaceAdapter,
@@ -142,6 +143,12 @@ export class FakeAdapter implements MarketplaceAdapter {
     this.chamadas.push({ metodo: "detalhe", arg: idExterno });
     const p = this.#produtos.get(idExterno);
     return p ? { ...p } : null;
+  }
+
+  /** Conversões simuladas para os testes de ponta a ponta. */
+  conversoesSimuladas: ConversaoMarketplace[] = [];
+  async conversoes(desde: Date, ate: Date): Promise<ConversaoMarketplace[]> {
+    return this.conversoesSimuladas.filter((c) => c.compradoEm >= desde && c.compradoEm <= ate);
   }
 
   async gerarLinkAfiliado(url: string, subIds: string[] = []): Promise<string> {

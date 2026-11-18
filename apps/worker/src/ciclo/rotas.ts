@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ErroNegocio } from "../servicos.js";
 import { checarOferta, listarChecagens } from "./checagem.js";
 import { definirPausa, lerPausa } from "./controle.js";
+import { custosPorAgente, importarConversoes } from "./conversoes.js";
 import { gastoLlm, gerarCopy } from "./copy.js";
 import {
   agendarAprovadas,
@@ -358,6 +359,16 @@ export function rotasCiclo(app: FastifyInstance, d: DepsCiclo, webhookToken: str
       })
       .returning({ id: t.chamadasPagas.id });
     return reply.code(201).send({ id: r?.id, gastoLlmUsd: await gastoLlm(db) });
+  });
+
+  // ---------- conversões e custos (Prompt 8) ----------
+  app.post("/conversoes/importar", async (req) => {
+    const { dias } = z.object({ dias: z.number().int().min(1).max(90).default(7) }).parse(req.body ?? {});
+    return importarConversoes(db, d.marketplace, dias);
+  });
+  app.get("/custos", async (req) => {
+    const { dias } = z.object({ dias: z.coerce.number().int().min(1).max(90).default(7) }).parse(req.query);
+    return custosPorAgente(db, dias);
   });
 
   // ---------- webhook do wa-gateway (público, com token na URL) ----------

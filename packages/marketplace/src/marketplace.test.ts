@@ -226,3 +226,68 @@ describe("literal GraphQL", () => {
     expect(JSON.parse(l)).toBe('luminária "led"');
   });
 });
+
+describe("Shopee: relatório de conversões", () => {
+  it("pagina pelo scrollId, lê os subIds do utmContent e soma a comissão por pedido", async () => {
+    const corpos: string[] = [];
+    const paginas = [
+      {
+        conversionReport: {
+          nodes: [
+            {
+              conversionId: 111,
+              purchaseTime: 1795000000,
+              utmContent: "g1-n2-o3-h1100-AbC1234",
+              totalCommission: "9.99",
+              orders: [
+                {
+                  orderId: "A1",
+                  orderStatus: "PENDING",
+                  items: [
+                    { actualAmount: "39.90", itemTotalCommission: "2.40" },
+                    { actualAmount: "10.00", itemTotalCommission: "0.60" },
+                  ],
+                },
+              ],
+            },
+          ],
+          pageInfo: { hasNextPage: true, scrollId: "SCROLL-2" },
+        },
+      },
+      {
+        conversionReport: {
+          nodes: [
+            {
+              conversionId: 222,
+              purchaseTime: 1795003600,
+              utmContent: "",
+              orders: [],
+              totalCommission: "1.5",
+            },
+          ],
+          pageInfo: { hasNextPage: false },
+        },
+      },
+    ];
+    const { ShopeeAdapter } = await import("./shopee.ts");
+    const a = new ShopeeAdapter({
+      appId: "123",
+      secret: "segredo-teste",
+      fetch: (async (_u: string, init: RequestInit) => {
+        corpos.push(String(init.body));
+        return new Response(JSON.stringify({ data: paginas[corpos.length - 1] }));
+      }) as unknown as typeof fetch,
+    });
+    const r = await a.conversoes(new Date(1794990000000), new Date(1795010000000));
+    expect(corpos).toHaveLength(2);
+    expect(JSON.parse(corpos[1] ?? "{}").query).toContain('scrollId: "SCROLL-2"');
+    expect(r[0]).toMatchObject({
+      pedido: "111:A1",
+      subIds: ["g1", "n2", "o3", "h1100", "AbC1234"],
+      valor: 49.9,
+      comissao: 3,
+      status: "PENDING",
+    });
+    expect(r[1]).toMatchObject({ pedido: "222:", subIds: [], comissao: 1.5 });
+  });
+});

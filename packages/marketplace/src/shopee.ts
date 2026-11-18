@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  type ConversaoMarketplace,
   ErroMarketplace,
   type FiltrosBusca,
   filtrarPorPreco,
@@ -204,6 +205,60 @@ export class ShopeeAdapter implements MarketplaceAdapter {
       throw new ErroMarketplace("resposta sem shortLink", "RESPOSTA", false);
     }
     return link;
+  }
+
+  /**
+   * T8.1: conversionReport da Open API (uma página por vez, com scrollId). Os subIds do link voltam em utmContent,
+   * separados por hífen. Cada pedido vira uma conversão; a comissão é a soma de itemTotalCommission.
+   */
+  async conversoes(desde: Date, ate: Date): Promise<ConversaoMarketplace[]> {
+    const ini = Math.floor(desde.getTime() / 1000);
+    const fim = Math.floor(ate.getTime() / 1000);
+    const saida: ConversaoMarketplace[] = [];
+    let scroll = "";
+    for (let pagina = 0; pagina < 40; pagina++) {
+      const q = `{ conversionReport(purchaseTimeStart: ${ini}, purchaseTimeEnd: ${fim}, limit: 500${scroll ? `, scrollId: ${literalGraphql(scroll)}` : ""}) { nodes { conversionId purchaseTime utmContent totalCommission orders { orderId orderStatus items { itemId actualAmount itemTotalCommission } } } pageInfo { hasNextPage scrollId } } }`;
+      const dados = (await this.#consultar(q)) as {
+        conversionReport?: {
+          nodes?: {
+            conversionId?: string | number;
+            purchaseTime?: number;
+            utmContent?: string;
+            totalCommission?: string | number;
+            orders?: {
+              orderId?: string;
+              orderStatus?: string;
+              items?: { actualAmount?: string | number; itemTotalCommission?: string | number }[];
+            }[];
+          }[];
+          pageInfo?: { hasNextPage?: boolean; scrollId?: string };
+        };
+      };
+      const r = dados.conversionReport;
+      for (const n of r?.nodes ?? []) {
+        const subIds = (n.utmContent ?? "")
+          .split("-")
+          .map((x) => x.trim())
+          .filter(Boolean);
+        const pedidos = n.orders?.length ? n.orders : [{ orderId: "", orderStatus: "", items: [] }];
+        for (const o of pedidos) {
+          const itens = o.items ?? [];
+          saida.push({
+            pedido: `${n.conversionId ?? "?"}:${o.orderId ?? ""}`,
+            subIds,
+            valor: itens.reduce((a, i) => a + Number(i.actualAmount ?? 0), 0),
+            comissao: itens.length
+              ? itens.reduce((a, i) => a + Number(i.itemTotalCommission ?? 0), 0)
+              : Number(n.totalCommission ?? 0),
+            status: o.orderStatus ?? "",
+            compradoEm: new Date((n.purchaseTime ?? ini) * 1000),
+          });
+        }
+      }
+      if (!r?.pageInfo?.hasNextPage || !r.pageInfo.scrollId) break;
+      scroll = r.pageInfo.scrollId;
+    }
+    return saida;
   }
 
   async #consultar(query: string): Promise<unknown> {

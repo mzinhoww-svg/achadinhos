@@ -288,3 +288,20 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - **Ciclo reserva:** qualquer chamada pelo MCP conta como sinal de vida; 30 min de silêncio ligam o ciclo do worker.
 - **Pendente do Aurimar (no Mac):** cadastrar os 6 servidores MCP, criar os agentes e as rotinas (`openbot/RECRIAR.md`).
   "Um dia inteiro só pelos agentes" só pode ser conferido depois disso.
+
+## D-018 · 18/11/2026 · Conversões, qualidade e operação (Prompt 8)
+
+- **Conversões da Shopee:** `conversionReport` da Open API, paginado por `scrollId`, todo dia às 05:40 com os últimos 7
+  dias (o status dos pedidos muda depois da compra). Os subIds voltam em `utmContent`; o código do link liga o pedido
+  ao link e, por ele, à oferta, ao grupo e ao horário. Os nomes dos campos seguem a documentação da Open API; como
+  ainda não houve venda real, a primeira importação de verdade precisa ser conferida no painel (Conversões).
+- **Custo por agente e por oferta enviada** em Números. As chamadas do worker entram sozinhas; as do OpenBot entram
+  pela ferramenta `registrar_custo`.
+- **Teste de ponta a ponta** (`apps/worker/src/e2e.test.ts`): coleta → Monitor → candidata → ciclo reserva → envio →
+  confirmação → clique → conversão → métricas, com adaptador e gateway falsos.
+- **Segredos:** gitleaks no CI a cada push, no histórico inteiro. A varredura local encontrou só fixtures de teste do
+  projeto antigo (valores falsos), liberados por commit em `.gitleaks.toml`.
+- **/r com limite** de 30 acessos por minuto por IP (429 depois).
+- **Snapshot diário:** a Vertra já faz snapshot automático do `agencia-db` toda noite (~00:35 de Brasília), confirmado
+  na lista de snapshots desde 14/11. Nenhum código extra foi preciso.
+- **Alertas no WhatsApp** também quando os jobs de disparo, ciclo reserva ou conversões falham (uma vez por dia por tipo).

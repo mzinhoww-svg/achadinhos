@@ -109,5 +109,9 @@ export function comLimite<A extends MarketplaceAdapter>(adapter: A, o: OpcoesLim
     )) as A["detalhe"];
   envolvido.gerarLinkAfiliado = (url, subIds) =>
     executar("gerarLinkAfiliado", () => adapter.gerarLinkAfiliado(url, subIds));
+  if (adapter.conversoes) {
+    const original = adapter.conversoes.bind(adapter);
+    envolvido.conversoes = (desde, ate) => executar("buscar", () => original(desde, ate), "conversionReport");
+  }
   return envolvido;
 }

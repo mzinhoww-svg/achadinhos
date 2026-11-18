@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { permitir } from "@/lib/limite";
 import { ErroWorker, worker } from "@/lib/worker";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || null;
   const sal = env("AUTH_SECRET") ?? "achadinhos";
   const ipHash = ip ? createHash("sha256").update(`${sal}:${ip}`).digest("hex").slice(0, 32) : null;
+  if (!permitir(ipHash ?? "sem-ip")) {
+    return new NextResponse("Muitos acessos seguidos. Tente de novo em um minuto.", {
+      status: 429,
+      headers: { "retry-after": "60" },
+    });
+  }
   try {
     const { destino } = await worker.clique(codigo, ipHash, req.headers.get("user-agent"));
     if (!/^https:\/\//.test(destino)) return new NextResponse("Link inválido.", { status: 404 });
