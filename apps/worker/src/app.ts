@@ -19,6 +19,7 @@ import { rotasCiclo } from "./ciclo/rotas.js";
 import type { Marketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { rotasColeta } from "./coleta/rotas.js";
+import { rotasMcp } from "./mcp/rotas.js";
 import type { OuvinteEventos } from "./ouvinte.js";
 import { rotasPainel } from "./painel/rotas.js";
 import { conferirSenha, gerarHashSenha } from "./senha.js";
@@ -37,7 +38,9 @@ import {
 } from "./servicos.js";
 import { tokenConfere } from "./token.js";
 
-export const VERSAO = "0.1.0";
+import { VERSAO } from "./versao.js";
+
+export { VERSAO };
 
 export interface DepsApp {
   db: Db;
@@ -89,6 +92,8 @@ export function criarApp(deps: DepsApp): FastifyInstance {
   app.addHook("onRequest", async (req, reply) => {
     const caminho = req.url.split("?")[0] ?? "";
     if (ROTAS_PUBLICAS.has(caminho)) return;
+    // MCP dos agentes: token próprio de cada agente (Authorization: Bearer).
+    if (deps.ciclo && caminho === "/mcp") return;
     // Webhook do wa-gateway: confere o próprio token (?t=) na rota.
     if (deps.ciclo && req.method === "POST" && caminho === "/wa/webhook") return;
     // Peças guardadas no banco: públicas para o WhatsApp e o painel abrirem a imagem.
@@ -298,6 +303,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
   if (deps.ciclo) {
     rotasCiclo(app, deps.ciclo.deps, deps.ciclo.webhookToken);
     rotasPainel(app, deps.db);
+    rotasMcp(app, deps.serviceToken, deps.ciclo.deps.arte.baseUrl);
   }
   if (deps.arte) rotasArte(app, deps.db, deps.arte);
   else app.post("/imagem/render", async (_req, reply) => reply.code(501).send(arteDesligada));

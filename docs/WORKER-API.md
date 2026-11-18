@@ -97,6 +97,17 @@ prepara as candidatas quando os agentes ficam 30 min sem chamar o worker com `x-
 Travas automáticas (pausam e avisam no privado): 3 falhas de envio seguidas, mais de 20% de reprovação no dia (mínimo
 de 5), número banido e pool sem número. O teto de US$ 1/dia e US$ 20/mês de LLM troca a copy pelo modelo fixo.
 
+## Agentes (Prompt 7)
+
+| Método e rota                                        | Quem chama         | O que faz                                                                                                                                                                                    |
+| ---------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /mcp`                                          | agentes do OpenBot | Servidor MCP (JSON-RPC: `initialize`, `tools/list`, `tools/call`). Autenticação `Authorization: Bearer <token do agente>`; cada agente só vê as suas ferramentas (`src/mcp/ferramentas.ts`). |
+| `GET /agentes`                                       | painel             | URL do MCP, token e ferramentas de cada agente.                                                                                                                                              |
+| `GET /resumo` · `POST /resumo/enviar {observacoes?}` | Coordenador        | Texto do resumo do dia e envio para o WhatsApp do dono.                                                                                                                                      |
+| `POST /custos {agente, modelo, custoUsd, ...}`       | agentes            | Registra o custo de uma chamada de LLM feita no OpenBot.                                                                                                                                     |
+
+Job `resumo-reserva` às 21h05: manda o resumo se ninguém mandou no dia.
+
 ## Pendentes (respondem 501 com o motivo)
 
 Nenhuma desde o Prompt 5.

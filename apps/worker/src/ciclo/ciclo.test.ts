@@ -6,10 +6,12 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { criarApp } from "../app.js";
 import { ArmazenamentoBanco } from "../arte/armazenamento.js";
+import { tokenAgente } from "../mcp/ferramentas.js";
 import { Alertas } from "./controle.js";
 import { copyModeloFixo, validarCopy } from "./copy.js";
 import { type DepsCiclo, escolherHorario, executarDevidos, horarioBrt } from "./disparo.js";
 import { Gateway } from "./gateway.js";
+import { openbotCalado, rodarCicloReserva } from "./job.js";
 import { regrasEnvio } from "./regras.js";
 
 const URL_TESTE = process.env.DATABASE_URL_TESTE;
@@ -315,6 +317,77 @@ describe.skipIf(!URL_TESTE)("ciclo completo com gateway falso", () => {
     expect(
       pedidos.some((x) => x.url.endsWith("/privado") && String(x.corpo.texto).includes("cancelado")),
     ).toBe(true);
+  });
+
+  it("MCP: cada agente vê só as suas ferramentas e age com o próprio nome", async () => {
+    const rpc = (agente: Parameters<typeof tokenAgente>[1] | null, method: string, params?: unknown) =>
+      app.inject({
+        method: "POST",
+        url: "/mcp",
+        headers: agente ? { authorization: `Bearer ${tokenAgente(TOKEN, agente)}` } : {},
+        payload: { jsonrpc: "2.0", id: 1, method, ...(params ? { params } : {}) },
+      });
+    expect((await rpc(null, "tools/list")).statusCode).toBe(401);
+    const init = (await rpc("Garimpeiro", "initialize", { protocolVersion: "2025-06-18" })).json();
+    expect(init.result.serverInfo.name).toBe("achadinhos-worker");
+    const nomes = (await rpc("Garimpeiro", "tools/list"))
+      .json()
+      .result.tools.map((x: { name: string }) => x.name);
+    expect(nomes).toContain("buscar_produtos");
+    expect(nomes).not.toContain("gravar_biblia");
+    expect(nomes).not.toContain("agendar_disparo");
+    const negado = (
+      await rpc("Garimpeiro", "tools/call", {
+        name: "definir_pausa",
+        arguments: { pausado: true, motivo: "x" },
+      })
+    ).json();
+    expect(negado.error.message).toMatch(/não é permitida/);
+    expect(await openbotCalado(deps)).toBe(true);
+    const ok = (
+      await rpc("Coordenador", "tools/call", {
+        name: "definir_pausa",
+        arguments: { pausado: false, motivo: "teste mcp" },
+      })
+    ).json();
+    expect(ok.result.isError).toBe(false);
+    expect(JSON.parse(ok.result.content[0].text)).toMatchObject({ pausado: false, por: "Coordenador" });
+    expect(await openbotCalado(deps)).toBe(false);
+    expect(await rodarCicloReserva(deps, "reserva")).toMatchObject({
+      rodou: false,
+      motivo: "agentes ativos",
+    });
+    const biblia = (await rpc("Copywriter", "tools/call", { name: "ler_biblia", arguments: {} })).json();
+    expect(JSON.parse(biblia.result.content[0].text)).toHaveProperty("documentos");
+    const ag = (await app.inject({ url: "/agentes", headers: H })).json();
+    expect(ag.agentes).toHaveLength(6);
+    expect(ag.mcpUrl).toBe("https://w.test/mcp");
+  });
+
+  it("resumo do dia sai no privado do dono pelo gateway, uma vez por dia", async () => {
+    pedidos.length = 0;
+    const r = await app.inject({
+      method: "POST",
+      url: "/resumo/enviar",
+      headers: H,
+      payload: { observacoes: "dia de ensaio" },
+    });
+    expect(r.json()).toMatchObject({ enviado: true });
+    expect(r.json().texto).toMatch(/resumo de/);
+    expect(r.json().texto).toMatch(/Coordenador: dia de ensaio/);
+    expect(pedidos.filter((x) => x.url.endsWith("/privado"))).toHaveLength(1);
+    const { resumoReserva } = await import("./resumo.js");
+    expect(await resumoReserva(db, deps.alertas)).toMatchObject({
+      enviado: false,
+      motivo: "já enviado hoje",
+    });
+    const c = await app.inject({
+      method: "POST",
+      url: "/custos",
+      headers: H,
+      payload: { agente: "Copywriter", modelo: "x/y", custoUsd: 0.002 },
+    });
+    expect(c.json().gastoLlmUsd.dia).toBeGreaterThan(0);
   });
 
   it("3 falhas seguidas de envio pausam sozinho", async () => {

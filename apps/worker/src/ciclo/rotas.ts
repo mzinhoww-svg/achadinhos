@@ -18,6 +18,7 @@ import {
 } from "./disparo.js";
 import { criarOfertaEnsaio } from "./ensaio.js";
 import { registrarClique } from "./links.js";
+import { enviarResumo, montarResumo } from "./resumo.js";
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 const jidGrupo = z.string().regex(/^[0-9-]{5,40}@g\.us$/, "JID do grupo (…@g.us)");
@@ -313,6 +314,50 @@ export function rotasCiclo(app: FastifyInstance, d: DepsCiclo, webhookToken: str
     });
     const preparo = b.preparar ? await prepararOferta(d, e.ofertaId, "ensaio") : null;
     return reply.code(201).send({ ...e, preparo });
+  });
+
+  // ---------- resumo do dia e custos dos agentes (Prompt 7) ----------
+  app.get("/resumo", async () => ({ texto: await montarResumo(db) }));
+  app.post("/resumo/enviar", async (req) => {
+    const b = z
+      .object({
+        observacoes: z.string().max(500).optional(),
+        autor: z.string().trim().min(1).max(80).default("Coordenador"),
+      })
+      .parse(req.body ?? {});
+    return enviarResumo(
+      db,
+      d.alertas,
+      (req.headers["x-agente"] as string | undefined) ?? b.autor,
+      b.observacoes,
+    );
+  });
+  app.post("/custos", async (req, reply) => {
+    const b = z
+      .object({
+        agente: z.string().trim().min(1).max(80),
+        modelo: z.string().trim().min(1).max(120),
+        tokensEntrada: z.number().int().nonnegative().optional(),
+        tokensSaida: z.number().int().nonnegative().optional(),
+        custoUsd: z.number().nonnegative().max(50),
+        ofertaId: z.number().int().positive().optional(),
+      })
+      .parse(req.body);
+    const [r] = await db
+      .insert(t.chamadasPagas)
+      .values({
+        chaveIdempotente: `agente:${b.agente}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        servico: "llm",
+        agente: b.agente,
+        modelo: b.modelo,
+        tokensEntrada: b.tokensEntrada ?? null,
+        tokensSaida: b.tokensSaida ?? null,
+        custoUsd: b.custoUsd.toFixed(6),
+        ofertaId: b.ofertaId ?? null,
+        sucesso: true,
+      })
+      .returning({ id: t.chamadasPagas.id });
+    return reply.code(201).send({ id: r?.id, gastoLlmUsd: await gastoLlm(db) });
   });
 
   // ---------- webhook do wa-gateway (público, com token na URL) ----------

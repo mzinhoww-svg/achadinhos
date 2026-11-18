@@ -8,9 +8,11 @@ import {
   executarDevidos,
   prepararOferta,
 } from "./disparo.js";
+import { resumoReserva } from "./resumo.js";
 
 export const FILA_DISPARO = "disparo-tick";
 export const FILA_CICLO = "ciclo-reserva";
+export const FILA_RESUMO = "resumo-reserva";
 
 /** Último sinal dos agentes do OpenBot (requisições com x-origem: openbot). */
 export async function registrarSinalOpenbot(d: Pick<DepsCiclo, "db">) {
@@ -62,7 +64,7 @@ export async function agendarCiclo(
     log: { info: (m: string) => void; warn: (o: unknown, m: string) => void };
   },
 ) {
-  for (const fila of [FILA_DISPARO, FILA_CICLO])
+  for (const fila of [FILA_DISPARO, FILA_CICLO, FILA_RESUMO])
     await boss.createQueue(fila, { policy: "singleton" }).catch(() => {});
   await boss.work(FILA_DISPARO, async () => {
     try {
@@ -78,6 +80,14 @@ export async function agendarCiclo(
       o.log.warn({ err: e }, "ciclo reserva falhou");
     }
   });
+  await boss.work(FILA_RESUMO, async () => {
+    try {
+      await resumoReserva(d.db, d.alertas);
+    } catch (e) {
+      o.log.warn({ err: e }, "resumo reserva falhou");
+    }
+  });
+  await boss.schedule(FILA_RESUMO, "5 21 * * *", {}, { tz: "America/Sao_Paulo" });
   await boss.schedule(FILA_DISPARO, o.cronDisparo, {}, { tz: "America/Sao_Paulo" });
   await boss.schedule(FILA_CICLO, "*/15 * * * *", {}, { tz: "America/Sao_Paulo" });
   o.log.info("disparo (1 min) e ciclo reserva (15 min) agendados");

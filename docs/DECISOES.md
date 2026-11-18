@@ -267,3 +267,24 @@ O único conteúdo mantido foi o kit Docker do OpenBot, agora em `openbot/servid
 - **Ciclo reserva já no Prompt 5:** sem sinal dos agentes por 30 min, o worker prepara e agenda sozinho. Isso também
   permite o ensaio antes de o OpenBot estar ligado.
 - **Oferta de ensaio:** produto `fake` com foto e link de um produto real, desconto forçado, só para grupos de teste.
+
+## D-017 · 18/11/2026 · Agentes ligados ao worker por MCP (Prompt 7)
+
+- **O worker virou servidor MCP** (`POST /mcp`, Streamable HTTP com respostas JSON). As ferramentas aparecem nativas no
+  OpenBot, com descrição e schema em português.
+- **Permissão mínima de verdade:** cada agente tem um token próprio (`ach_…`, HMAC do `SERVICE_TOKEN` com o nome do
+  agente). O token define quem é o agente: ele só vê e só chama as ferramentas da sua função, e os campos de autoria
+  (autor, decididoPor, agente) são preenchidos pelo worker com o nome do token, não pelo que o agente escreve.
+- **Sem segredo no chat:** a tela **Agentes** do painel mostra a configuração de cada agente para copiar no OpenBot.
+- **Equipe versionada:** `openbot/equipe.json` (agentes, modelos com reserva, ferramentas e rotinas da ROTINA.md) e
+  `openbot/agentes/*.md`. Um teste garante que `equipe.json` bate com as ferramentas que o worker libera.
+- **Modelos:** Coordenador e Copywriter num modelo melhor; Garimpeiro, Monitor, Arte e Disparador num barato, todos
+  com reserva. Os nomes são sugestões: o Aurimar confirma no catálogo do OpenRouter na hora de criar.
+- **Custo por agente:** as chamadas de LLM do próprio worker já são gravadas. As do OpenBot acontecem dentro dele; os
+  agentes registram com `registrar_custo`, e o total entra no teto diário. Não há como o worker medir sozinho o gasto
+  que acontece no OpenBot.
+- **Resumo do dia:** o Coordenador fecha às 21h com `enviar_resumo_whatsapp`; se não fizer, o worker manda às 21h05.
+  Propostas aprovadas que mexem em gasto ou grupos aparecem em destaque.
+- **Ciclo reserva:** qualquer chamada pelo MCP conta como sinal de vida; 30 min de silêncio ligam o ciclo do worker.
+- **Pendente do Aurimar (no Mac):** cadastrar os 6 servidores MCP, criar os agentes e as rotinas (`openbot/RECRIAR.md`).
+  "Um dia inteiro só pelos agentes" só pode ser conferido depois disso.

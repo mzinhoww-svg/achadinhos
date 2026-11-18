@@ -16,10 +16,14 @@ O time de agentes do Achadinhos vive no OpenBot, no Mac do Aurimar. A Vertra nã
 3. Os modelos usam o formato `lab/modelo` (ex.: `anthropic/claude-sonnet-5.5`). Quem escolhe o modelo de cada agente
    é você, na entrevista do Coordenador.
 
-## 3 · Guardar o token do worker
+## 3 · Ligar os agentes ao worker (MCP)
 
-Guarde o `SERVICE_TOKEN` no cofre do OpenBot, com o nome `SERVICE_TOKEN` do worker do Achadinhos. Os agentes o enviam
-no header `X-Service-Token` para chamar `https://achadinhos-worker.vertraweb.app`. Nunca cole o token na conversa.
+O worker é um servidor MCP em `https://achadinhos-worker.vertraweb.app/mcp`. Cada agente tem o próprio token e só vê as
+ferramentas da sua função. No painel, tela **Agentes**, copie a configuração de cada um e cadastre no OpenBot em
+Settings › MCP servers › Add › HTTP (header `Authorization: Bearer <token>`). Nunca cole token na conversa.
+
+A equipe inteira (instruções, modelos, ferramentas e rotinas) está versionada em `equipe.json` e `agentes/`. Para
+recriar do zero, siga `RECRIAR.md`.
 
 ## 4 · Mandar o pacote
 
