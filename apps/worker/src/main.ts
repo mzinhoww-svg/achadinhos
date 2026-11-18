@@ -1,70 +1,72 @@
-import { loadConfig, ConfigError, type WorkerConfig } from "./config.js";
-import { createLogger, type Logger } from "./logger.js";
-import { createSqlBuildDeps } from "./sql/build-deps.js";
-import { createWorkerRuntime, type RuntimeDeps, type WorkerRuntime } from "./runtime.js";
+import { criarDb, migrar, PASTA_MIGRACOES } from "@achadinhos/db";
+import pg from "pg";
+import { PgBoss } from "pg-boss";
+import { criarApp } from "./app.js";
+import { lerConfig, opcoesSsl } from "./config.js";
+import { OuvinteEventos } from "./ouvinte.js";
+import { semearAdmin } from "./seed.js";
 
-export type BuildDeps = (config: WorkerConfig, log: Logger) => Promise<Omit<RuntimeDeps, "config" | "log">>;
+const config = lerConfig();
+const ssl = opcoesSsl(config);
+const conexao = { connectionString: config.DATABASE_URL, ssl };
 
+const pool = new pg.Pool({ ...conexao, max: 10, application_name: "achadinhos-worker" });
+const db = criarDb(pool);
 
-export type StartResult =
-  | { ok: true; runtime: WorkerRuntime; config: WorkerConfig; log: Logger }
-  | { ok: false; code: 1 };
+// No deploy, as migrações ficam em ./drizzle ao lado do worker.mjs; no desenvolvimento, no pacote db.
+const pastaMigracoes =
+  config.MIGRACOES_DIR ??
+  (import.meta.url.endsWith("/worker.mjs")
+    ? new URL("./drizzle", import.meta.url).pathname
+    : PASTA_MIGRACOES);
 
-export async function startWorker(opts: {
-  env: Record<string, string | undefined>;
-  buildDeps?: BuildDeps;
-  sink?: (line: string) => void;
-}): Promise<StartResult> {
-  const sink = opts.sink ?? ((l: string) => process.stdout.write(`${l}\n`));
-  let config: WorkerConfig;
-  try {
-    config = loadConfig(opts.env);
-  } catch (e) {
-    const log = createLogger({ sink });
-    log.error("worker.config_invalida", e instanceof ConfigError ? { vars: [...e.vars] } : {});
-    return { ok: false, code: 1 };
-  }
-  const log = createLogger({ sink, level: config.logLevel });
-  // o segredo mais sensível do processo é registrado antes de qualquer outra coisa
-  log.addSecret(config.databaseUrl.reveal());
-  try {
-    const parts = await (opts.buildDeps ?? createSqlBuildDeps({ env: opts.env }))(config, log);
-    const runtime = createWorkerRuntime({
-      config: {
-        tickIntervalMs: config.tickIntervalMs,
-        executorPollMs: config.executorPollMs,
-        stallAlertMs: config.stallAlertMs,
-        shutdownGraceMs: config.shutdownGraceMs,
-        heartbeatStaleMs: config.heartbeatStaleMs,
-      },
-      log,
-      ...parts,
-    });
-    runtime.start();
-    log.info("worker.iniciado", { tickIntervalMs: config.tickIntervalMs });
-    return { ok: true, runtime, config, log };
-  } catch (e) {
-    log.error("worker.falha_ao_iniciar", { err: e });
-    return { ok: false, code: 1 };
-  }
+const ouvinte = new OuvinteEventos(conexao, {
+  info: (o, m) => app.log.info(o, m),
+  warn: (o, m) => app.log.warn(o, m),
+});
+// Fila no próprio Postgres, num schema separado.
+const boss = new PgBoss({
+  connectionString: config.DATABASE_URL,
+  ssl,
+  schema: "achadinhos_fila",
+  application_name: "achadinhos-fila",
+});
+let filaOk = false;
+
+const app = criarApp({
+  db,
+  serviceToken: config.SERVICE_TOKEN,
+  ouvinte,
+  logLevel: config.LOG_LEVEL,
+  estado: () => ({ fila: filaOk, listen: ouvinte.conectado }),
+});
+
+async function iniciar() {
+  app.log.info({ pastaMigracoes }, "aplicando migrações");
+  await migrar(db, pastaMigracoes);
+  await semearAdmin(db, config, { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) });
+  await ouvinte.iniciar();
+  boss.on("error", (e) => app.log.error({ err: e }, "pg-boss"));
+  await boss.start();
+  filaOk = true;
+  await app.listen({ port: config.PORT, host: config.HOST });
 }
 
-/** Processo: SIGTERM/SIGINT encerram limpo; segundo sinal força a saída. */
-export async function main(): Promise<void> {
-  const r = await startWorker({ env: process.env });
-  if (!r.ok) {
-    process.exitCode = r.code;
-    return;
-  }
-  let shuttingDown = false;
-  const shutdown = async (signal: string) => {
-    if (shuttingDown) process.exit(1);
-    shuttingDown = true;
-    r.log.info("worker.encerrando", { signal });
-    const { clean } = await r.runtime.stop();
-    r.log.info("worker.encerrado", { clean });
-    process.exit(clean ? 0 : 1);
-  };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
+let encerrando = false;
+async function encerrar(sinal: string) {
+  if (encerrando) return;
+  encerrando = true;
+  app.log.info({ sinal }, "encerrando");
+  await app.close().catch(() => {});
+  await boss.stop({ graceful: true, timeout: 10_000 }).catch(() => {});
+  await ouvinte.parar();
+  await pool.end().catch(() => {});
+  process.exit(0);
 }
+process.on("SIGTERM", () => void encerrar("SIGTERM"));
+process.on("SIGINT", () => void encerrar("SIGINT"));
+
+iniciar().catch((e) => {
+  app.log.fatal({ err: e }, "falha ao iniciar o worker");
+  process.exit(1);
+});

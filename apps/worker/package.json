@@ -1,33 +1,28 @@
 {
   "name": "@achadinhos/worker",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-    "start": "node --import tsx src/bin.ts",
-    "outbox:gerar": "tsx src/gerar/cli.ts"
+    "dev": "tsx watch src/main.ts",
+    "build": "node build.mjs",
+    "start": "node dist/worker.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@achadinhos/alerts": "workspace:*",
-    "@achadinhos/channel": "workspace:*",
-    "@achadinhos/commission": "workspace:*",
-    "@achadinhos/creative": "workspace:*",
-    "@achadinhos/domain": "workspace:*",
-    "@achadinhos/shopee": "workspace:*",
-    "@achadinhos/telegram": "workspace:*",
-    "pg": "^8.23.1",
-    "zod": "^3.23.8"
+    "@achadinhos/db": "workspace:*",
+    "@achadinhos/shared": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "fastify": "5.12.8",
+    "pg": "8.23.1",
+    "pg-boss": "12.38.2",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.9",
-    "@types/node": "^22.20.5",
-    "@types/pg": "^8.23.1",
-    "tsx": "^4.23.15",
-    "typescript": "^5",
-    "vitest": "^2"
+    "@types/pg": "8.23.1",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "vitest": "5.1.1"
   }
 }
