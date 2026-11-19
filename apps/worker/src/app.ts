@@ -19,9 +19,11 @@ import { rotasCiclo } from "./ciclo/rotas.js";
 import type { Marketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { rotasColeta } from "./coleta/rotas.js";
-import { rotasMcp } from "./mcp/rotas.js";
+import { agenteDoToken, rotasMcp } from "./mcp/rotas.js";
 import type { OuvinteEventos } from "./ouvinte.js";
 import { rotasPainel } from "./painel/rotas.js";
+import { rotasReels } from "./reels/rotas.js";
+import type { DepsReels } from "./reels/servico.js";
 import { conferirSenha, gerarHashSenha } from "./senha.js";
 import {
   buscarEvento,
@@ -56,6 +58,8 @@ export interface DepsApp {
   arte?: DepsArte;
   /** Copy, checagem, pausa, disparo, link curto e webhook do wa-gateway (Prompt 5). */
   ciclo?: { deps: DepsCiclo; webhookToken?: string | undefined };
+  /** Reels do Instagram (vídeo da Shopee coletado no Mac, ou fotos como reserva). */
+  reels?: DepsReels;
 }
 
 const ROTAS_PUBLICAS = new Set(["/health", "/"]);
@@ -103,6 +107,14 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     if (ROTAS_PUBLICAS.has(caminho)) return;
     // MCP dos agentes: token próprio de cada agente (Authorization: Bearer).
     if (deps.ciclo && (caminho === "/mcp" || caminho.startsWith("/mcp/"))) return;
+    // Coletor de vídeo do Mac: entra na fila de Reels com o token do Diretor de Vídeo.
+    if (deps.reels && caminho.startsWith("/reels/") && typeof req.headers.authorization === "string") {
+      const ag = agenteDoToken(deps.serviceToken, req.headers.authorization);
+      if (ag === "Diretor de Vídeo" || ag === "Coordenador") {
+        req.headers["x-agente"] = ag;
+        return;
+      }
+    }
     // Webhook do wa-gateway: confere o próprio token (?t=) na rota.
     if (deps.ciclo && req.method === "POST" && caminho === "/wa/webhook") return;
     // Peças guardadas no banco: públicas para o WhatsApp e o painel abrirem a imagem.
@@ -314,6 +326,7 @@ export function criarApp(deps: DepsApp): FastifyInstance {
     rotasPainel(app, deps.db);
     rotasMcp(app, deps.serviceToken, deps.ciclo.deps.arte.baseUrl);
   }
+  if (deps.reels) rotasReels(app, deps.reels);
   if (deps.arte) rotasArte(app, deps.db, deps.arte);
   else app.post("/imagem/render", async (_req, reply) => reply.code(501).send(arteDesligada));
 

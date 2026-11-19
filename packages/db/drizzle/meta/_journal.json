@@ -43,6 +43,13 @@
       "when": 1795031916795,
       "tag": "0005_painel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795113433893,
+      "tag": "0006_reels",
+      "breakpoints": true
     }
   ]
 }

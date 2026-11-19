@@ -34,7 +34,7 @@ describe("ferramentas dos agentes", () => {
   });
   it("tokens diferentes por agente e estáveis", () => {
     const t = AGENTES.map((a) => tokenAgente("s".repeat(40), a));
-    expect(new Set(t).size).toBe(6);
+    expect(new Set(t).size).toBe(7);
     expect(tokenAgente("s".repeat(40), "Monitor")).toBe(t[2]);
   });
 });

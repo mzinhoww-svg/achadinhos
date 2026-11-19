@@ -322,10 +322,13 @@ export const links = achadinhos.table(
   "links",
   {
     id: id(),
-    ofertaId: ref("oferta_id")
-      .notNull()
-      .references(() => ofertas.id, { onDelete: "cascade" }),
+    /** Null quando o link é de um Reel de produto sem oferta. */
+    ofertaId: ref("oferta_id").references(() => ofertas.id, { onDelete: "cascade" }),
+    produtoId: ref("produto_id").references(() => produtos.id, { onDelete: "cascade" }),
     grupoId: ref("grupo_id").references(() => grupos.id),
+    /** grupo (WhatsApp) ou instagram (DM do Reel). */
+    origem: text("origem").notNull().default("grupo"),
+    reelId: ref("reel_id"),
     urlAfiliado: text("url_afiliado").notNull(),
     codigoCurto: text("codigo_curto").notNull().unique(),
     /** Capacidade 13: grupo, nicho, oferta e horário. */
@@ -438,4 +441,36 @@ export const checagens = achadinhos.table(
     criadoEm: criadoEm(),
   },
   (t) => [index("checagens_dia").on(t.criadoEm), index("checagens_oferta").on(t.ofertaId)],
+);
+
+// ---------- Reels (Instagram via mLabs) ----------
+
+export const reels = achadinhos.table(
+  "reels",
+  {
+    id: id(),
+    produtoId: ref("produto_id")
+      .notNull()
+      .references(() => produtos.id, { onDelete: "cascade" }),
+    ofertaId: ref("oferta_id").references(() => ofertas.id),
+    /** Palavra que a pessoa comenta para receber o link (única entre os Reels ativos). */
+    palavra: text("palavra").notNull(),
+    modelo: text("modelo").notNull(),
+    /** video_pendente → pronto → agendado → publicado | falhou */
+    status: text("status").notNull().default("video_pendente"),
+    /** video (vídeo da página da Shopee) ou fotos (reserva). */
+    fonte: text("fonte"),
+    reelUrl: text("reel_url"),
+    capaUrl: text("capa_url"),
+    legenda: text("legenda"),
+    dmTexto: text("dm_texto"),
+    linkId: ref("link_id"),
+    dia: date("dia").notNull(),
+    agendadoPara: timestamp("agendado_para", { withTimezone: true }),
+    mlabsPostId: text("mlabs_post_id"),
+    mlabsFlowId: text("mlabs_flow_id"),
+    erro: text("erro"),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("reels_status").on(t.status, t.dia), index("reels_produto").on(t.produtoId, t.criadoEm)],
 );

@@ -9,3 +9,6 @@ dist/
 deploy/
 coverage/
 .DS_Store
+
+openbot/coletor-video/.perfil-chrome/
+openbot/coletor-video/node_modules/

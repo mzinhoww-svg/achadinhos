@@ -13,6 +13,8 @@ import { criarMarketplaces } from "./coleta/marketplaces.js";
 import { REGRAS_PADRAO, type RegrasOferta } from "./coleta/regras.js";
 import { type Config, lerConfig, opcoesSsl, urlSemSsl } from "./config.js";
 import { OuvinteEventos } from "./ouvinte.js";
+import { agendarReels } from "./reels/job.js";
+import type { DepsReels } from "./reels/servico.js";
 import { semearAdmin } from "./seed.js";
 
 const porta = Number(process.env.PORT || 80);
@@ -85,6 +87,13 @@ const ciclo: DepsCiclo = {
   openrouterKey: config.OPENROUTER_API_KEY,
   openrouterBaseUrl: config.OPENROUTER_BASE_URL,
 };
+const reels: DepsReels = {
+  db,
+  marketplace: marketplaces.principal,
+  armazenamento,
+  baseUrl: config.WORKER_PUBLIC_URL ?? "https://achadinhos-worker.vertraweb.app",
+  painelUrl: config.PAINEL_PUBLIC_URL,
+};
 const app = criarApp({
   db,
   serviceToken: config.SERVICE_TOKEN,
@@ -99,6 +108,7 @@ const app = criarApp({
     publicUrl: config.WORKER_PUBLIC_URL,
   },
   ciclo: { deps: ciclo, webhookToken: config.WA_WEBHOOK_TOKEN },
+  reels,
 });
 
 /** Migrações, admin inicial, LISTEN e fila. Se o banco falhar, tenta de novo sem derrubar o processo. */
@@ -121,6 +131,7 @@ async function prepararBanco(tentativa = 1): Promise<void> {
       modo: config.CICLO_AUTOMATICO,
       log: { info: (m) => app.log.info(m), warn: (o, m) => app.log.warn(o, m) },
     });
+    await agendarReels(boss, reels, { warn: (o, m) => app.log.warn(o, m) });
     if (!gateway)
       app.log.warn("WA_GATEWAY_URL/WA_GATEWAY_TOKEN ausentes: disparo e alertas no WhatsApp desligados");
     if (marketplaces.indisponivel) app.log.warn(marketplaces.indisponivel);

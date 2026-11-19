@@ -376,7 +376,7 @@ describe.skipIf(!URL_TESTE)("ciclo completo com gateway falso", () => {
       ).statusCode,
     ).toBe(401);
     const ag = (await app.inject({ url: "/agentes", headers: H })).json();
-    expect(ag.agentes).toHaveLength(6);
+    expect(ag.agentes).toHaveLength(7);
     expect(ag.mcpUrl).toBe("https://w.test/mcp");
   });
 

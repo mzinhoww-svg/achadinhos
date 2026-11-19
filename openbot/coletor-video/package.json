@@ -1,0 +1,8 @@
+{
+  "name": "achadinhos-coletor-video",
+  "private": true,
+  "type": "module",
+  "description": "Baixa o vídeo oficial da página de cada produto na Shopee e entrega ao worker do Achadinhos (roda no Mac).",
+  "scripts": { "coletar": "node coletar.mjs" },
+  "dependencies": { "playwright": "1.52.0" }
+}

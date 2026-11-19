@@ -284,3 +284,194 @@ export async function gerarReel(e: EntradaReel, binario?: string): Promise<ReelG
     await rm(pasta, { recursive: true, force: true });
   }
 }
+
+// ---------- Reel a partir do VÍDEO REAL da Shopee (coletado da página do produto) ----------
+
+export interface EntradaReelVideo extends Omit<EntradaReel, "fotos"> {
+  video: Buffer;
+  /** Duração máxima do trecho do vídeo original (s). */
+  maxTrechoS?: number;
+}
+
+async function rodar(ffmpeg: string, args: string[]) {
+  return promisify(execFile)(ffmpeg, args, { maxBuffer: 20 * 1024 * 1024, timeout: 240_000 });
+}
+
+/** Lê duração e se há áudio (o ffmpeg-static não traz ffprobe: usa a saída de `ffmpeg -i`). */
+async function sondar(ffmpeg: string, arquivo: string): Promise<{ duracaoS: number; temAudio: boolean }> {
+  const saida = await rodar(ffmpeg, ["-hide_banner", "-i", arquivo]).catch((e: { stderr?: string }) => ({
+    stderr: e.stderr ?? "",
+  }));
+  const txt = String((saida as { stderr?: string }).stderr ?? "");
+  const m = /Duration: (\d+):(\d+):([\d.]+)/.exec(txt);
+  const duracaoS = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+  return { duracaoS, temAudio: /Stream #\d+:\d+.*Audio:/.test(txt) };
+}
+
+function camadaSobreVideo(e: EntradaReel, c: (typeof CORES)[ModeloReel], comGancho: boolean): No {
+  const caixa = (texto: string, tamanho: number, inverso: boolean) =>
+    h(
+      "div",
+      {
+        display: "flex",
+        padding: "20px 34px",
+        borderRadius: 26,
+        backgroundColor: inverso ? c.destaque : "rgba(255,255,255,0.94)",
+        color: inverso ? c.textoDestaque : "#111111",
+        fontSize: tamanho,
+        fontWeight: 800,
+        lineHeight: 1.15,
+        textAlign: "center",
+        justifyContent: "center",
+        maxWidth: 960,
+      },
+      texto,
+    );
+  return h(
+    "div",
+    {
+      width: L,
+      height: A,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "space-between",
+      fontFamily: "Inter",
+    },
+    h(
+      "div",
+      { display: "flex", marginTop: 140 },
+      comGancho ? caixa(e.gancho ?? GANCHO[e.modelo](e), 68, true) : null,
+    ),
+    h(
+      "div",
+      { display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 210 },
+      e.precoAntigo
+        ? h(
+            "div",
+            {
+              display: "flex",
+              fontSize: 44,
+              color: c.texto,
+              opacity: 0.75,
+              textDecoration: "line-through",
+              marginBottom: 8,
+            },
+            `De ${formatarPreco(e.precoAntigo)}`,
+          )
+        : null,
+      caixa(
+        `${formatarPreco(e.preco)}${e.descontoPct ? ` · −${Math.round(e.descontoPct)}%` : ""}`,
+        64,
+        false,
+      ),
+    ),
+  );
+}
+
+/**
+ * Reel com o vídeo oficial do produto: trecho de até 12 s enquadrado em 1080×1920 (sem cortar o produto),
+ * gancho nos primeiros 2,5 s, preço embaixo e o cartão final "Comente PALAVRA" (3,5 s). Mantém o áudio original.
+ */
+export async function gerarReelDeVideo(e: EntradaReelVideo, binario?: string): Promise<ReelGerado> {
+  const c = CORES[e.modelo];
+  const ffmpeg = binario ?? (createRequire(import.meta.url)("ffmpeg-static") as string);
+  const pasta = await mkdtemp(join(tmpdir(), "reelv-"));
+  try {
+    const entrada = join(pasta, "original.mp4");
+    await writeFile(entrada, e.video);
+    const info = await sondar(ffmpeg, entrada);
+    if (!info.duracaoS) throw new Error("não foi possível ler o vídeo");
+    const trecho = Math.min(info.duracaoS, e.maxTrechoS ?? 12);
+    const cartao = 3.5;
+    await writeFile(
+      join(pasta, "gancho.png"),
+      await svgParaPng(camadaSobreVideo({ ...e, fotos: [] }, c, true)),
+    );
+    await writeFile(
+      join(pasta, "preco.png"),
+      await svgParaPng(camadaSobreVideo({ ...e, fotos: [] }, c, false)),
+    );
+    await writeFile(join(pasta, "cta.png"), await svgParaPng(camadaTexto({ ...e, fotos: [] }, c, "cta")));
+    const filtro = [
+      // vídeo original inteiro dentro do quadro vertical, com faixas na cor do modelo
+      `[0:v]trim=0:${trecho},setpts=PTS-STARTPTS,scale=${L}:${A}:force_original_aspect_ratio=decrease,pad=${L}:${A}:(ow-iw)/2:(oh-ih)/2:color=${c.fundo.replace("#", "0x")},fps=${FPS},setsar=1[base]`,
+      `[base][1:v]overlay=0:0:enable='lt(t,2.5)'[g]`,
+      `[g][2:v]overlay=0:0:enable='gte(t,2.5)'[vid]`,
+      `[3:v]scale=${L}:${A},setsar=1,fps=${FPS}[fim]`,
+      info.temAudio
+        ? `[0:a]atrim=0:${trecho},asetpts=PTS-STARTPTS,aresample=44100[a0]`
+        : `[4:a]atrim=0:${trecho}[a0]`,
+      `[4:a]atrim=0:${cartao},asetpts=PTS-STARTPTS[a1]`,
+      `[vid][a0][fim][a1]concat=n=2:v=1:a=1[cv][a]`,
+      `[cv]format=yuv420p[v]`,
+    ].join(";");
+    await rodar(ffmpeg, [
+      "-y",
+      "-loglevel",
+      "error",
+      "-i",
+      entrada,
+      "-i",
+      join(pasta, "gancho.png"),
+      "-i",
+      join(pasta, "preco.png"),
+      "-loop",
+      "1",
+      "-framerate",
+      String(FPS),
+      "-t",
+      String(cartao),
+      "-i",
+      join(pasta, "cta.png"),
+      "-f",
+      "lavfi",
+      "-t",
+      String(trecho + cartao),
+      "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=44100",
+      "-filter_complex",
+      filtro,
+      "-map",
+      "[v]",
+      "-map",
+      "[a]",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "23",
+      "-threads",
+      "2",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-movflags",
+      "+faststart",
+      join(pasta, "reel.mp4"),
+    ]);
+    // capa: um quadro do vídeo com o gancho
+    await rodar(ffmpeg, [
+      "-y",
+      "-loglevel",
+      "error",
+      "-ss",
+      "1",
+      "-i",
+      join(pasta, "reel.mp4"),
+      "-frames:v",
+      "1",
+      join(pasta, "capa.jpg"),
+    ]);
+    return {
+      mp4: await readFile(join(pasta, "reel.mp4")),
+      capa: await readFile(join(pasta, "capa.jpg")),
+      duracaoS: trecho + cartao,
+      modelo: e.modelo,
+    };
+  } finally {
+    await rm(pasta, { recursive: true, force: true });
+  }
+}

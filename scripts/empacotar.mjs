@@ -29,7 +29,7 @@ gravarJson(join(dw, "package.json"), {
   scripts: { start: "node worker.mjs" },
   dependencies: Object.fromEntries(
     Object.entries(ler("packages/arte/package.json").dependencies).filter(([n]) =>
-      ["sharp", "satori", "@resvg/resvg-js"].includes(n),
+      ["sharp", "satori", "@resvg/resvg-js", "ffmpeg-static"].includes(n),
     ),
   ),
 });

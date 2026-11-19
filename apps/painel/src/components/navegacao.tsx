@@ -11,6 +11,7 @@ export const TELAS = [
   { href: "/ofertas", rotulo: "Ofertas" },
   { href: "/checagens", rotulo: "Checagens" },
   { href: "/conferencia", rotulo: "Conferência da arte" },
+  { href: "/reels", rotulo: "Reels" },
   { href: "/nichos", rotulo: "Nichos" },
   { href: "/grupos", rotulo: "Grupos" },
   { href: "/chips", rotulo: "Chips do WhatsApp" },

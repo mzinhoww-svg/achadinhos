@@ -6,7 +6,10 @@
     {
       "nome": "Coordenador",
       "instrucoes": "agentes/coordenador.md",
-      "modelo": { "principal": "anthropic/claude-sonnet-5.5", "reserva": "openai/gpt-4o" },
+      "modelo": {
+        "principal": "anthropic/claude-sonnet-5.5",
+        "reserva": "openai/gpt-4o"
+      },
       "esforco": "medio",
       "ferramentas": [
         "ler_biblia",
@@ -31,13 +34,17 @@
         "metricas",
         "enviar_resumo_whatsapp",
         "registrar_evento",
-        "registrar_custo"
+        "registrar_custo",
+        "listar_reels"
       ]
     },
     {
       "nome": "Garimpeiro",
       "instrucoes": "agentes/garimpeiro.md",
-      "modelo": { "principal": "google/gemini-2.5-flash", "reserva": "openai/gpt-4o-mini" },
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
       "esforco": "baixo",
       "ferramentas": [
         "ler_biblia",
@@ -52,7 +59,10 @@
     {
       "nome": "Monitor",
       "instrucoes": "agentes/monitor.md",
-      "modelo": { "principal": "google/gemini-2.5-flash", "reserva": "openai/gpt-4o-mini" },
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
       "esforco": "baixo",
       "ferramentas": [
         "ler_biblia",
@@ -69,7 +79,10 @@
     {
       "nome": "Diretor de Arte",
       "instrucoes": "agentes/diretor-de-arte.md",
-      "modelo": { "principal": "google/gemini-2.5-flash", "reserva": "openai/gpt-4o-mini" },
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
       "esforco": "baixo",
       "ferramentas": [
         "ler_biblia",
@@ -85,7 +98,10 @@
     {
       "nome": "Copywriter",
       "instrucoes": "agentes/copywriter.md",
-      "modelo": { "principal": "anthropic/claude-sonnet-5.5", "reserva": "openai/gpt-4o-mini" },
+      "modelo": {
+        "principal": "anthropic/claude-sonnet-5.5",
+        "reserva": "openai/gpt-4o-mini"
+      },
       "esforco": "medio",
       "ferramentas": [
         "ler_biblia",
@@ -100,7 +116,10 @@
     {
       "nome": "Disparador",
       "instrucoes": "agentes/disparador.md",
-      "modelo": { "principal": "google/gemini-2.5-flash", "reserva": "openai/gpt-4o-mini" },
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
       "esforco": "baixo",
       "ferramentas": [
         "ler_biblia",
@@ -113,6 +132,29 @@
         "registrar_evento",
         "registrar_custo"
       ]
+    },
+    {
+      "nome": "Diretor de Vídeo",
+      "instrucoes": "agentes/diretor-de-video.md",
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "baixo",
+      "ferramentas": [
+        "registrar_evento",
+        "ler_biblia",
+        "propor_mudanca",
+        "registrar_custo",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "planejar_reels",
+        "listar_reels",
+        "reels_sem_video",
+        "reel_de_fotos",
+        "marcar_reel"
+      ],
+      "mcpExtra": ["mlabs"]
     }
   ],
   "rotinas": [
@@ -163,6 +205,18 @@
       "agente": "Coordenador",
       "quando": "todo dia 21:00",
       "tarefa": "Decida as propostas abertas (listar_propostas, decidir_proposta). Depois rode enviar_resumo_whatsapp com até 3 linhas de observação."
+    },
+    {
+      "nome": "Planejar os Reels do dia",
+      "agente": "Diretor de Vídeo",
+      "quando": "todo dia 06:45",
+      "tarefa": "Rode planejar_reels (40). Depois rode o coletor de vídeo do Mac (openbot/coletor-video) para baixar os vídeos das páginas da Shopee."
+    },
+    {
+      "nome": "Publicar Reels",
+      "agente": "Diretor de Vídeo",
+      "quando": "a cada 30 min, das 07:30 às 21:30",
+      "tarefa": "Para cada Reel com status pronto: agende no mLabs (Reels do Instagram do Achadinhos) no agendadoPara, crie a automação 'Comente e receba um link na DM' com a palavra do Reel e marque com marcar_reel (agendado, ids do mLabs)."
     }
   ]
 }

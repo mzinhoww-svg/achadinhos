@@ -12,7 +12,8 @@ export type Agente =
   | "Monitor"
   | "Diretor de Arte"
   | "Copywriter"
-  | "Disparador";
+  | "Disparador"
+  | "Diretor de Vídeo";
 export const AGENTES: Agente[] = [
   "Coordenador",
   "Garimpeiro",
@@ -20,6 +21,7 @@ export const AGENTES: Agente[] = [
   "Diretor de Arte",
   "Copywriter",
   "Disparador",
+  "Diretor de Vídeo",
 ];
 
 type Esquema = Record<string, unknown>;
@@ -157,7 +159,7 @@ export const FERRAMENTAS: Ferramenta[] = [
     entrada: obj({ status: str("status"), nichoId: int("nicho"), limite: { type: "integer", maximum: 200 } }),
     metodo: "GET",
     rota: "/ofertas",
-    agentes: ["Monitor", "Copywriter", "Diretor de Arte", "Disparador", "Coordenador"],
+    agentes: ["Monitor", "Copywriter", "Diretor de Arte", "Disparador", "Coordenador", "Diretor de Vídeo"],
   },
   {
     nome: "detalhe_oferta",
@@ -165,7 +167,7 @@ export const FERRAMENTAS: Ferramenta[] = [
     entrada: obj({ id: int("id da oferta") }, ["id"]),
     metodo: "GET",
     rota: "/ofertas/{id}",
-    agentes: ["Monitor", "Copywriter", "Diretor de Arte", "Disparador", "Coordenador"],
+    agentes: ["Monitor", "Copywriter", "Diretor de Arte", "Disparador", "Coordenador", "Diretor de Vídeo"],
   },
   // ---------- Diretor de Arte ----------
   {
@@ -227,6 +229,64 @@ export const FERRAMENTAS: Ferramenta[] = [
     rota: "/pausa",
     agentes: ["Disparador", "Coordenador"],
   },
+  // ---------- Diretor de Vídeo (Reels no Instagram via mLabs) ----------
+  {
+    nome: "planejar_reels",
+    descricao:
+      "Escolhe os produtos do dia (até 40), define a palavra-chave e o modelo de cada Reel, os horários (8h às 22h) e o link de afiliado com origem instagram.",
+    entrada: obj({ quantidade: { type: "integer", minimum: 1, maximum: 50 } }),
+    metodo: "POST",
+    rota: "/reels/planejar",
+    agentes: ["Diretor de Vídeo"],
+  },
+  {
+    nome: "listar_reels",
+    descricao:
+      "Reels do dia com status, palavra, horário, URL do vídeo (reelUrl), capa, legenda e o texto da DM (dmTexto).",
+    entrada: obj({
+      dia: str("AAAA-MM-DD"),
+      status: { type: "string", enum: ["video_pendente", "pronto", "agendado", "publicado", "falhou"] },
+    }),
+    metodo: "GET",
+    rota: "/reels",
+    agentes: ["Diretor de Vídeo", "Coordenador"],
+  },
+  {
+    nome: "reels_sem_video",
+    descricao: "Reels que ainda esperam o vídeo da página da Shopee (o coletor do Mac usa esta lista).",
+    entrada: obj({}),
+    metodo: "GET",
+    rota: "/reels/pendentes-video",
+    agentes: ["Diretor de Vídeo"],
+  },
+  {
+    nome: "reel_de_fotos",
+    descricao: "Monta o Reel com as fotos reais quando o produto não tem vídeo na página.",
+    entrada: obj({ id: int("id do reel") }, ["id"]),
+    metodo: "POST",
+    rota: "/reels/{id}/fotos",
+    agentes: ["Diretor de Vídeo"],
+  },
+  {
+    nome: "marcar_reel",
+    descricao:
+      "Registra o resultado no mLabs: agendado (com mlabsPostId e mlabsFlowId da automação de DM), publicado ou falhou.",
+    entrada: obj(
+      {
+        id: int("id do reel"),
+        status: { type: "string", enum: ["agendado", "publicado", "falhou"] },
+        mlabsPostId: str("id do post no mLabs"),
+        mlabsFlowId: str("id da automação Comente e receba"),
+        agendadoPara: str("ISO 8601 com fuso"),
+        erro: str("motivo da falha"),
+      },
+      ["id", "status"],
+    ),
+    metodo: "POST",
+    rota: "/reels/{id}/status",
+    agentes: ["Diretor de Vídeo"],
+  },
+
   // ---------- Coordenador ----------
   {
     nome: "gravar_biblia",
