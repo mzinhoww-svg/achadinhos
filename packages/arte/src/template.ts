@@ -116,7 +116,7 @@ function pastaFontes(): string {
   return achada;
 }
 
-function carregarFontes() {
+export function carregarFontes() {
   if (fontes) return fontes;
   const p = pastaFontes();
   fontes = ([400, 700, 800] as const).map((weight) => ({
