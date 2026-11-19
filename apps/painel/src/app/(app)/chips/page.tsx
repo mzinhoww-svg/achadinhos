@@ -108,7 +108,9 @@ export default async function Chips({ searchParams }: { searchParams: Promise<{ 
                 id="instanceId"
                 name="instanceId"
                 placeholder="ach-1"
-                autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
               />
             </div>

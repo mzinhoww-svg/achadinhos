@@ -38,8 +38,16 @@ async function chamar<T>(caminho: string, init: RequestInit = {}, semSessao = fa
   } catch {
     throw new ErroWorker("O worker não respondeu. Veja se a app worker está no ar na Vertra.", 503);
   }
-  const corpo = (await res.json().catch(() => null)) as (T & { mensagem?: string }) | null;
-  if (!res.ok) throw new ErroWorker(corpo?.mensagem ?? `Worker respondeu HTTP ${res.status}.`, res.status);
+  const corpo = (await res.json().catch(() => null)) as
+    | (T & { mensagem?: string; detalhes?: { campo: string; mensagem: string }[] })
+    | null;
+  if (!res.ok) {
+    const detalhe = corpo?.detalhes?.map((d) => `${d.campo}: ${d.mensagem}`).join("; ");
+    throw new ErroWorker(
+      corpo?.mensagem ?? (detalhe ? `Dados inválidos (${detalhe}).` : `Worker respondeu HTTP ${res.status}.`),
+      res.status,
+    );
+  }
   return corpo as T;
 }
 
