@@ -119,6 +119,10 @@ export async function adicionarNumero(form: FormData) {
     instanceId: apelido(form.get("instanceId")),
     ordem: num(form.get("ordem")) ?? 0,
   };
+  if (!/^[a-z0-9-]{2,32}$/.test(corpo.instanceId))
+    redirect(
+      `/chips?erro=${encodeURIComponent("Apelido inválido: use de 2 a 32 letras minúsculas, números ou hífen (ex.: ach-1).")}`,
+    );
   await agir(
     "numero.adicionado",
     `numero:${corpo.instanceId}`,
