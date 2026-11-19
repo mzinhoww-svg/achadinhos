@@ -31,7 +31,8 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 function acharVideos(obj, achados = new Set(), prof = 0) {
   if (!obj || prof > 12) return achados;
   if (typeof obj === "string") {
-    if (/^https?:\/\/[^\s"]+\.(mp4|m3u8)(\?|$)/i.test(obj) || /vod\.susercontent\.com|cvf\.shopee/i.test(obj)) achados.add(obj);
+    if (/^https?:\/\/[^\s"]+\.(mp4|m3u8)(\?|$)/i.test(obj) || /vod\.susercontent\.com|cvf\.shopee/i.test(obj))
+      achados.add(obj);
     return achados;
   }
   if (Array.isArray(obj)) {
@@ -69,7 +70,8 @@ try {
         const url = res.url();
         const tipo = res.headers()["content-type"] ?? "";
         if (tipo.startsWith("video/mp4")) candidatos.add(url);
-        else if (/\/api\/v4\/(pdp\/get_pc|pdp\/get|item\/get)/.test(url) && tipo.includes("json")) acharVideos(await res.json(), candidatos);
+        else if (/\/api\/v4\/(pdp\/get_pc|pdp\/get|item\/get)/.test(url) && tipo.includes("json"))
+          acharVideos(await res.json(), candidatos);
       } catch {
         /* resposta já descartada */
       }
@@ -78,15 +80,22 @@ try {
       await page.goto(p.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
       for (let i = 0; i < 24 && !candidatos.size; i++) await esperar(500);
       if (!candidatos.size) {
-        const src = await page.evaluate(() => document.querySelector("video")?.currentSrc || "").catch(() => "");
+        const src = await page
+          .evaluate(() => document.querySelector("video")?.currentSrc || "")
+          .catch(() => "");
         if (src && !src.startsWith("blob:")) candidatos.add(src);
       }
       const url = [...candidatos].find((u) => /\.mp4/i.test(u)) ?? [...candidatos][0];
       if (url && !/\.m3u8/i.test(url)) {
         const r = await ctx.request.get(url, { timeout: 60_000 });
         const video = await r.body();
-        if (!r.ok() || video.length < 20_000 || video.length > 80 * 1024 * 1024) throw new Error(`vídeo inválido (${r.status()}, ${video.length} bytes)`);
-        await api(`/reels/${p.id}/video`, { method: "POST", headers: { "content-type": "video/mp4" }, body: video });
+        if (!r.ok() || video.length < 20_000 || video.length > 80 * 1024 * 1024)
+          throw new Error(`vídeo inválido (${r.status()}, ${video.length} bytes)`);
+        await api(`/reels/${p.id}/video`, {
+          method: "POST",
+          headers: { "content-type": "video/mp4" },
+          body: video,
+        });
         resumo.video++;
         console.log(`✓ ${p.palavra}: vídeo enviado (${(video.length / 1048576).toFixed(1)} MB)`);
       } else {
