@@ -1,0 +1,222 @@
+{
+  "$comentario": "Equipe do Achadinhos no OpenBot. Recrie com openbot/RECRIAR.md. Modelos via OpenRouter (confirme os nomes no catálogo do OpenRouter antes de criar).",
+  "worker": "https://achadinhos-worker.vertraweb.app",
+  "mcp": "https://achadinhos-worker.vertraweb.app/mcp",
+  "agentes": [
+    {
+      "nome": "Coordenador",
+      "instrucoes": "agentes/coordenador.md",
+      "modelo": {
+        "principal": "anthropic/claude-sonnet-5.5",
+        "reserva": "openai/gpt-4o"
+      },
+      "esforco": "medio",
+      "ferramentas": [
+        "ler_biblia",
+        "gravar_biblia",
+        "listar_propostas",
+        "decidir_proposta",
+        "propor_mudanca",
+        "listar_numeros",
+        "promover_numero",
+        "ver_pausa",
+        "definir_pausa",
+        "listar_nichos",
+        "salvar_nicho",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "preparar_oferta",
+        "checar_oferta",
+        "oferta_de_ensaio",
+        "listar_pecas",
+        "listar_envios",
+        "resumo_do_dia",
+        "metricas",
+        "enviar_resumo_whatsapp",
+        "registrar_evento",
+        "registrar_custo",
+        "listar_reels"
+      ]
+    },
+    {
+      "nome": "Garimpeiro",
+      "instrucoes": "agentes/garimpeiro.md",
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "baixo",
+      "ferramentas": [
+        "ler_biblia",
+        "listar_nichos",
+        "buscar_produtos",
+        "listar_produtos",
+        "propor_mudanca",
+        "registrar_evento",
+        "registrar_custo"
+      ]
+    },
+    {
+      "nome": "Monitor",
+      "instrucoes": "agentes/monitor.md",
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "baixo",
+      "ferramentas": [
+        "ler_biblia",
+        "rodar_monitor",
+        "historico_precos",
+        "listar_produtos",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "propor_mudanca",
+        "registrar_evento",
+        "registrar_custo"
+      ]
+    },
+    {
+      "nome": "Diretor de Arte",
+      "instrucoes": "agentes/diretor-de-arte.md",
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "baixo",
+      "ferramentas": [
+        "ler_biblia",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "renderizar_peca",
+        "listar_pecas",
+        "propor_mudanca",
+        "registrar_evento",
+        "registrar_custo"
+      ]
+    },
+    {
+      "nome": "Copywriter",
+      "instrucoes": "agentes/copywriter.md",
+      "modelo": {
+        "principal": "anthropic/claude-sonnet-5.5",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "medio",
+      "ferramentas": [
+        "ler_biblia",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "gerar_copy",
+        "propor_mudanca",
+        "registrar_evento",
+        "registrar_custo"
+      ]
+    },
+    {
+      "nome": "Disparador",
+      "instrucoes": "agentes/disparador.md",
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "baixo",
+      "ferramentas": [
+        "ler_biblia",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "agendar_disparo",
+        "listar_envios",
+        "ver_pausa",
+        "propor_mudanca",
+        "registrar_evento",
+        "registrar_custo"
+      ]
+    },
+    {
+      "nome": "Diretor de Vídeo",
+      "instrucoes": "agentes/diretor-de-video.md",
+      "modelo": {
+        "principal": "google/gemini-2.5-flash",
+        "reserva": "openai/gpt-4o-mini"
+      },
+      "esforco": "baixo",
+      "ferramentas": [
+        "registrar_evento",
+        "ler_biblia",
+        "propor_mudanca",
+        "registrar_custo",
+        "listar_ofertas",
+        "detalhe_oferta",
+        "planejar_reels",
+        "listar_reels",
+        "reels_sem_video",
+        "reel_de_fotos",
+        "marcar_reel"
+      ],
+      "mcpExtra": ["mlabs"]
+    }
+  ],
+  "rotinas": [
+    {
+      "nome": "Abrir o dia",
+      "agente": "Coordenador",
+      "quando": "todo dia 06:15",
+      "tarefa": "Leia ROTINA.md e o resumo de ontem (resumo_do_dia, metricas 7 dias). Confira ver_pausa e listar_numeros. Se houver chip caído ou pausa, registre o motivo e não siga."
+    },
+    {
+      "nome": "Coleta da manhã",
+      "agente": "Garimpeiro",
+      "quando": "todo dia 06:30",
+      "tarefa": "Para cada nicho ativo (listar_nichos), rode buscar_produtos. Registre um evento coleta.analisada com quantos produtos novos."
+    },
+    {
+      "nome": "Monitor",
+      "agente": "Monitor",
+      "quando": "a cada 2 h, das 07:00 às 21:00",
+      "tarefa": "Rode rodar_monitor. Para cada oferta candidata nova, registre o porquê ela é oferta real (mediana, desconto)."
+    },
+    {
+      "nome": "Arte e copy antes de cada horário",
+      "agente": "Diretor de Arte",
+      "quando": "07:30, 10:30, 13:30, 16:30, 19:30",
+      "tarefa": "Para as candidatas sem peça (listar_ofertas status=candidata), rode renderizar_peca formato=ambos. Avise o Copywriter quando terminar."
+    },
+    {
+      "nome": "Copy antes de cada horário",
+      "agente": "Copywriter",
+      "quando": "07:40, 10:40, 13:40, 16:40, 19:40",
+      "tarefa": "Para as candidatas com peça e sem copy, rode gerar_copy. Leia TOM-DE-VOZ.md antes."
+    },
+    {
+      "nome": "Checagem antes de cada horário",
+      "agente": "Coordenador",
+      "quando": "07:50, 10:50, 13:50, 16:50, 19:50",
+      "tarefa": "Para as candidatas com peça e copy, rode checar_oferta (aprovada é agendada sozinha). Veja os motivos das reprovadas e, se a mesma regra reprova demais, proponha ajuste."
+    },
+    {
+      "nome": "Disparo",
+      "agente": "Disparador",
+      "quando": "08:00, 11:00, 14:00, 17:00, 20:00",
+      "tarefa": "Confira ver_pausa. Rode agendar_disparo executar=true. Registre quantos saíram e para quais grupos."
+    },
+    {
+      "nome": "Fechar o dia",
+      "agente": "Coordenador",
+      "quando": "todo dia 21:00",
+      "tarefa": "Decida as propostas abertas (listar_propostas, decidir_proposta). Depois rode enviar_resumo_whatsapp com até 3 linhas de observação."
+    },
+    {
+      "nome": "Planejar os Reels do dia",
+      "agente": "Diretor de Vídeo",
+      "quando": "todo dia 06:45",
+      "tarefa": "Rode planejar_reels (40). Depois rode o coletor de vídeo do Mac (openbot/coletor-video) para baixar os vídeos das páginas da Shopee."
+    },
+    {
+      "nome": "Publicar Reels",
+      "agente": "Diretor de Vídeo",
+      "quando": "a cada 30 min, das 07:30 às 21:30",
+      "tarefa": "Para cada Reel com status pronto: agende no mLabs (Reels do Instagram do Achadinhos) no agendadoPara, crie a automação 'Comente e receba um link na DM' com a palavra do Reel e marque com marcar_reel (agendado, ids do mLabs)."
+    }
+  ]
+}

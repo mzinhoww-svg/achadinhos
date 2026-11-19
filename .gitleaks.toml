@@ -1,5 +1,7 @@
-title = "achadinhos"
+# Configuração do gitleaks (roda no CI a cada push, no histórico inteiro).
 [extend]
 useDefault = true
+
 [allowlist]
-paths = ['''\.env\.example$''', '''pnpm-lock\.yaml$''']
+description = "Fixtures de teste do projeto antigo (valores falsos, com 'senha'/'secret' no texto), anteriores ao recomeço."
+commits = ["c83eba15", "3617a04f", "a27e5159", "1ca2db67"]

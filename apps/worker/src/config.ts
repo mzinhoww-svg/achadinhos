@@ -1,129 +1,122 @@
-import { inspect } from "node:util";
+import type { ConnectionOptions } from "node:tls";
 import { z } from "zod";
+import { CA_VERTRA_AGENCIA_DB } from "./ca-vertra.js";
 
-export class ConfigError extends Error {
-  readonly vars: readonly string[];
-  constructor(vars: readonly string[]) {
-    // Só nomes de variáveis: nunca valores (podem ser segredos).
-    super(`configuração inválida: ${vars.join(", ")}`);
-    this.name = "ConfigError";
-    this.vars = vars;
-  }
-}
+const pemBase64 = z
+  .string()
+  .transform((s) => Buffer.from(s.trim(), "base64").toString("utf8"))
+  .refine((s) => s.includes("-----BEGIN "), "não é um PEM em base64")
+  .optional();
 
-/** Valor sensível: não aparece em JSON, inspect nem template string. */
-export class Secret {
-  readonly #value: string;
-  constructor(value: string) {
-    this.#value = value;
-  }
-  reveal(): string {
-    return this.#value;
-  }
-  toJSON(): string {
-    return "[REDACTED]";
-  }
-  toString(): string {
-    return "[REDACTED]";
-  }
-  [inspect.custom](): string {
-    return "[REDACTED]";
-  }
-}
-
-const ms = (def: number, min = 1, max = 3_600_000) =>
-  z
+const esquema = z.object({
+  PORT: z.coerce.number().int().min(1).max(65535).default(80),
+  HOST: z.string().default("0.0.0.0"),
+  DATABASE_URL: z.string().url({ message: "DATABASE_URL ausente ou inválida" }),
+  /**
+   * verify-ca (padrão): TLS conferindo a CA, sem conferir o nome do host (o certificado do Postgres da
+   * Vertra é emitido para "postgres"). verify-full: confere também o nome. no-verify: TLS sem conferir.
+   * off: sem TLS (só para o banco local de testes).
+   */
+  DB_SSL_MODO: z.enum(["verify-ca", "verify-full", "no-verify", "off"]).default("verify-ca"),
+  /** CA, certificado e chave de cliente (mTLS) em PEM codificado em base64, como nas outras apps da Vertra. */
+  DB_SSL_CA_B64: pemBase64,
+  DB_SSL_CERT_B64: pemBase64,
+  DB_SSL_KEY_B64: pemBase64,
+  SERVICE_TOKEN: z.string().min(32, "SERVICE_TOKEN precisa de pelo menos 32 caracteres"),
+  ADMIN_EMAIL: z.string().email().optional(),
+  ADMIN_NOME: z.string().default("Aurimar"),
+  ADMIN_SENHA_INICIAL: z.string().min(8, "ADMIN_SENHA_INICIAL precisa de pelo menos 8 caracteres").optional(),
+  /** Pasta das migrações; no deploy fica ao lado do worker.mjs. */
+  MIGRACOES_DIR: z.string().optional(),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  /** shopee (piloto) ou fake (ensaio e testes, sem a API real). */
+  MARKETPLACE: z.enum(["shopee", "fake"]).default("shopee"),
+  SHOPEE_APP_ID: z.string().regex(/^\d+$/, "SHOPEE_APP_ID tem só dígitos").optional(),
+  SHOPEE_SECRET: z.string().min(8).optional(),
+  /** Só para apontar a um servidor simulado; a validação aceita *.shopee.com.br e loopback. */
+  SHOPEE_ENDPOINT: z.string().url().optional(),
+  /** Chamadas por minuto à Open API (limite real não publicado; 30/min = 1800/h fica abaixo de 2000/h). */
+  SHOPEE_POR_MINUTO: z.coerce.number().int().min(1).max(600).default(30),
+  /** Agenda do Monitor (cron, fuso de São Paulo). Padrão: a cada 2 horas. */
+  MONITOR_CRON: z.string().default("0 */2 * * *"),
+  MONITOR_MAX_DETALHES: z.coerce.number().int().min(0).max(2000).default(100),
+  /** Histórico mínimo para virar oferta. */
+  HISTORICO_MIN_AMOSTRAS: z.coerce.number().int().min(1).max(500).default(4),
+  HISTORICO_MIN_DIAS: z.coerce.number().min(0).max(30).default(3),
+  // Arte (Prompt 3)
+  /** Chave da Vertra com blob:write. Sem ela, as peças ficam no banco e saem por GET /arquivos/... */
+  VERTRA_BLOB_KEY: z.string().min(16).optional(),
+  VERTRA_BLOB_URL: z.string().url().default("https://blob.vertracloud.app/v1"),
+  VERTRA_BLOB_PREFIXO: z
     .string()
-    .regex(/^\d{1,9}$/)
-    .transform(Number)
-    .pipe(z.number().int().min(min).max(max))
-    .default(String(def));
+    .regex(/^[a-z0-9][a-z0-9/_-]*[a-z0-9]$/, "prefixo só com letras minúsculas, números, / _ -")
+    .default("achadinhos/pecas"),
+  /** URL pública do worker, usada nas URLs das peças guardadas no banco. Sem ela, vem do host da requisição. */
+  WORKER_PUBLIC_URL: z.string().url().optional(),
+  ARTE_LIMIAR_CONFIANCA: z.coerce.number().min(0).max(1).default(0.8),
+  // Ciclo (Prompt 5)
+  OPENROUTER_API_KEY: z.string().min(10).optional(),
+  OPENROUTER_BASE_URL: z.string().url().optional(),
+  WA_GATEWAY_URL: z.string().url().optional(),
+  WA_GATEWAY_TOKEN: z.string().min(24).optional(),
+  WA_GATEWAY_POOL: z
+    .string()
+    .regex(/^[a-z0-9-]{2,32}$/)
+    .default("achadinhos"),
+  /** Token que o wa-gateway manda na URL do webhook (?t=). */
+  WA_WEBHOOK_TOKEN: z.string().min(24).optional(),
+  /** Onde fica o /r/:codigo (link curto). */
+  PAINEL_PUBLIC_URL: z.string().url().default("https://achadinhos-painel.vertraweb.app"),
+  /** reserva: o worker prepara as ofertas sozinho quando os agentes ficam 30 min calados; sempre; nunca. */
+  CICLO_AUTOMATICO: z.enum(["reserva", "sempre", "nunca"]).default("reserva"),
+  DISPARO_CRON: z.string().default("* * * * *"),
+});
 
-// `new URL` lança TypeError com o valor na mensagem: nunca deixar escapar.
-function parse(u: string): URL | null {
-  try {
-    return new URL(u);
-  } catch {
-    return null;
-  }
-}
+export type Config = z.infer<typeof esquema>;
 
-const LEASE_MARGIN_MS = 5_000;
+export const VALOR_PENDENTE = "PENDENTE";
 
-const schema = z
-  .object({
-    DATABASE_URL: z
-      .string()
-      .url()
-      .refine((u) => ["postgres:", "postgresql:"].includes(parse(u)?.protocol ?? "")),
-    SHOPEE_ENDPOINT: z
-      .string()
-      .url()
-      .refine((u) => {
-        const x = parse(u);
-        if (!x) return false;
-        const host = x.hostname;
-        const ip = /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.startsWith("[");
-        return x.protocol === "https:" && !x.username && !x.password && !ip && host !== "localhost";
-      })
-      .default("https://open-api.affiliate.shopee.com.br/graphql"),
-    TICK_INTERVAL_MS: ms(60_000, 5_000),
-    CLAIM_LEASE_MS: ms(120_000),
-    EXTERNAL_TIMEOUT_MS: ms(30_000),
-    HEARTBEAT_STALE_MS: ms(180_000),
-    EXECUTOR_POLL_MS: ms(5_000, 1_000, 60_000),
-    WORKER_STALL_ALERT_MS: ms(600_000, 60_000),
-    SHUTDOWN_GRACE_MS: ms(30_000, 1_000, 300_000),
-    ALERT_EMAIL_TO: z.string().email().optional(),
-    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  })
-  .refine((c) => c.EXTERNAL_TIMEOUT_MS + LEASE_MARGIN_MS <= c.CLAIM_LEASE_MS, {
-    path: ["EXTERNAL_TIMEOUT_MS"],
-  })
-  .refine((c) => c.HEARTBEAT_STALE_MS >= 2 * c.TICK_INTERVAL_MS, {
-    path: ["HEARTBEAT_STALE_MS"],
-  })
-  .refine((c) => c.WORKER_STALL_ALERT_MS > c.HEARTBEAT_STALE_MS, {
-    path: ["WORKER_STALL_ALERT_MS"],
-  });
-
-export interface WorkerConfig {
-  readonly databaseUrl: Secret;
-  readonly shopeeEndpoint: string;
-  readonly tickIntervalMs: number;
-  readonly leaseMs: number;
-  readonly externalTimeoutMs: number;
-  readonly heartbeatStaleMs: number;
-  readonly executorPollMs: number;
-  readonly stallAlertMs: number;
-  readonly shutdownGraceMs: number;
-  readonly alertEmailTo: string | undefined;
-  readonly logLevel: "debug" | "info" | "warn" | "error";
-}
-
-export function loadConfig(env: Record<string, string | undefined>): WorkerConfig {
-  let r;
-  try {
-    r = schema.safeParse(env);
-  } catch {
-    throw new ConfigError(["config"]);
-  }
+export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  // "PENDENTE" é o marcador das variáveis criadas na Vertra à espera do valor (ela não aceita vazio).
+  const limpo = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== "" && v !== VALOR_PENDENTE));
+  const r = esquema.safeParse(limpo);
   if (!r.success) {
-    const vars = [...new Set(r.error.issues.map((i) => String(i.path[0] ?? "config")))];
-    throw new ConfigError(vars);
+    // Só o nome da variável e o problema: nunca o valor.
+    const faltas = r.error.issues
+      .map((i) => {
+        const nome = i.path.join(".");
+        return `${nome}: ${limpo[nome] === undefined ? "ausente" : i.message}`;
+      })
+      .join("; ");
+    throw new Error(`Configuração inválida: ${faltas}`);
   }
-  const c = r.data;
-  return Object.freeze({
-    databaseUrl: new Secret(c.DATABASE_URL),
-    shopeeEndpoint: c.SHOPEE_ENDPOINT,
-    tickIntervalMs: c.TICK_INTERVAL_MS,
-    leaseMs: c.CLAIM_LEASE_MS,
-    externalTimeoutMs: c.EXTERNAL_TIMEOUT_MS,
-    heartbeatStaleMs: c.HEARTBEAT_STALE_MS,
-    executorPollMs: c.EXECUTOR_POLL_MS,
-    stallAlertMs: c.WORKER_STALL_ALERT_MS,
-    shutdownGraceMs: c.SHUTDOWN_GRACE_MS,
-    alertEmailTo: c.ALERT_EMAIL_TO,
-    logLevel: c.LOG_LEVEL,
-  });
+  return r.data;
+}
+
+type ConfigSsl = Pick<Config, "DB_SSL_MODO" | "DB_SSL_CA_B64" | "DB_SSL_CERT_B64" | "DB_SSL_KEY_B64">;
+
+export function opcoesSsl(c: ConfigSsl): ConnectionOptions | false {
+  if (c.DB_SSL_MODO === "off") return false;
+  const cliente =
+    c.DB_SSL_CERT_B64 && c.DB_SSL_KEY_B64 ? { cert: c.DB_SSL_CERT_B64, key: c.DB_SSL_KEY_B64 } : {};
+  if (c.DB_SSL_MODO === "no-verify") return { rejectUnauthorized: false, ...cliente };
+  const base: ConnectionOptions = {
+    rejectUnauthorized: true,
+    ...cliente,
+    ca: c.DB_SSL_CA_B64 ?? CA_VERTRA_AGENCIA_DB,
+  };
+  // verify-ca: a cadeia é conferida contra a CA, o nome do host não.
+  return c.DB_SSL_MODO === "verify-ca" ? { ...base, checkServerIdentity: () => undefined } : base;
+}
+
+/**
+ * Tira da URL os parâmetros de TLS (sslmode, sslrootcert...). No `pg`, eles sobrescrevem a opção `ssl`
+ * passada no código; aqui quem manda é DB_SSL_MODO.
+ */
+export function urlSemSsl(url: string): string {
+  const u = new URL(url);
+  for (const p of ["sslmode", "ssl", "sslcert", "sslkey", "sslrootcert", "sslpassword", "uselibpqcompat"]) {
+    u.searchParams.delete(p);
+  }
+  return u.toString();
 }

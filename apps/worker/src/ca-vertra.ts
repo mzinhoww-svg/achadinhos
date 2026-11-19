@@ -1,0 +1,24 @@
+/**
+ * CA pública do Postgres da Vertra (agencia-db), "VertraCloud CA", válida até 10/11/2036.
+ * Não é segredo: é o certificado que confere o servidor. Usada quando DB_SSL_CA_B64 não é definida.
+ * Conferida com `openssl verify` (autoassinada). Se a Vertra trocar a CA, defina DB_SSL_CA_B64.
+ */
+export const CA_VERTRA_AGENCIA_DB = `-----BEGIN CERTIFICATE-----
+MIIDAjCCAeqgAwIBAgIUO/8+KUJ/TkTqL4mup69UUriO4EkwDQYJKoZIhvcNAQEL
+BQAwGTEXMBUGA1UEAwwOVmVydHJhQ2xvdWQgQ0EwHhcNMjYxMTEzMDMxNjU2WhcN
+MzYxMTEwMDMxNjU2WjAZMRcwFQYDVQQDDA5WZXJ0cmFDbG91ZCBDQTCCASIwDQYJ
+KoZIhvcNAQEBBQADggEPADCCAQoCggEBAKdy+I3ruMnjJ+R4oospydH4edWpqdDS
+5U2/96ozR3nWF0mR3V0kFENs+fX7i4JNIr9SWZT4/ufURwESMxcANLlRAEj4M8kJ
+mIzOpz+hGLgZiJkIlwjHky9X7oZphoJT/Tumd1xwlrBj4A1HVY8adZESadVtzUJS
+j3gg8DVexIV1NQXdylZYuhl7sOfMZ7BuO1wSCKhF/6gBcL5oy86wg7eJ4cOaLzsy
+xog5CiS8ei2hoSf20BDnMXL/glrtGwMQHf2v4fAPlbE8PrPv0DxCnyXhYlZyneM5
+wjOd0ye67xKtmWVKq+RZ3i3GQwfS5TzJWXT5OOVHvq+l4OHvMlgp6BUCAwEAAaNC
+MEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFEKK
+jICshlzcM2c+RWgg0oI1cOFvMA0GCSqGSIb3DQEBCwUAA4IBAQAD1LFbtTDka/TJ
+hOvt6lwljemhauyOC2m7feutacIJywdU8LTapAN+3tOzF//WznlaZnVxrFyFiNE6
+Cg1vTvsYES5jGlNpxLciuBlC+qtJVX0NOTh8Os2iTUpLuXn3y60GqeDDXiRP1qXL
+DmOc2CjtqKbdY9z57yg0J4fqUg57JM82G6Bv5gnsaSM6w+JSF+noH1N09ovKE6Ks
+5wXX8qQiztuOEU9cpig7p3oADiPmOyX4DDTHO23tY1Qt0gO6iT2bTeD6yFgpsX2p
+arFcIpy9WL9of3OGAx9OWze3Fa3I5H8rX1EdFyf0E4BFZDTpQxMVm2R+ARFG7hfe
+F6z/ZFwc
+-----END CERTIFICATE-----`;
