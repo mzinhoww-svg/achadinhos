@@ -101,6 +101,12 @@ export class Gateway {
   ) {
     return this.chamar<{ ok: true }>("PUT", this.p(`/grupos/${encodeURIComponent(jid)}`), g);
   }
+  gruposDoWhatsapp() {
+    return this.chamar<{ grupos: { jid: string; nome: string; participantes: number; souAdmin: boolean }[] }>(
+      "GET",
+      this.p("/grupos-whatsapp"),
+    );
+  }
   convite(jid: string) {
     return this.chamar<{ convite: string }>("GET", this.p(`/grupos/${encodeURIComponent(jid)}/convite`));
   }

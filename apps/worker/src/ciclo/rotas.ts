@@ -270,6 +270,9 @@ export function rotasCiclo(app: FastifyInstance, d: DepsCiclo, webhookToken: str
     return gateway().configurarPool(b.adminPhones);
   });
 
+  /** Grupos do WhatsApp em que o chip ativo está (o painel cadastra sem digitar o JID). */
+  app.get("/whatsapp/grupos", async () => gateway().gruposDoWhatsapp());
+
   app.get("/grupos/:id/convite", async (req) => {
     const { id } = idParam.parse(req.params);
     const [g] = await db.select().from(t.grupos).where(eq(t.grupos.id, id));

@@ -84,6 +84,12 @@ export default async function Grupos({ searchParams }: { searchParams: Promise<{
     worker.get<{ grupos: Grupo[] }>("/grupos"),
     worker.get<{ nichos: Nicho[] }>("/nichos"),
   ]);
+  const doWhatsapp = await worker
+    .get<{ grupos: { jid: string; nome: string; participantes: number; souAdmin: boolean }[] }>(
+      "/whatsapp/grupos",
+    )
+    .then((r) => r.grupos)
+    .catch(() => null);
   const convites = await Promise.all(
     grupos.map((g) =>
       g.waJid
@@ -172,6 +178,53 @@ export default async function Grupos({ searchParams }: { searchParams: Promise<{
           ) : null}
         </Card>
       ))}
+      <Card className="flex flex-col gap-3 p-5">
+        <h2 className="font-semibold">Grupos do WhatsApp do chip ativo</h2>
+        <p className="text-sm text-muted-foreground">
+          Crie o grupo no WhatsApp, adicione o chip e deixe-o como admin. Depois atualize esta página e toque
+          em cadastrar.
+        </p>
+        {doWhatsapp === null ? (
+          <p className="text-sm text-muted-foreground">Sem chip ativo conectado no momento.</p>
+        ) : doWhatsapp.length === 0 ? (
+          <p className="text-sm text-muted-foreground">O chip ativo ainda não está em nenhum grupo.</p>
+        ) : (
+          <ul className="flex flex-col divide-y">
+            {doWhatsapp.map((w) => {
+              const ja = grupos.find((g) => g.waJid === w.jid);
+              return (
+                <li key={w.jid} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                  <span>
+                    <span className="font-medium">{w.nome || "(sem nome)"}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {w.participantes} participantes · {w.souAdmin ? "chip é admin" : "chip NÃO é admin"}
+                    </span>
+                  </span>
+                  {ja ? (
+                    <Badge variant="secondary">cadastrado como {ja.nome}</Badge>
+                  ) : (
+                    <form action={salvarGrupo}>
+                      <input type="hidden" name="nome" value={w.nome || "Grupo de teste"} />
+                      <input type="hidden" name="waJid" value={w.jid} />
+                      <input type="hidden" name="teste" value="on" />
+                      <input type="hidden" name="ativo" value="on" />
+                      {nichos
+                        .filter((n) => n.ativo)
+                        .map((n) => (
+                          <input key={n.id} type="hidden" name="nichoIds" value={n.id} />
+                        ))}
+                      <Button type="submit" size="sm" variant={w.souAdmin ? "default" : "outline"}>
+                        Cadastrar como grupo de teste
+                      </Button>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
       <Card className="flex flex-col gap-3 p-5">
         <h2 className="font-semibold">Novo grupo</h2>
         <Formulario nichos={nichos} />
