@@ -35,7 +35,11 @@ export interface EntradaReel {
 
 const L = 1080;
 const A = 1920;
+/** Saída em 720×1280: o Instagram aceita e o ffmpeg cabe na memória do worker (as artes são desenhadas em 1080). */
+const SL = 720;
+const SA = 1280;
 const FPS = 30;
+const X264 = ["-x264-params", "rc-lookahead=10:ref=2:bframes=1"];
 
 const CORES: Record<
   ModeloReel,
@@ -252,8 +256,8 @@ export async function gerarReel(e: EntradaReel, binario?: string): Promise<ReelG
     const filtros = cenas.map((cena, i) => {
       const quadros = Math.round(cena.dur * FPS);
       return cena.zoom
-        ? `[${i}:v]scale=${L * 2}:${A * 2},zoompan=z='min(zoom+0.0009,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${quadros}:s=${L}x${A}:fps=${FPS},setsar=1[v${i}]`
-        : `[${i}:v]scale=${L}:${A},setsar=1,fps=${FPS}[v${i}]`;
+        ? `[${i}:v]scale=${SL}:${SA},zoompan=z='min(zoom+0.0009,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${quadros}:s=${SL}x${SA}:fps=${FPS},setsar=1[v${i}]`
+        : `[${i}:v]scale=${SL}:${SA},setsar=1,fps=${FPS}[v${i}]`;
     });
     const total = cenas.reduce((a, x) => a + x.dur, 0);
     args.push(
@@ -268,7 +272,8 @@ export async function gerarReel(e: EntradaReel, binario?: string): Promise<ReelG
       "-crf",
       "23",
       "-threads",
-      "2",
+      "1",
+      ...X264,
       "-movflags",
       "+faststart",
       "-t",
@@ -395,10 +400,12 @@ export async function gerarReelDeVideo(e: EntradaReelVideo, binario?: string): P
     await writeFile(join(pasta, "cta.png"), await svgParaPng(camadaTexto({ ...e, fotos: [] }, c, "cta")));
     const filtro = [
       // vídeo original inteiro dentro do quadro vertical, com faixas na cor do modelo
-      `[0:v]trim=0:${trecho},setpts=PTS-STARTPTS,scale=${L}:${A}:force_original_aspect_ratio=decrease,pad=${L}:${A}:(ow-iw)/2:(oh-ih)/2:color=${c.fundo.replace("#", "0x")},fps=${FPS},setsar=1[base]`,
-      `[base][1:v]overlay=0:0:enable='lt(t,2.5)'[g]`,
-      `[g][2:v]overlay=0:0:enable='gte(t,2.5)'[vid]`,
-      `[3:v]scale=${L}:${A},setsar=1,fps=${FPS}[fim]`,
+      `[0:v]trim=0:${trecho},setpts=PTS-STARTPTS,scale=${SL}:${SA}:force_original_aspect_ratio=decrease,pad=${SL}:${SA}:(ow-iw)/2:(oh-ih)/2:color=${c.fundo.replace("#", "0x")},fps=${FPS},setsar=1[base]`,
+      `[1:v]scale=${SL}:${SA}[o1]`,
+      `[2:v]scale=${SL}:${SA}[o2]`,
+      `[base][o1]overlay=0:0:enable='lt(t,2.5)'[g]`,
+      `[g][o2]overlay=0:0:enable='gte(t,2.5)'[vid]`,
+      `[3:v]scale=${SL}:${SA},setsar=1,fps=${FPS}[fim]`,
       info.temAudio
         ? `[0:a]atrim=0:${trecho},asetpts=PTS-STARTPTS,aresample=44100[a0]`
         : `[4:a]atrim=0:${trecho}[a0]`,
@@ -443,7 +450,8 @@ export async function gerarReelDeVideo(e: EntradaReelVideo, binario?: string): P
       "-crf",
       "23",
       "-threads",
-      "2",
+      "1",
+      ...X264,
       "-c:a",
       "aac",
       "-b:a",
