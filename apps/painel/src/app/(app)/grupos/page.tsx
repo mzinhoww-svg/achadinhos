@@ -1,3 +1,4 @@
+import { AvisoErro } from "@/components/aviso-erro";
 import { Cabecalho } from "@/components/cabecalho";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,8 @@ function Formulario({ g, nichos }: { g?: Grupo; nichos: Nicho[] }) {
   );
 }
 
-export default async function Grupos() {
+export default async function Grupos({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
+  const { erro } = await searchParams;
   const [{ grupos }, { nichos }] = await Promise.all([
     worker.get<{ grupos: Grupo[] }>("/grupos"),
     worker.get<{ nichos: Nicho[] }>("/nichos"),
@@ -95,6 +97,7 @@ export default async function Grupos() {
   return (
     <div className="flex flex-col gap-5">
       <Cabecalho titulo="Grupos" descricao="Para onde as ofertas vão, quando e com que limite." />
+      <AvisoErro erro={erro} />
       {grupos.map((g, i) => (
         <Card key={g.id} className="flex flex-col gap-3 p-5">
           <div className="flex flex-wrap items-center gap-2">

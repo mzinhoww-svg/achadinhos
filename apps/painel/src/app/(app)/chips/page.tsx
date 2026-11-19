@@ -1,3 +1,4 @@
+import { AvisoErro } from "@/components/aviso-erro";
 import { Cabecalho } from "@/components/cabecalho";
 import { StatusDot } from "@/components/status-dot";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,8 @@ import { LinkPareamento } from "./pareamento";
 
 export const dynamic = "force-dynamic";
 
-export default async function Chips() {
+export default async function Chips({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
+  const { erro } = await searchParams;
   const r = await worker
     .get<{ numeros: NumeroGateway[] }>("/numeros")
     .catch((e: Error) => ({ erro: e.message }));
@@ -23,6 +25,7 @@ export default async function Chips() {
         titulo="Chips do WhatsApp"
         descricao="O número ativo e os reservas. O failover troca sozinho e avisa você."
       />
+      <AvisoErro erro={erro} />
       {"erro" in r ? (
         <Card className="p-5 text-sm text-muted-foreground">wa-gateway: {r.erro}</Card>
       ) : (
@@ -105,7 +108,7 @@ export default async function Chips() {
                 id="instanceId"
                 name="instanceId"
                 placeholder="ach-1"
-                pattern="[a-z0-9-]{2,32}"
+                autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 required
               />
             </div>

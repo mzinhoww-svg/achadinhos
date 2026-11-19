@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { exigirSessao } from "@/lib/auth";
 import { worker } from "@/lib/worker";
 
@@ -13,10 +14,28 @@ async function agir<T>(
   caminho: string,
 ) {
   const s = await exigirSessao();
-  const r = await fazer();
+  let erro: string | null = null;
+  try {
+    await fazer();
+  } catch (e) {
+    // Falha vira aviso na própria tela (?erro=), não a página de erro.
+    erro = (e as Error).message || "não foi possível concluir";
+  }
+  if (erro) redirect(`${caminho}?erro=${encodeURIComponent(erro.slice(0, 200))}`);
   await worker.post("/auditoria", { ator: `${s.nome} (painel)`, acao, alvo, detalhes }).catch(() => {});
   revalidatePath(caminho);
-  return r;
+  redirect(caminho);
+}
+
+/** Apelido de chip: minúsculas, sem acento, espaços viram hífen (o celular costuma pôr maiúscula). */
+function apelido(v: FormDataEntryValue | null) {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
 }
 
 const num = (v: FormDataEntryValue | null) =>
@@ -97,7 +116,7 @@ export async function criarEntrada(form: FormData) {
 
 export async function adicionarNumero(form: FormData) {
   const corpo = {
-    instanceId: String(form.get("instanceId") ?? "").trim(),
+    instanceId: apelido(form.get("instanceId")),
     ordem: num(form.get("ordem")) ?? 0,
   };
   await agir(

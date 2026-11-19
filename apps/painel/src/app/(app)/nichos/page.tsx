@@ -1,3 +1,4 @@
+import { AvisoErro } from "@/components/aviso-erro";
 import { Cabecalho } from "@/components/cabecalho";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,8 @@ function Formulario({ n }: { n?: Nicho }) {
   );
 }
 
-export default async function Nichos() {
+export default async function Nichos({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
+  const { erro } = await searchParams;
   const [{ nichos }, { grupos }] = await Promise.all([
     worker.get<{ nichos: Nicho[] }>("/nichos"),
     worker.get<{ grupos: Grupo[] }>("/grupos"),
@@ -101,6 +103,7 @@ export default async function Nichos() {
         titulo="Nichos"
         descricao="O que o Garimpeiro procura e a régua de oferta real de cada nicho."
       />
+      <AvisoErro erro={erro} />
       {nichos.map((n) => {
         const destinos = grupos.filter((g) => g.nichoIds.includes(n.id));
         return (
